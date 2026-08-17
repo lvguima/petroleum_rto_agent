@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_version": "open-loop-feed-step-v0.1.0",
+  "config_version": "cdu-mini-config-0.1.0",
+  "case_version": "case-20260604-v0.1.0",
+  "model_version": "cdu-reduced-0.1.0",
+  "parameter_set_version": "cdu-parameters-0.1.0",
+  "name": "open_loop_fresh_feed_plus_5_percent",
+  "duration": {
+    "value": 2.0,
+    "unit": "h"
+  },
+  "time_step": {
+    "value": 1.0,
+    "unit": "s"
+  },
+  "events": [
+    {
+      "time": {
+        "value": 10.0,
+        "unit": "min"
+      },
+      "target": "fresh_feed_flow_kg_s",
+      "value": 118.79583333333335
+    }
+  ],
+  "metadata": {
+    "synthetic": "true",
+    "purpose": "M3 open-loop inventory accumulation and material-balance verification",
+    "command_basis": "5 percent above case-20260604-v0.1.0 fresh crude flow"
+  }
+}

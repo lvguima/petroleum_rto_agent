@@ -1,0 +1,76 @@
+{
+  "schema_version": "1.0.0",
+  "parameter_set_version": "cdu-parameters-0.1.0",
+  "components": {
+    "light_ends": {
+      "normal_boiling_point_k": 300.0,
+      "molecular_weight_kg_mol": 0.058,
+      "liquid_density_kg_m3": 560.0,
+      "cp_liquid_j_kg_k": 2350.0,
+      "cp_vapor_j_kg_k": 1750.0,
+      "latent_heat_j_kg": 350000.0,
+      "source": "reduced_model_initial_assumption",
+      "confidence": "low"
+    },
+    "naphtha": {
+      "normal_boiling_point_k": 385.0,
+      "molecular_weight_kg_mol": 0.1,
+      "liquid_density_kg_m3": 720.0,
+      "cp_liquid_j_kg_k": 2250.0,
+      "cp_vapor_j_kg_k": 1850.0,
+      "latent_heat_j_kg": 320000.0,
+      "source": "reduced_model_initial_assumption",
+      "confidence": "low"
+    },
+    "kerosene": {
+      "normal_boiling_point_k": 493.0,
+      "molecular_weight_kg_mol": 0.16,
+      "liquid_density_kg_m3": 800.0,
+      "cp_liquid_j_kg_k": 2150.0,
+      "cp_vapor_j_kg_k": 1950.0,
+      "latent_heat_j_kg": 285000.0,
+      "source": "reduced_model_initial_assumption",
+      "confidence": "low"
+    },
+    "light_diesel": {
+      "normal_boiling_point_k": 553.0,
+      "molecular_weight_kg_mol": 0.21,
+      "liquid_density_kg_m3": 830.0,
+      "cp_liquid_j_kg_k": 2100.0,
+      "cp_vapor_j_kg_k": 2000.0,
+      "latent_heat_j_kg": 260000.0,
+      "source": "reduced_model_initial_assumption",
+      "confidence": "low"
+    },
+    "heavy_diesel": {
+      "normal_boiling_point_k": 610.0,
+      "molecular_weight_kg_mol": 0.27,
+      "liquid_density_kg_m3": 860.0,
+      "cp_liquid_j_kg_k": 2050.0,
+      "cp_vapor_j_kg_k": 2050.0,
+      "latent_heat_j_kg": 235000.0,
+      "source": "reduced_model_initial_assumption",
+      "confidence": "low"
+    },
+    "residue": {
+      "normal_boiling_point_k": 700.0,
+      "molecular_weight_kg_mol": 0.45,
+      "liquid_density_kg_m3": 930.0,
+      "cp_liquid_j_kg_k": 1950.0,
+      "cp_vapor_j_kg_k": 2100.0,
+      "latent_heat_j_kg": 200000.0,
+      "source": "reduced_model_heavy_end_assumption",
+      "confidence": "low"
+    },
+    "water": {
+      "normal_boiling_point_k": 373.15,
+      "molecular_weight_kg_mol": 0.018015,
+      "liquid_density_kg_m3": 998.2,
+      "cp_liquid_j_kg_k": 4180.0,
+      "cp_vapor_j_kg_k": 2010.0,
+      "latent_heat_j_kg": 2257000.0,
+      "source": "standard_water_property_initial_value",
+      "confidence": "medium"
+    }
+  }
+}

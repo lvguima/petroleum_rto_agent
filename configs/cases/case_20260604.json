@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0.0",
+  "case_version": "case-20260604-v0.1.0",
+  "model_version": "cdu-reduced-0.1.0",
+  "parameter_set_version": "cdu-parameters-0.1.0",
+  "name": "case_20260604",
+  "feed": {
+    "name": "fresh_crude",
+    "mass_flow": {
+      "value": 407.3,
+      "unit": "t/h"
+    },
+    "temperature": {
+      "value": 35.0,
+      "unit": "degC"
+    },
+    "pressure": {
+      "value": 0.3,
+      "unit": "MPa",
+      "basis": "gauge"
+    },
+    "mass_fractions": {
+      "light_ends": 0.003,
+      "naphtha": 0.1559,
+      "kerosene": 0.0781,
+      "light_diesel": 0.0546,
+      "heavy_diesel": 0.2023,
+      "residue": 0.5051,
+      "water": 0.001
+    },
+    "salt_mass_flow": {
+      "value": 0.0052,
+      "unit": "kg/s"
+    },
+    "metadata": {
+      "source": "DCS screenshot plus weakly aligned laboratory data",
+      "confidence": "low",
+      "synthetic_composition": "true"
+    }
+  },
+  "operating_conditions": {
+    "flash_temperature_k": {
+      "value": 220.0,
+      "unit": "degC"
+    },
+    "flash_pressure_pa": {
+      "value": 0.08,
+      "unit": "MPa",
+      "basis": "gauge"
+    },
+    "furnace_outlet_temperature_k": {
+      "value": 355.2,
+      "unit": "degC"
+    },
+    "tower_top_temperature_k": {
+      "value": 113.5,
+      "unit": "degC"
+    },
+    "tower_top_pressure_pa": {
+      "value": 0.051,
+      "unit": "MPa",
+      "basis": "gauge"
+    },
+    "condenser_temperature_k": {
+      "value": 40.0,
+      "unit": "degC"
+    },
+    "ambient_temperature_k": {
+      "value": 25.0,
+      "unit": "degC"
+    }
+  },
+  "observations": {
+    "basis": "weak_time_alignment",
+    "dcs_time": "2026-06-04T09:16:00+08:00",
+    "product_mass_flows_t_h": {
+      "gasoline": 63.5,
+      "kerosene": 31.79,
+      "light_diesel": 22.25,
+      "heavy_diesel": 82.41,
+      "residue": 203.72
+    },
+    "notes": [
+      "DCS values were read manually from screenshots",
+      "Feed pseudo-composition is an initial modeling assumption",
+      "Laboratory values are not exactly time aligned"
+    ]
+  },
+  "metadata": {
+    "synthetic": "false",
+    "purpose": "initial model-throughput case",
+    "precision_claim": "none",
+    "pressure_basis_assumption": "DCS pressure readings treated as gauge and converted using 101325 Pa atmosphere"
+  }
+}
