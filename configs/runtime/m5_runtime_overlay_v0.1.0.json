@@ -1,0 +1,76 @@
+{
+  "artifact_type": "M5_runtime_overlay",
+  "schema_version": "1.0.0",
+  "overlay_version": "m5-case-20260604-runtime-overlay-v0.1.0",
+  "claim_scope": "case_alignment_only",
+  "versions": {
+    "base_model_config_version": "cdu-mini-config-0.1.0",
+    "model_version": "cdu-reduced-0.1.0",
+    "base_parameter_set_version": "cdu-parameters-0.1.0",
+    "derived_parameter_set_version": "cdu-parameters-m5-case20260604-v0.1.0",
+    "base_case_version": "case-20260604-v0.1.0",
+    "derived_case_version": "case-20260604-m5-aligned-v0.1.0"
+  },
+  "source_evidence": {
+    "manifest": {
+      "path": "reports/modeling/M5_case_20260604_artifact_manifest_v0.1.0.json",
+      "sha256": "948f400bf265855aa7a3c928307f6486660f12cbbada6f031c52544ed71e562b",
+      "artifact_fingerprint": "01c9cd02442e62da12f7263ce881dc566fdb25a721b0174ee4955544c5b124b1"
+    },
+    "artifacts": {
+      "reconciled_case": {
+        "path": "data/gold/case_20260604_reconciled_v0.1.0.json",
+        "sha256": "ab3f4e60c88b4f11d450ca7bcf0dd32c0860ba7e866eace17f0eca35a58bf2e5"
+      },
+      "calibrated_parameters": {
+        "path": "configs/parameters/cdu_parameters_m5_case20260604_v0.1.0.json",
+        "sha256": "d837f32c321c5ba7d5fbe82828b0d4b5112c926b57c01460866c93fdef66f816",
+        "artifact_fingerprint": "2b0309ca3142bdd9a7d5e641df723e40238f7537b394c1d86b08b7a1b6cdbeda"
+      },
+      "report_json": {
+        "path": "reports/modeling/M5_case_20260604_calibration_v0.1.0.json",
+        "sha256": "e730080b10396a25d292c0e0c220984f8c0cd5416e6f7e1d3f6a471e1565fcd2"
+      },
+      "report_markdown": {
+        "path": "reports/modeling/M5_case_20260604_calibration_v0.1.0.md",
+        "sha256": "1ae81105c8adcc59bb7008e1969031ab276aaabe3a4eaa63a9e8a061febb7484"
+      }
+    },
+    "pipeline_result_fingerprint": "9e7bbda6a4f534008d847c49a42b2ee6526fb7132a5ca5db52a112ccf56941b7",
+    "calibrated_model_object_fingerprint": "49c04b222ab817ca2b27922171c832d562adcd55e80cda480c94b3142e0d2473",
+    "effective_case_object_fingerprint": "6687e0637c0cfbef46f6020b52751058325363f2e175ced59b3ba4469658585e",
+    "component_catalog_object_fingerprint": "e4d719fb1e0dbd71f5465644fbd051494661c480bd06a22c467a5c66410c81ec",
+    "analysis_basis_fingerprint": "4c12146b6fb14cb033b0e05f64e68093f28087482f55128aed5aa56c37dfffed"
+  },
+  "case_operating_overrides": {
+    "flash_temperature_k": {
+      "baseline": 493.15,
+      "effective": 473.75,
+      "classification": "case_input_weak_time_alignment"
+    },
+    "wash_water_ratio": {
+      "baseline": 0.04,
+      "effective": 0.04654072620215898,
+      "classification": "case_input_weak_time_alignment"
+    }
+  },
+  "calibrated_parameter_overrides": {
+    "column.cut_points_k[2]": {
+      "baseline": 583.15,
+      "effective": 571.7046875,
+      "classification": "M5_calibrated_parameter"
+    },
+    "column.cut_points_k[3]": {
+      "baseline": 638.15,
+      "effective": 647.9546875,
+      "classification": "M5_calibrated_parameter"
+    }
+  },
+  "metadata": {
+    "purpose": "portable runtime reconstruction of the accepted M5 effective basis",
+    "source_basis": "frozen_M5_formal_artifact_suite",
+    "precision_claim": "none",
+    "prohibited_claim": "not_field_dynamic_validation"
+  },
+  "overlay_fingerprint": "e2a9cc48aba81fb05ba96ceb930821a99412935d4ad3bfdbba6681df825d79d6"
+}

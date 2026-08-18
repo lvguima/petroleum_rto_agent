@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_version": "closed-loop-feed-step-v0.1.0",
+  "control_version": "cdu-pi-control-0.1.0",
+  "config_version": "cdu-mini-config-0.1.0",
+  "case_version": "case-20260604-v0.1.0",
+  "model_version": "cdu-reduced-0.1.0",
+  "parameter_set_version": "cdu-parameters-0.1.0",
+  "name": "closed_loop_fresh_feed_setpoint_plus_5_percent",
+  "duration": {
+    "value": 2.0,
+    "unit": "h"
+  },
+  "time_step": {
+    "value": 1.0,
+    "unit": "s"
+  },
+  "events": [
+    {
+      "time": {
+        "value": 10.0,
+        "unit": "min"
+      },
+      "target": "feed_flow.setpoint_ratio",
+      "value": 1.05
+    }
+  ],
+  "metadata": {
+    "synthetic": "true",
+    "purpose": "M4 baseline hold followed by 5 percent fresh-feed setpoint recovery",
+    "setpoint_basis": "ratio relative to the M3 nominal fresh-feed measurement"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0.0",
+  "calibration_version": "m5-case-20260604-calibration-v0.1.0",
+  "model_version": "cdu-reduced-0.1.0",
+  "base_parameter_set_version": "cdu-parameters-0.1.0",
+  "calibrated_parameter_set_version": "cdu-parameters-m5-case20260604-v0.1.0",
+  "case_version": "case-20260604-v0.1.0",
+  "name": "M5 case_20260604 two-cut-point calibration",
+  "data_reference": {
+    "reconciliation_version": "m5-case-20260604-reconciliation-v0.1.0",
+    "path": "data/gold/case_20260604_reconciled_v0.1.0.json",
+    "target_basis": "reconciled_net_boundary_flows",
+    "target_unit": "kg/s"
+  },
+  "parameters": [
+    {
+      "path": "column.cut_points_k[2]",
+      "lower_bound_k": 568.15,
+      "upper_bound_k": 598.15,
+      "prior_k": 583.15,
+      "prior_scale_k": 10.0
+    },
+    {
+      "path": "column.cut_points_k[3]",
+      "lower_bound_k": 623.15,
+      "upper_bound_k": 653.15,
+      "prior_k": 638.15,
+      "prior_scale_k": 10.0
+    }
+  ],
+  "targets": [
+    {
+      "product": "light_diesel",
+      "scale_kg_s": 0.5555555555555556
+    },
+    {
+      "product": "heavy_diesel",
+      "scale_kg_s": 0.5555555555555556
+    },
+    {
+      "product": "residue",
+      "scale_kg_s": 0.8333333333333334
+    }
+  ],
+  "regularization_weight": 1.0,
+  "optimizer": {
+    "initial_step_k": 5.0,
+    "minimum_step_k": 0.01,
+    "step_reduction": 0.5,
+    "maximum_iterations": 100,
+    "objective_improvement_tolerance": 1e-12
+  },
+  "sensitivity": {
+    "central_step_k": 1.0,
+    "absolute_rank_tolerance": 1e-10,
+    "relative_rank_tolerance": 1e-8
+  },
+  "metadata": {
+    "purpose": "fit reconciled M5 net product flows with the smallest identifiable parameter subset",
+    "confidence": "low",
+    "claim_scope": "case_alignment_only",
+    "target_scale_basis": "engineering residual scales: 2 t/h for both diesel cuts and 3 t/h for residue; not fitted uncertainty estimates"
+  }
+}

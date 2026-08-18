@@ -1,0 +1,35 @@
+{
+  "artifact_type": "M6_validation_artifact_suite_manifest",
+  "artifacts": {
+    "report_json": {
+      "bytes": 770793,
+      "path": "reports/modeling/m6_validation_report_v0.1.0.json",
+      "sha256": "cb5678451613b8c92edef3ccccad360c0c89311606cd2a5aaaff891894ed150a"
+    },
+    "report_markdown": {
+      "bytes": 8375,
+      "path": "reports/modeling/M6_VALIDATION_REPORT.md",
+      "sha256": "aeecc00f1e94f4b2b2b14ad6ea66a24ccc609ffb361f2f85aff4888ca5ba1dc3"
+    },
+    "validation_evidence": {
+      "bytes": 774892,
+      "path": "data/gold/m6_validation_evidence_v0.1.0.json",
+      "sha256": "e27624ff14a294d20e8bd3446ee2aaf0f95b8cf0d4623c939e5798153f146e96"
+    }
+  },
+  "claim_scope": "engineering_validation_only",
+  "completion_passed": true,
+  "manifest_fingerprint": "fa66f444ac6c9f077945ecf38b3aa0f46113bc68eacb52e83d12c6b206f55ada",
+  "manifest_path": "reports/modeling/m6_validation_manifest_v0.1.0.json",
+  "manifest_version": "m6-validation-artifacts-v0.1.0",
+  "metadata": {
+    "claim_scope": "engineering_validation_only",
+    "data_origin": "M6_synthetic_validation",
+    "source_basis": "mixed_sources",
+    "synthetic": "true"
+  },
+  "result_fingerprint": "76c8e86262f96e517c76083677500621bcf777e3e7d2a6e3dd84b4a94e3370ba",
+  "schema_version": "1.0.0",
+  "status": "valid",
+  "validation_status": "success"
+}

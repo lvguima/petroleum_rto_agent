@@ -1,0 +1,161 @@
+{
+  "schema_version": "1.0.0",
+  "control_version": "cdu-pi-control-0.1.0",
+  "model_version": "cdu-reduced-0.1.0",
+  "config_version": "cdu-mini-config-0.1.0",
+  "parameter_set_version": "cdu-parameters-0.1.0",
+  "tuning_basis_case_version": "case-20260604-v0.1.0",
+  "control_interval_s": 1.0,
+  "loops": {
+    "feed_flow": {
+      "controlled_variable": {
+        "source": "actuator",
+        "name": "fresh_feed_flow_kg_s"
+      },
+      "manipulated_variable": "fresh_feed_flow_kg_s",
+      "action": "direct",
+      "proportional_gain": 1.0,
+      "integral_time_s": 8.0,
+      "anti_windup_time_s": 8.0,
+      "setpoint_rate_limit_fraction_per_s": 0.001,
+      "output_min_ratio": 0.8,
+      "output_max_ratio": 1.2,
+      "output_rate_limit_fraction_per_s": 0.01,
+      "initial_mode": "automatic",
+      "feedforward": "none"
+    },
+    "flash_inventory": {
+      "controlled_variable": {
+        "source": "sensor",
+        "name": "flash_drum_inventory_kg"
+      },
+      "manipulated_variable": "flash_liquid_outflow_kg_s",
+      "action": "reverse",
+      "proportional_gain": 2.0,
+      "integral_time_s": 600.0,
+      "anti_windup_time_s": 300.0,
+      "setpoint_rate_limit_fraction_per_s": 0.001,
+      "output_min_ratio": 0.8,
+      "output_max_ratio": 1.2,
+      "output_rate_limit_fraction_per_s": 0.005,
+      "initial_mode": "automatic",
+      "feedforward": "none"
+    },
+    "furnace_temperature": {
+      "controlled_variable": {
+        "source": "sensor",
+        "name": "furnace_outlet_temperature_k"
+      },
+      "manipulated_variable": "furnace_fuel_duty_w",
+      "action": "direct",
+      "proportional_gain": 4.0,
+      "integral_time_s": 180.0,
+      "anti_windup_time_s": 45.0,
+      "setpoint_rate_limit_fraction_per_s": 0.0001,
+      "output_min_ratio": 0.8,
+      "output_max_ratio": 1.15,
+      "output_rate_limit_fraction_per_s": 0.005,
+      "initial_mode": "automatic",
+      "feedforward": "furnace_feed_flow"
+    },
+    "top_pressure": {
+      "controlled_variable": {
+        "source": "sensor",
+        "name": "tower_top_pressure_pa"
+      },
+      "manipulated_variable": "top_gas_vent_kg_s",
+      "action": "reverse",
+      "proportional_gain": 8.0,
+      "integral_time_s": 1200.0,
+      "anti_windup_time_s": 150.0,
+      "setpoint_rate_limit_fraction_per_s": 0.0005,
+      "output_min_ratio": 0.5,
+      "output_max_ratio": 1.5,
+      "output_rate_limit_fraction_per_s": 0.005,
+      "initial_mode": "automatic",
+      "feedforward": "none"
+    },
+    "reflux_inventory": {
+      "controlled_variable": {
+        "source": "sensor",
+        "name": "reflux_drum_inventory_kg"
+      },
+      "manipulated_variable": "gasoline_draw_kg_s",
+      "action": "reverse",
+      "proportional_gain": 4.0,
+      "integral_time_s": 700.0,
+      "anti_windup_time_s": 175.0,
+      "setpoint_rate_limit_fraction_per_s": 0.001,
+      "output_min_ratio": 0.8,
+      "output_max_ratio": 1.2,
+      "output_rate_limit_fraction_per_s": 0.005,
+      "initial_mode": "automatic",
+      "feedforward": "none"
+    },
+    "bottom_inventory": {
+      "controlled_variable": {
+        "source": "sensor",
+        "name": "tower_bottom_inventory_kg"
+      },
+      "manipulated_variable": "residue_draw_kg_s",
+      "action": "reverse",
+      "proportional_gain": 3.0,
+      "integral_time_s": 800.0,
+      "anti_windup_time_s": 266.6666666666667,
+      "setpoint_rate_limit_fraction_per_s": 0.001,
+      "output_min_ratio": 0.8,
+      "output_max_ratio": 1.2,
+      "output_rate_limit_fraction_per_s": 0.005,
+      "initial_mode": "automatic",
+      "feedforward": "none"
+    },
+    "top_temperature": {
+      "controlled_variable": {
+        "source": "sensor",
+        "name": "tower_top_temperature_k"
+      },
+      "manipulated_variable": "pump_around_1_duty_w",
+      "action": "reverse",
+      "proportional_gain": 8.0,
+      "integral_time_s": 450.0,
+      "anti_windup_time_s": 56.25,
+      "setpoint_rate_limit_fraction_per_s": 0.0001,
+      "output_min_ratio": 0.5,
+      "output_max_ratio": 1.5,
+      "output_rate_limit_fraction_per_s": 0.0025,
+      "initial_mode": "automatic",
+      "feedforward": "none"
+    }
+  },
+  "acceptance": {
+    "baseline_tail_window_s": 300.0,
+    "baseline_error_fraction": 1e-6,
+    "baseline_slope_fraction_per_s": 1e-8,
+    "feed_band_fraction": 0.002,
+    "inventory_band_fraction": 0.005,
+    "temperature_pressure_band_fraction": 0.005,
+    "recovery_time_s": {
+      "feed_flow": 300.0,
+      "flash_inventory": 3600.0,
+      "furnace_temperature": 3600.0,
+      "top_pressure": 3600.0,
+      "reflux_inventory": 3600.0,
+      "bottom_inventory": 3600.0,
+      "top_temperature": 3600.0
+    },
+    "settling_dwell_s": 300.0,
+    "inventory_true_min_ratio": 0.8,
+    "inventory_true_max_ratio": 1.2,
+    "tail_window_s": 600.0,
+    "tail_mean_abs_error_fraction": 0.002,
+    "tail_slope_fraction_per_s": 1e-6,
+    "max_continuous_saturation_s": 300.0,
+    "tail_peak_to_peak_fraction": 0.005
+  },
+  "metadata": {
+    "synthetic": "true",
+    "tuning_basis": "normalized local M3 closed-loop engineering probe",
+    "confidence": "low",
+    "purpose": "M4 initial PI tuning and synthetic acceptance; not plant hardware limits"
+  }
+}

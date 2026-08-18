@@ -1,0 +1,357 @@
+{
+  "benchmark_version": "m7-artifact-io-baseline-v0.1.0",
+  "case_count": 2,
+  "cases": [
+    {
+      "case_id": "m3_open_loop_feed_plus_5pct_2h_artifact_io",
+      "description": "Complete JSONL/JSON/manifest write and strict readback for the M3 two-hour open-loop +5% fresh-feed step.",
+      "expected_duration_s": 7200.0,
+      "expected_sample_count": 7201,
+      "expected_status": "success",
+      "expected_time_step_s": 1.0,
+      "model_layer": "M3",
+      "preset_id": "open-loop-feed-step",
+      "repetitions": [
+        {
+          "read": {
+            "operation": "read_run",
+            "python_peak_bytes": 176938896,
+            "wall_time_s": 22.651762400000734
+          },
+          "repetition": 1,
+          "strict_readback": {
+            "duration_s": 7200.0,
+            "input_resource_count": 11,
+            "input_resource_ids": [
+              "model.base",
+              "catalog.components",
+              "case.base",
+              "control.pi",
+              "scenario.open_loop.baseline",
+              "scenario.open_loop.feed_step",
+              "scenario.closed_loop.baseline",
+              "scenario.closed_loop.feed_step",
+              "validation.m6",
+              "validation.m6_manifest",
+              "overlay.m5"
+            ],
+            "manifest_result_fingerprint": "3a2d5d0ebd5a82a25efcfe6ff99b47e903e92a1ed470e63f0c526ad1765b1feb",
+            "manifest_runtime_status": "success",
+            "result_fingerprint": "3a2d5d0ebd5a82a25efcfe6ff99b47e903e92a1ed470e63f0c526ad1765b1feb",
+            "runtime_status": "success",
+            "sample_count": 7201,
+            "time_step_s": 1.0
+          },
+          "write": {
+            "operation": "write_run",
+            "python_peak_bytes": 2177693,
+            "wall_time_s": 17.880549199999223
+          },
+          "written_artifact": {
+            "duration_s": 7200.0,
+            "input_resource_count": 11,
+            "input_resource_ids": [
+              "model.base",
+              "catalog.components",
+              "case.base",
+              "control.pi",
+              "scenario.open_loop.baseline",
+              "scenario.open_loop.feed_step",
+              "scenario.closed_loop.baseline",
+              "scenario.closed_loop.feed_step",
+              "validation.m6",
+              "validation.m6_manifest",
+              "overlay.m5"
+            ],
+            "manifest_result_fingerprint": "3a2d5d0ebd5a82a25efcfe6ff99b47e903e92a1ed470e63f0c526ad1765b1feb",
+            "manifest_runtime_status": "success",
+            "result_fingerprint": "3a2d5d0ebd5a82a25efcfe6ff99b47e903e92a1ed470e63f0c526ad1765b1feb",
+            "runtime_status": "success",
+            "sample_count": 7201,
+            "time_step_s": 1.0
+          }
+        },
+        {
+          "read": {
+            "operation": "read_run",
+            "python_peak_bytes": 176934984,
+            "wall_time_s": 24.837697399998433
+          },
+          "repetition": 2,
+          "strict_readback": {
+            "duration_s": 7200.0,
+            "input_resource_count": 11,
+            "input_resource_ids": [
+              "model.base",
+              "catalog.components",
+              "case.base",
+              "control.pi",
+              "scenario.open_loop.baseline",
+              "scenario.open_loop.feed_step",
+              "scenario.closed_loop.baseline",
+              "scenario.closed_loop.feed_step",
+              "validation.m6",
+              "validation.m6_manifest",
+              "overlay.m5"
+            ],
+            "manifest_result_fingerprint": "3a2d5d0ebd5a82a25efcfe6ff99b47e903e92a1ed470e63f0c526ad1765b1feb",
+            "manifest_runtime_status": "success",
+            "result_fingerprint": "3a2d5d0ebd5a82a25efcfe6ff99b47e903e92a1ed470e63f0c526ad1765b1feb",
+            "runtime_status": "success",
+            "sample_count": 7201,
+            "time_step_s": 1.0
+          },
+          "write": {
+            "operation": "write_run",
+            "python_peak_bytes": 2175025,
+            "wall_time_s": 19.60656569999992
+          },
+          "written_artifact": {
+            "duration_s": 7200.0,
+            "input_resource_count": 11,
+            "input_resource_ids": [
+              "model.base",
+              "catalog.components",
+              "case.base",
+              "control.pi",
+              "scenario.open_loop.baseline",
+              "scenario.open_loop.feed_step",
+              "scenario.closed_loop.baseline",
+              "scenario.closed_loop.feed_step",
+              "validation.m6",
+              "validation.m6_manifest",
+              "overlay.m5"
+            ],
+            "manifest_result_fingerprint": "3a2d5d0ebd5a82a25efcfe6ff99b47e903e92a1ed470e63f0c526ad1765b1feb",
+            "manifest_runtime_status": "success",
+            "result_fingerprint": "3a2d5d0ebd5a82a25efcfe6ff99b47e903e92a1ed470e63f0c526ad1765b1feb",
+            "runtime_status": "success",
+            "sample_count": 7201,
+            "time_step_s": 1.0
+          }
+        }
+      ],
+      "result_fingerprint": "3a2d5d0ebd5a82a25efcfe6ff99b47e903e92a1ed470e63f0c526ad1765b1feb",
+      "summary": {
+        "read_run": {
+          "python_peak_bytes": {
+            "max": 176938896,
+            "median": 176936940
+          },
+          "wall_time_s": {
+            "max": 24.837697399998433,
+            "median": 23.744729899999584
+          }
+        },
+        "write_run": {
+          "python_peak_bytes": {
+            "max": 2177693,
+            "median": 2176359
+          },
+          "wall_time_s": {
+            "max": 19.60656569999992,
+            "median": 18.74355744999957
+          }
+        }
+      }
+    },
+    {
+      "case_id": "m4_closed_loop_feed_plus_5pct_2h_artifact_io",
+      "description": "Complete JSONL/JSON/manifest write and strict readback for the M4 two-hour closed-loop +5% feed-setpoint step.",
+      "expected_duration_s": 7200.0,
+      "expected_sample_count": 7201,
+      "expected_status": "success",
+      "expected_time_step_s": 1.0,
+      "model_layer": "M4",
+      "preset_id": "closed-loop-feed-step",
+      "repetitions": [
+        {
+          "read": {
+            "operation": "read_run",
+            "python_peak_bytes": 235419782,
+            "wall_time_s": 34.565862299998116
+          },
+          "repetition": 1,
+          "strict_readback": {
+            "duration_s": 7200.0,
+            "input_resource_count": 11,
+            "input_resource_ids": [
+              "model.base",
+              "catalog.components",
+              "case.base",
+              "control.pi",
+              "scenario.open_loop.baseline",
+              "scenario.open_loop.feed_step",
+              "scenario.closed_loop.baseline",
+              "scenario.closed_loop.feed_step",
+              "validation.m6",
+              "validation.m6_manifest",
+              "overlay.m5"
+            ],
+            "manifest_result_fingerprint": "8872d7e52afed27057d163cbf50657fbcc8f44863361b1bfff1445cd2e6fec8b",
+            "manifest_runtime_status": "success",
+            "result_fingerprint": "8872d7e52afed27057d163cbf50657fbcc8f44863361b1bfff1445cd2e6fec8b",
+            "runtime_status": "success",
+            "sample_count": 7201,
+            "time_step_s": 1.0
+          },
+          "write": {
+            "operation": "write_run",
+            "python_peak_bytes": 2183088,
+            "wall_time_s": 28.796269599999505
+          },
+          "written_artifact": {
+            "duration_s": 7200.0,
+            "input_resource_count": 11,
+            "input_resource_ids": [
+              "model.base",
+              "catalog.components",
+              "case.base",
+              "control.pi",
+              "scenario.open_loop.baseline",
+              "scenario.open_loop.feed_step",
+              "scenario.closed_loop.baseline",
+              "scenario.closed_loop.feed_step",
+              "validation.m6",
+              "validation.m6_manifest",
+              "overlay.m5"
+            ],
+            "manifest_result_fingerprint": "8872d7e52afed27057d163cbf50657fbcc8f44863361b1bfff1445cd2e6fec8b",
+            "manifest_runtime_status": "success",
+            "result_fingerprint": "8872d7e52afed27057d163cbf50657fbcc8f44863361b1bfff1445cd2e6fec8b",
+            "runtime_status": "success",
+            "sample_count": 7201,
+            "time_step_s": 1.0
+          }
+        },
+        {
+          "read": {
+            "operation": "read_run",
+            "python_peak_bytes": 235419343,
+            "wall_time_s": 32.918316699997376
+          },
+          "repetition": 2,
+          "strict_readback": {
+            "duration_s": 7200.0,
+            "input_resource_count": 11,
+            "input_resource_ids": [
+              "model.base",
+              "catalog.components",
+              "case.base",
+              "control.pi",
+              "scenario.open_loop.baseline",
+              "scenario.open_loop.feed_step",
+              "scenario.closed_loop.baseline",
+              "scenario.closed_loop.feed_step",
+              "validation.m6",
+              "validation.m6_manifest",
+              "overlay.m5"
+            ],
+            "manifest_result_fingerprint": "8872d7e52afed27057d163cbf50657fbcc8f44863361b1bfff1445cd2e6fec8b",
+            "manifest_runtime_status": "success",
+            "result_fingerprint": "8872d7e52afed27057d163cbf50657fbcc8f44863361b1bfff1445cd2e6fec8b",
+            "runtime_status": "success",
+            "sample_count": 7201,
+            "time_step_s": 1.0
+          },
+          "write": {
+            "operation": "write_run",
+            "python_peak_bytes": 2183217,
+            "wall_time_s": 28.967896699999983
+          },
+          "written_artifact": {
+            "duration_s": 7200.0,
+            "input_resource_count": 11,
+            "input_resource_ids": [
+              "model.base",
+              "catalog.components",
+              "case.base",
+              "control.pi",
+              "scenario.open_loop.baseline",
+              "scenario.open_loop.feed_step",
+              "scenario.closed_loop.baseline",
+              "scenario.closed_loop.feed_step",
+              "validation.m6",
+              "validation.m6_manifest",
+              "overlay.m5"
+            ],
+            "manifest_result_fingerprint": "8872d7e52afed27057d163cbf50657fbcc8f44863361b1bfff1445cd2e6fec8b",
+            "manifest_runtime_status": "success",
+            "result_fingerprint": "8872d7e52afed27057d163cbf50657fbcc8f44863361b1bfff1445cd2e6fec8b",
+            "runtime_status": "success",
+            "sample_count": 7201,
+            "time_step_s": 1.0
+          }
+        }
+      ],
+      "result_fingerprint": "8872d7e52afed27057d163cbf50657fbcc8f44863361b1bfff1445cd2e6fec8b",
+      "summary": {
+        "read_run": {
+          "python_peak_bytes": {
+            "max": 235419782,
+            "median": 235419562
+          },
+          "wall_time_s": {
+            "max": 34.565862299998116,
+            "median": 33.742089499997746
+          }
+        },
+        "write_run": {
+          "python_peak_bytes": {
+            "max": 2183217,
+            "median": 2183152
+          },
+          "wall_time_s": {
+            "max": 28.967896699999983,
+            "median": 28.882083149999744
+          }
+        }
+      }
+    }
+  ],
+  "environment": {
+    "distribution_version": "0.1.0",
+    "git_commit": "unavailable",
+    "git_dirty": "unavailable",
+    "machine": "unknown",
+    "operating_system": "Windows",
+    "os_release": "10",
+    "python_full_version": "3.12.13 | packaged by Anaconda, Inc. | (main, Jul  9 2026, 14:26:47) [MSC v.1942 64 bit (AMD64)]",
+    "python_implementation": "CPython",
+    "python_version": "3.12.13"
+  },
+  "environment_fingerprint": "17acec035d263ee2adf2be011d8fff2019230a33fde07b27e4c833b7923e722d",
+  "generated_at_utc": "2026-08-17T20:26:19Z",
+  "input_resource_count": 11,
+  "input_resource_ids": [
+    "model.base",
+    "catalog.components",
+    "case.base",
+    "control.pi",
+    "scenario.open_loop.baseline",
+    "scenario.open_loop.feed_step",
+    "scenario.closed_loop.baseline",
+    "scenario.closed_loop.feed_step",
+    "validation.m6",
+    "validation.m6_manifest",
+    "overlay.m5"
+  ],
+  "installed_source_tree_sha256": "1003a7b2893f90cf823829d273a5e5ea9681d79199a506ac2569fc380767c867",
+  "measurement_scope": {
+    "clock": "time.perf_counter wall clock",
+    "memory_limit": "tracemalloc observes Python-traced allocations only; it is not whole-process RSS and may exclude native allocations",
+    "memory_metric": "tracemalloc peak traced bytes",
+    "model_preparation": "execute(load_preset(preset_id)) completes before either measurement region",
+    "process_model": "two ordered repetitions per case in one process; temporary run directories are removed after strict readback",
+    "read_entrypoint": "read_run(run_dir)",
+    "read_preparation": "the original payload, writer RunRecord, and input byte mapping are deleted and garbage collection completes before tracing",
+    "threshold_policy": "report-only environment-specific baseline; no cross-machine performance pass threshold",
+    "write_entrypoint": "write_run(request, payload, output_root, ...)",
+    "write_preparation": "the full payload and fixed 11 packaged input byte strings are loaded and bound before tracemalloc starts"
+  },
+  "repetitions_per_case": 2,
+  "report_fingerprint": "979ed299fa9c18df8994c314d26dcc3f506ffb26b965988fb9ff94714499a8d5",
+  "runtime_version": "cdu-mini-runtime-v0.1.0",
+  "schema_version": "m7.artifact-io-baseline.schema-v1",
+  "status": "success"
+}

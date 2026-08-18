@@ -1,0 +1,120 @@
+{
+  "schema_version": "1.0.0",
+  "alignment_version": "m5-case-20260604-alignment-v0.1.0",
+  "reconciliation_config_version": "m5-case-20260604-reconciliation-v0.1.0",
+  "derived_case_version": "case-20260604-m5-aligned-v0.1.0",
+  "model_version": "cdu-reduced-0.1.0",
+  "model_config_version": "cdu-mini-config-0.1.0",
+  "base_parameter_set_version": "cdu-parameters-0.1.0",
+  "base_case_version": "case-20260604-v0.1.0",
+  "observation_catalog_version": "cdu-observations-v0.1.0",
+  "source_manifest_version": "cdu-sources-v0.1.0",
+  "calibration_version": "m5-case-20260604-calibration-v0.1.0",
+  "case_reference_time": "2026-06-04T09:16:00+08:00",
+  "maximum_alignment_offset_s": 120.0,
+  "paths": {
+    "model_config": "configs/models/cdu_mini_v0.1.0.json",
+    "case_config": "configs/cases/case_20260604.json",
+    "observation_catalog": "data/catalog/cdu_observations_v0.1.0.jsonl",
+    "source_manifest": "data/catalog/cdu_sources_v0.1.0.jsonl",
+    "calibration_config": "configs/calibration/m5_case_20260604_v0.1.0.json"
+  },
+  "case_overlays": {
+    "flash_temperature_observation_id": "obs-dcs-flash-temperature-ti-1012",
+    "wash_water_observation_id": "obs-dcs-wash-water-fic-1107",
+    "wash_ratio_feed_observation_id": "obs-dcs-wash-ratio-feed-fi-1018"
+  },
+  "boundary_measurements": [
+    {
+      "stream_id": "fresh_feed",
+      "observation_id": "obs-dcs-fresh-feed-overview",
+      "relative_engineering_scale": 0.01,
+      "floor_kg_s": 0.1388888888888889
+    },
+    {
+      "stream_id": "wash_water",
+      "observation_id": "obs-dcs-wash-water-fic-1107",
+      "relative_engineering_scale": 0.05,
+      "floor_kg_s": 0.1388888888888889
+    },
+    {
+      "stream_id": "gasoline",
+      "observation_id": "obs-dcs-gasoline-product",
+      "relative_engineering_scale": 0.01,
+      "floor_kg_s": 0.1388888888888889
+    },
+    {
+      "stream_id": "kerosene",
+      "observation_id": "obs-dcs-kerosene-product",
+      "relative_engineering_scale": 0.01,
+      "floor_kg_s": 0.1388888888888889
+    },
+    {
+      "stream_id": "light_diesel",
+      "observation_id": "obs-dcs-light-diesel-product",
+      "relative_engineering_scale": 0.01,
+      "floor_kg_s": 0.1388888888888889
+    },
+    {
+      "stream_id": "heavy_diesel",
+      "observation_id": "obs-dcs-heavy-diesel-product",
+      "relative_engineering_scale": 0.01,
+      "floor_kg_s": 0.1388888888888889
+    },
+    {
+      "stream_id": "residue",
+      "observation_id": "obs-dcs-residue-product",
+      "relative_engineering_scale": 0.01,
+      "floor_kg_s": 0.1388888888888889
+    }
+  ],
+  "latent_priors": [
+    {
+      "stream_id": "offgas",
+      "source": "effective_baseline_m2",
+      "relative_engineering_scale": 1.0,
+      "floor_kg_s": 0.5
+    },
+    {
+      "stream_id": "aqueous",
+      "source": "effective_baseline_m2",
+      "relative_engineering_scale": 1.0,
+      "floor_kg_s": 0.5
+    },
+    {
+      "stream_id": "brine",
+      "source": "effective_baseline_m2",
+      "relative_engineering_scale": 1.0,
+      "floor_kg_s": 0.5
+    }
+  ],
+  "excluded_internal": [
+    {
+      "stream_id": "reflux",
+      "observation_id": "obs-dcs-overhead-reflux-fi-1010",
+      "relative_engineering_scale": 0.01,
+      "floor_kg_s": 0.1388888888888889,
+      "exclusion_reason": "Internal overhead reflux; excluded from the CDU net material boundary."
+    },
+    {
+      "stream_id": "top_circulation",
+      "observation_id": "obs-dcs-top-circulation-fi-1003",
+      "relative_engineering_scale": 0.01,
+      "floor_kg_s": 0.1388888888888889,
+      "exclusion_reason": "Internal top-circulation heat-recovery loop; excluded from the CDU net material boundary."
+    }
+  ],
+  "artifacts": {
+    "reconciled_case": "data/gold/case_20260604_reconciled_v0.1.0.json",
+    "calibrated_parameters": "configs/parameters/cdu_parameters_m5_case20260604_v0.1.0.json",
+    "report_json": "reports/modeling/M5_case_20260604_calibration_v0.1.0.json",
+    "report_markdown": "reports/modeling/M5_case_20260604_calibration_v0.1.0.md",
+    "artifact_manifest": "reports/modeling/M5_case_20260604_artifact_manifest_v0.1.0.json"
+  },
+  "metadata": {
+    "claim_scope": "case_alignment_only",
+    "confidence": "low",
+    "engineering_scale_basis": "Conservative reconciliation weights: same-screen flows use max(1% of reading, 0.5 t/h); cross-screen wash water uses max(5%, 0.5 t/h). These are engineering regularization scales, not instrument one-sigma uncertainties.",
+    "latent_prior_basis": "Missing offgas, aqueous and brine use effective-baseline M2 predictions with max(100% of prior, 0.5 kg/s); they are model priors, not field measurements."
+  }
+}

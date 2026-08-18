@@ -1,0 +1,247 @@
+{
+  "benchmark_version": "m7-performance-baseline-v0.1.0",
+  "case_count": 4,
+  "cases": [
+    {
+      "case_id": "m2_steady_baseline",
+      "description": "M2 source-closed steady recycle baseline.",
+      "expected_duration_s": null,
+      "expected_sample_count": 0,
+      "expected_status": "success",
+      "expected_time_step_s": null,
+      "model_layer": "M2",
+      "preset_id": "steady-baseline",
+      "repetitions": [
+        {
+          "duration_s": null,
+          "python_peak_bytes": 369268,
+          "repetition": 1,
+          "result_fingerprint": "4f2ac7766bad361f2981c2a9e795791e23f7857f2a82593330436f31883b1b2d",
+          "runtime_status": "success",
+          "sample_count": 0,
+          "time_step_s": null,
+          "wall_time_s": 0.17834290000246256
+        },
+        {
+          "duration_s": null,
+          "python_peak_bytes": 289347,
+          "repetition": 2,
+          "result_fingerprint": "4f2ac7766bad361f2981c2a9e795791e23f7857f2a82593330436f31883b1b2d",
+          "runtime_status": "success",
+          "sample_count": 0,
+          "time_step_s": null,
+          "wall_time_s": 0.16209600000001956
+        },
+        {
+          "duration_s": null,
+          "python_peak_bytes": 284584,
+          "repetition": 3,
+          "result_fingerprint": "4f2ac7766bad361f2981c2a9e795791e23f7857f2a82593330436f31883b1b2d",
+          "runtime_status": "success",
+          "sample_count": 0,
+          "time_step_s": null,
+          "wall_time_s": 0.1701189000013983
+        }
+      ],
+      "result_fingerprint": "4f2ac7766bad361f2981c2a9e795791e23f7857f2a82593330436f31883b1b2d",
+      "summary": {
+        "python_peak_bytes": {
+          "max": 369268,
+          "median": 289347
+        },
+        "wall_time_s": {
+          "max": 0.17834290000246256,
+          "median": 0.1701189000013983
+        }
+      }
+    },
+    {
+      "case_id": "m3_open_loop_feed_plus_5pct_2h",
+      "description": "M3 two-hour open-loop +5% fresh-feed command step.",
+      "expected_duration_s": 7200.0,
+      "expected_sample_count": 7201,
+      "expected_status": "success",
+      "expected_time_step_s": 1.0,
+      "model_layer": "M3",
+      "preset_id": "open-loop-feed-step",
+      "repetitions": [
+        {
+          "duration_s": 7200.0,
+          "python_peak_bytes": 205645619,
+          "repetition": 1,
+          "result_fingerprint": "3a2d5d0ebd5a82a25efcfe6ff99b47e903e92a1ed470e63f0c526ad1765b1feb",
+          "runtime_status": "success",
+          "sample_count": 7201,
+          "time_step_s": 1.0,
+          "wall_time_s": 135.60420460000023
+        },
+        {
+          "duration_s": 7200.0,
+          "python_peak_bytes": 205643742,
+          "repetition": 2,
+          "result_fingerprint": "3a2d5d0ebd5a82a25efcfe6ff99b47e903e92a1ed470e63f0c526ad1765b1feb",
+          "runtime_status": "success",
+          "sample_count": 7201,
+          "time_step_s": 1.0,
+          "wall_time_s": 138.14152029999968
+        },
+        {
+          "duration_s": 7200.0,
+          "python_peak_bytes": 205642592,
+          "repetition": 3,
+          "result_fingerprint": "3a2d5d0ebd5a82a25efcfe6ff99b47e903e92a1ed470e63f0c526ad1765b1feb",
+          "runtime_status": "success",
+          "sample_count": 7201,
+          "time_step_s": 1.0,
+          "wall_time_s": 136.63850979999916
+        }
+      ],
+      "result_fingerprint": "3a2d5d0ebd5a82a25efcfe6ff99b47e903e92a1ed470e63f0c526ad1765b1feb",
+      "summary": {
+        "python_peak_bytes": {
+          "max": 205645619,
+          "median": 205643742
+        },
+        "wall_time_s": {
+          "max": 138.14152029999968,
+          "median": 136.63850979999916
+        }
+      }
+    },
+    {
+      "case_id": "m4_closed_loop_feed_plus_5pct_2h",
+      "description": "M4 two-hour closed-loop +5% feed-setpoint step.",
+      "expected_duration_s": 7200.0,
+      "expected_sample_count": 7201,
+      "expected_status": "success",
+      "expected_time_step_s": 1.0,
+      "model_layer": "M4",
+      "preset_id": "closed-loop-feed-step",
+      "repetitions": [
+        {
+          "duration_s": 7200.0,
+          "python_peak_bytes": 257916085,
+          "repetition": 1,
+          "result_fingerprint": "8872d7e52afed27057d163cbf50657fbcc8f44863361b1bfff1445cd2e6fec8b",
+          "runtime_status": "success",
+          "sample_count": 7201,
+          "time_step_s": 1.0,
+          "wall_time_s": 143.22656350000034
+        },
+        {
+          "duration_s": 7200.0,
+          "python_peak_bytes": 257911302,
+          "repetition": 2,
+          "result_fingerprint": "8872d7e52afed27057d163cbf50657fbcc8f44863361b1bfff1445cd2e6fec8b",
+          "runtime_status": "success",
+          "sample_count": 7201,
+          "time_step_s": 1.0,
+          "wall_time_s": 143.98770030000014
+        },
+        {
+          "duration_s": 7200.0,
+          "python_peak_bytes": 257910233,
+          "repetition": 3,
+          "result_fingerprint": "8872d7e52afed27057d163cbf50657fbcc8f44863361b1bfff1445cd2e6fec8b",
+          "runtime_status": "success",
+          "sample_count": 7201,
+          "time_step_s": 1.0,
+          "wall_time_s": 143.77040850000049
+        }
+      ],
+      "result_fingerprint": "8872d7e52afed27057d163cbf50657fbcc8f44863361b1bfff1445cd2e6fec8b",
+      "summary": {
+        "python_peak_bytes": {
+          "max": 257916085,
+          "median": 257911302
+        },
+        "wall_time_s": {
+          "max": 143.98770030000014,
+          "median": 143.77040850000049
+        }
+      }
+    },
+    {
+      "case_id": "m6_portable_pump_around_1_trip",
+      "description": "Selected portable M6 pump-around-1 trip replay; this is not the full source-closed M6 validation matrix.",
+      "expected_duration_s": 600.0,
+      "expected_sample_count": 601,
+      "expected_status": "limited",
+      "expected_time_step_s": 1.0,
+      "model_layer": "M6",
+      "preset_id": "m6-abnormal-pump-trip",
+      "repetitions": [
+        {
+          "duration_s": 600.0,
+          "python_peak_bytes": 27880761,
+          "repetition": 1,
+          "result_fingerprint": "ddcbd7b9d1e29dd786aa8f45888b897efcadc4bf259b4a8d14d59c6dfe536dd4",
+          "runtime_status": "limited",
+          "sample_count": 601,
+          "time_step_s": 1.0,
+          "wall_time_s": 22.708879900001193
+        },
+        {
+          "duration_s": 600.0,
+          "python_peak_bytes": 27876658,
+          "repetition": 2,
+          "result_fingerprint": "ddcbd7b9d1e29dd786aa8f45888b897efcadc4bf259b4a8d14d59c6dfe536dd4",
+          "runtime_status": "limited",
+          "sample_count": 601,
+          "time_step_s": 1.0,
+          "wall_time_s": 22.47026140000162
+        },
+        {
+          "duration_s": 600.0,
+          "python_peak_bytes": 27876589,
+          "repetition": 3,
+          "result_fingerprint": "ddcbd7b9d1e29dd786aa8f45888b897efcadc4bf259b4a8d14d59c6dfe536dd4",
+          "runtime_status": "limited",
+          "sample_count": 601,
+          "time_step_s": 1.0,
+          "wall_time_s": 22.62679449999996
+        }
+      ],
+      "result_fingerprint": "ddcbd7b9d1e29dd786aa8f45888b897efcadc4bf259b4a8d14d59c6dfe536dd4",
+      "summary": {
+        "python_peak_bytes": {
+          "max": 27880761,
+          "median": 27876658
+        },
+        "wall_time_s": {
+          "max": 22.708879900001193,
+          "median": 22.62679449999996
+        }
+      }
+    }
+  ],
+  "environment": {
+    "distribution_version": "0.1.0",
+    "git_commit": "unavailable",
+    "git_dirty": "unavailable",
+    "machine": "unknown",
+    "operating_system": "Windows",
+    "os_release": "10",
+    "python_full_version": "3.12.13 | packaged by Anaconda, Inc. | (main, Jul  9 2026, 14:26:47) [MSC v.1942 64 bit (AMD64)]",
+    "python_implementation": "CPython",
+    "python_version": "3.12.13"
+  },
+  "environment_fingerprint": "17acec035d263ee2adf2be011d8fff2019230a33fde07b27e4c833b7923e722d",
+  "generated_at_utc": "2026-08-17T20:08:57Z",
+  "installed_source_tree_sha256": "1003a7b2893f90cf823829d273a5e5ea9681d79199a506ac2569fc380767c867",
+  "measurement_scope": {
+    "clock": "time.perf_counter wall clock",
+    "entrypoint": "execute(load_preset(preset_id))",
+    "excluded": "run artifact JSONL/JSON/manifest I/O, report serialization, and result fingerprint calculation",
+    "included": "fixed preset loading, packaged resource loading, model execution, and in-memory result construction",
+    "memory_limit": "tracemalloc observes Python-traced allocations only; it is not whole-process RSS and may exclude native allocations",
+    "memory_metric": "tracemalloc peak traced bytes",
+    "process_model": "three ordered repetitions per case in one process",
+    "threshold_policy": "report-only environment-specific baseline; no cross-machine performance pass threshold"
+  },
+  "repetitions_per_case": 3,
+  "report_fingerprint": "714194bf9d203be6956758b65c30f6482e5342351be6d571ae7f6bb7a51c4f7c",
+  "runtime_version": "cdu-mini-runtime-v0.1.0",
+  "schema_version": "m7.performance-baseline.schema-v1",
+  "status": "success"
+}

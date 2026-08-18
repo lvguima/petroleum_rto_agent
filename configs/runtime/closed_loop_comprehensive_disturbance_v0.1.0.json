@@ -1,0 +1,89 @@
+{
+  "preset_id": "closed-loop-feed-step",
+  "parameters": {
+    "feed.mass_flow_t_h": 400.0,
+    "feed.temperature_c": 38.0,
+    "feed.pressure_mpa_g": 0.3,
+    "feed.salt_mass_flow_kg_s": 0.006,
+    "feed.mass_fraction.light_ends": 0.004,
+    "feed.mass_fraction.naphtha": 0.165,
+    "feed.mass_fraction.kerosene": 0.082,
+    "feed.mass_fraction.light_diesel": 0.06,
+    "feed.mass_fraction.heavy_diesel": 0.2,
+    "feed.mass_fraction.residue": 0.488,
+    "feed.mass_fraction.water": 0.001,
+    "operating.flash_temperature_c": 202.0,
+    "operating.flash_pressure_mpa_g": 0.085,
+    "operating.furnace_outlet_temperature_c": 356.0,
+    "operating.tower_top_temperature_c": 114.0,
+    "operating.tower_top_pressure_mpa_g": 0.052,
+    "operating.condenser_temperature_c": 41.0,
+    "operating.ambient_temperature_c": 27.0,
+    "operation.wash_water_ratio": 0.05,
+    "operation.reflux_ratio": 0.47,
+    "operation.pump_around_1_duty_mw": 8.2,
+    "operation.pump_around_2_duty_mw": 9.8,
+    "operation.pump_around_3_duty_mw": 8.1
+  },
+  "overrides": {
+    "column.cut_3_temperature_c": 299.0,
+    "column.cut_4_temperature_c": 375.0,
+    "dynamic.furnace_time_constant_s": 130.0,
+    "dynamic.preheater_time_constant_s": 95.0,
+    "dynamic.condenser_time_constant_s": 65.0,
+    "dynamic.tower_temperature_time_constant_s": 315.0,
+    "dynamic.actuator_time_constant_s": 9.0,
+    "dynamic.sensor_time_constant_s": 16.0,
+    "dynamic.flash_residence_time_s": 650.0,
+    "dynamic.reflux_drum_residence_time_s": 950.0,
+    "dynamic.tower_bottom_residence_time_s": 1250.0,
+    "dynamic.top_gas_volume_m3": 540.0
+  },
+  "initial_state": {
+    "inventory.flash_drum_ratio": 1.005,
+    "inventory.reflux_drum_ratio": 0.995,
+    "inventory.tower_bottom_ratio": 1.01
+  },
+  "scenario": {
+    "duration_s": 7200.0,
+    "time_step_s": 1.0,
+    "events": [
+      {
+        "time_s": 600.0,
+        "target": "feed_flow.setpoint_ratio",
+        "value": 1.05,
+        "value_basis": "setpoint_ratio"
+      },
+      {
+        "time_s": 1500.0,
+        "target": "top_pressure.setpoint_ratio",
+        "value": 1.015,
+        "value_basis": "setpoint_ratio"
+      },
+      {
+        "time_s": 2400.0,
+        "target": "furnace_temperature.setpoint_ratio",
+        "value": 0.997,
+        "value_basis": "setpoint_ratio"
+      },
+      {
+        "time_s": 3300.0,
+        "target": "top_temperature.setpoint_ratio",
+        "value": 1.01,
+        "value_basis": "setpoint_ratio"
+      },
+      {
+        "time_s": 4200.0,
+        "target": "reflux_inventory.setpoint_ratio",
+        "value": 1.02,
+        "value_basis": "setpoint_ratio"
+      },
+      {
+        "time_s": 5100.0,
+        "target": "bottom_inventory.setpoint_ratio",
+        "value": 0.99,
+        "value_basis": "setpoint_ratio"
+      }
+    ]
+  }
+}

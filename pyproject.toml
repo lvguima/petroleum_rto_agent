@@ -5,9 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "petroleum-rto-cdu-model"
 version = "0.1.0"
-description = "Reduced-order atmospheric crude distillation closed-loop simulator"
+description = "Reduced-order atmospheric crude distillation simulation and validation package"
 requires-python = ">=3.12,<3.13"
 dependencies = []
+
+[project.scripts]
+cdu-mini = "petroleum_rto.cdu.runtime.cli:main"
 
 [dependency-groups]
 dev = [
@@ -22,6 +25,9 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"petroleum_rto.cdu.runtime.data" = ["*.json"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -29,6 +35,7 @@ target-version = "py312"
 [tool.mypy]
 python_version = "3.12"
 strict = true
+mypy_path = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

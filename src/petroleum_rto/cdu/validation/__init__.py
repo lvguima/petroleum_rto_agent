@@ -1,0 +1,126 @@
+"""Public M6 engineering-validation API."""
+
+from .artifacts import (
+    M6_ARTIFACT_PATHS,
+    M6ArtifactManifest,
+    m6_failure_payload,
+    verify_m6_artifacts,
+    write_m6_artifacts,
+)
+from .basis import M6Basis, load_m6_basis
+from .config import (
+    M6ValidationConfig,
+    ReportAcceptanceThresholds,
+    UncertaintyPlan,
+    ValidationScenarioSpec,
+    load_m6_validation_config,
+)
+from .domain import (
+    ApplicabilityAssessment,
+    DimensionAssessment,
+    DomainDimension,
+    assess_applicability,
+)
+from .metrics import (
+    STEADY_OUTPUT_IDS,
+    closed_loop_output_metrics,
+    dynamic_output_metrics,
+    evaluate_metric_directions,
+    steady_output_metrics,
+)
+from .protection import (
+    ProtectionAction,
+    ProtectionEvent,
+    ProtectionFrame,
+    ProtectionRule,
+    ProtectionRuleState,
+    ProtectionTrace,
+    advance_protection,
+    run_protection,
+)
+from .results import (
+    M6_COMPLETION_CHECK_IDS,
+    M6_RESULT_METADATA,
+    M6_RESULT_SCHEMA_VERSION,
+    M6_SOURCE_COMPOSITION,
+    M6ValidationResult,
+    ScenarioValidationResult,
+)
+from .runner import M6ValidationExecutionError, run_m6_validation
+from .scenarios import (
+    DYNAMIC_COMMAND_FACTOR_TARGETS,
+    STEADY_FACTOR_IDS,
+    FactorApplication,
+    apply_steady_factor,
+    dynamic_command_for_factor,
+)
+from .tracking import ControllerTrackingEvidence, verify_controller_tracking
+from .uncertainty import (
+    EngineeringInputInterval,
+    EngineeringOutputInterval,
+    EvaluationRecord,
+    InputSensitivitySpec,
+    LocalSensitivityAnalysis,
+    OutputSensitivitySpec,
+    UncertaintyPropagationResult,
+    assert_uncertainty_not_narrower,
+    propagate_uncertainty,
+    run_local_sensitivity,
+)
+
+__all__ = [
+    "DYNAMIC_COMMAND_FACTOR_TARGETS",
+    "M6_ARTIFACT_PATHS",
+    "M6_COMPLETION_CHECK_IDS",
+    "M6_RESULT_METADATA",
+    "M6_RESULT_SCHEMA_VERSION",
+    "M6_SOURCE_COMPOSITION",
+    "STEADY_FACTOR_IDS",
+    "STEADY_OUTPUT_IDS",
+    "ApplicabilityAssessment",
+    "ControllerTrackingEvidence",
+    "DimensionAssessment",
+    "DomainDimension",
+    "EngineeringInputInterval",
+    "EngineeringOutputInterval",
+    "EvaluationRecord",
+    "FactorApplication",
+    "InputSensitivitySpec",
+    "LocalSensitivityAnalysis",
+    "M6ArtifactManifest",
+    "M6Basis",
+    "M6ValidationConfig",
+    "M6ValidationExecutionError",
+    "M6ValidationResult",
+    "OutputSensitivitySpec",
+    "ProtectionAction",
+    "ProtectionEvent",
+    "ProtectionFrame",
+    "ProtectionRule",
+    "ProtectionRuleState",
+    "ProtectionTrace",
+    "ReportAcceptanceThresholds",
+    "ScenarioValidationResult",
+    "UncertaintyPlan",
+    "UncertaintyPropagationResult",
+    "ValidationScenarioSpec",
+    "advance_protection",
+    "apply_steady_factor",
+    "assert_uncertainty_not_narrower",
+    "assess_applicability",
+    "closed_loop_output_metrics",
+    "dynamic_command_for_factor",
+    "dynamic_output_metrics",
+    "evaluate_metric_directions",
+    "load_m6_basis",
+    "load_m6_validation_config",
+    "m6_failure_payload",
+    "propagate_uncertainty",
+    "run_local_sensitivity",
+    "run_m6_validation",
+    "run_protection",
+    "steady_output_metrics",
+    "verify_controller_tracking",
+    "verify_m6_artifacts",
+    "write_m6_artifacts",
+]

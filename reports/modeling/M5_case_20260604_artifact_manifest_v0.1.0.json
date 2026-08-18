@@ -1,0 +1,59 @@
+{
+  "artifact_fingerprint": "01c9cd02442e62da12f7263ce881dc566fdb25a721b0174ee4955544c5b124b1",
+  "artifact_type": "M5_artifact_suite_manifest",
+  "artifacts": {
+    "calibrated_parameters": {
+      "path": "configs/parameters/cdu_parameters_m5_case20260604_v0.1.0.json",
+      "sha256": "d837f32c321c5ba7d5fbe82828b0d4b5112c926b57c01460866c93fdef66f816"
+    },
+    "reconciled_case": {
+      "path": "data/gold/case_20260604_reconciled_v0.1.0.json",
+      "sha256": "ab3f4e60c88b4f11d450ca7bcf0dd32c0860ba7e866eace17f0eca35a58bf2e5"
+    },
+    "report_json": {
+      "path": "reports/modeling/M5_case_20260604_calibration_v0.1.0.json",
+      "sha256": "e730080b10396a25d292c0e0c220984f8c0cd5416e6f7e1d3f6a471e1565fcd2"
+    },
+    "report_markdown": {
+      "path": "reports/modeling/M5_case_20260604_calibration_v0.1.0.md",
+      "sha256": "1ae81105c8adcc59bb7008e1969031ab276aaabe3a4eaa63a9e8a061febb7484"
+    }
+  },
+  "claim_scope": "case_alignment_only",
+  "config_fingerprints": {
+    "alignment_file": "007c4791ad9b4ef74dd431c8f95aa08a22301128bb726749603e85a133afd751",
+    "alignment_object": "50c61cc6dec664503c8f86052231e34d86a81214b1eff239f5d71f6b6e14717c",
+    "calibration_config_file": "d73fb860773d012b54f1c7bb944f2d5367423f381f2d7bcdeba68f1e9ec74cd6",
+    "case_file": "0527a977baa6ca81c4d91c76299727dfd08556663d963269650166794426559c",
+    "component_catalog_file": "12d192eaeb7f3b30a6227ad5a3e908ec6f0e27c42bc173005dc050e34662918e",
+    "model_file": "0cb9ad6a62844b2e0cd26ab426e4f33e31cc71e6bfd0b674c34a002c1cb3af3d",
+    "observation_catalog_file": "fe5cc0d5b10b5f87419b9aa7861f000611612f460457e4e5c62a0d99322df9e7",
+    "source_manifest_file": "80a0bf2fda5199599bc4a5d95efe3961367a1c0ba56e5562e53bbc5463c6776f"
+  },
+  "manifest_path": "reports/modeling/M5_case_20260604_artifact_manifest_v0.1.0.json",
+  "manifest_version": "m5-case-20260604-calibration-v0.1.0",
+  "pipeline_result_fingerprint": "9e7bbda6a4f534008d847c49a42b2ee6526fb7132a5ca5db52a112ccf56941b7",
+  "result_fingerprints": {
+    "calibrated_model_object": "49c04b222ab817ca2b27922171c832d562adcd55e80cda480c94b3142e0d2473",
+    "calibration_result": "858c172a7f0c0cc59b07625f79afde2a0dd90270590a2ceb4c196ae1b43a6d2a",
+    "reconciliation_result": "5d4e2f8fa3a4b5f4d66e6146e02fc552563c078d6b44a2a5a68093170b1135c6"
+  },
+  "schema_version": "1.0.0",
+  "status": "valid",
+  "versions": {
+    "alignment_version": "m5-case-20260604-alignment-v0.1.0",
+    "base_case_version": "case-20260604-v0.1.0",
+    "base_parameter_set_version": "cdu-parameters-0.1.0",
+    "calibrated_parameter_set_version": "cdu-parameters-m5-case20260604-v0.1.0",
+    "calibration_version": "m5-case-20260604-calibration-v0.1.0",
+    "claim_scope": "case_alignment_only",
+    "derived_case_version": "case-20260604-m5-aligned-v0.1.0",
+    "model_config_version": "cdu-mini-config-0.1.0",
+    "model_version": "cdu-reduced-0.1.0",
+    "observation_catalog_version": "cdu-observations-v0.1.0",
+    "reconciliation_config_version": "m5-case-20260604-reconciliation-v0.1.0",
+    "simulation_stage": "M5",
+    "software_version": "0.1.0",
+    "source_manifest_version": "cdu-sources-v0.1.0"
+  }
+}
