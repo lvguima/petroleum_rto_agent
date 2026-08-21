@@ -18,8 +18,8 @@ from petroleum_rto.rto.contracts.candidate import (
 from petroleum_rto.rto.contracts.context import OperatingContext
 from petroleum_rto.rto.contracts.problem import ConstraintRule, OptimizationProblem
 from petroleum_rto.rto.contracts.reference import ContractRef
-from petroleum_rto.rto.selection import FinalizationArtifacts, UnifiedFinalSelector
-from petroleum_rto.rto.strategies.unified import (
+from petroleum_rto.rto.selection import FinalizationArtifacts, FinalSelector
+from petroleum_rto.rto.strategies import (
     StrategyBuilder,
     StrategyEntry,
     StrategyQuery,
@@ -177,7 +177,7 @@ def _artifacts(
     )
     dynamic = _valid_dynamic(problem, proposal)
     solver = _solver_result(problem, (proposal,), (static,))
-    artifacts = UnifiedFinalSelector().select(
+    artifacts = FinalSelector().select(
         problem,
         solver,
         _mapping((static,)),
@@ -583,7 +583,7 @@ def test_repository_rejects_a_concurrent_writer_lock(
 ) -> None:
     entry = _entry(repo_root)
     repository = StrategyRepository(tmp_path / "library")
-    lock_path = repository.root / ".unified-strategy-repository.lock"
+    lock_path = repository.root / ".strategy-repository.lock"
 
     with (
         exclusive_file_lock(lock_path, label="test strategy repository"),

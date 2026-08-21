@@ -16,25 +16,28 @@ from petroleum_rto.rto.adapters import CduM7RequestFactory
 from petroleum_rto.rto.capabilities import load_capability_bundle
 from petroleum_rto.rto.context import load_operating_context
 from petroleum_rto.rto.contracts.common import canonical_fingerprint, canonical_json_bytes
-from petroleum_rto.rto.contracts.models import CLAIM_SCOPE, RTO_SCHEMA_VERSION
+from petroleum_rto.rto.contracts.problem import ENGINEERING_CLAIM_SCOPE
 from petroleum_rto.rto.contracts.simulation import (
+    SIMULATION_SCHEMA_VERSION,
     SimulationEvaluationRequest,
     SimulationPreview,
     SimulationRunBundle,
 )
-from petroleum_rto.rto.orchestration.unified_models import WorkflowEvent
-from petroleum_rto.rto.orchestration.unified_service import (
+from petroleum_rto.rto.intent import load_optimization_intent
+from petroleum_rto.rto.orchestration.models import WorkflowEvent
+from petroleum_rto.rto.orchestration.service import (
     OfflineRtoOrchestrator,
     OfflineRtoRunRecord,
     _offline_result,
+    _reload_evidence,
     _replay_evaluations,
     _validate_top_level_entries,
     read_offline_run,
 )
+from petroleum_rto.rto.problem import ProblemBuilder
 from petroleum_rto.rto.runtime import api as runtime_api
 from petroleum_rto.rto.runtime import build_chat_result_summary
-from petroleum_rto.rto.strategies.unified import StrategyRepository
-from petroleum_rto.rto.unified_inputs import load_optimization_intent
+from petroleum_rto.rto.strategies import StrategyRepository
 
 
 class _PersistedSimulator:
@@ -53,7 +56,7 @@ class _PersistedSimulator:
 
     def preview(self, request: SimulationEvaluationRequest) -> SimulationPreview:
         return SimulationPreview(
-            schema_version=RTO_SCHEMA_VERSION,
+            schema_version=SIMULATION_SCHEMA_VERSION,
             preview_version="workflow-fake-preview",
             simulation_request_ref=request.ref,
             provider_id=request.provider_id,
@@ -61,7 +64,7 @@ class _PersistedSimulator:
             effective_input_fingerprint=request.provider_request_fingerprint,
             base_object_fingerprints={"model": self._model, "case": self._case},
             effective_object_fingerprints={},
-            claim_scope=CLAIM_SCOPE,
+            claim_scope=ENGINEERING_CLAIM_SCOPE,
         )
 
     def evaluate(
@@ -157,10 +160,12 @@ def _run(
 
     orchestrator = OfflineRtoOrchestrator(CduM7RequestFactory(), simulator_factory)
     repository = StrategyRepository(tmp_path / "library")
+    problem = ProblemBuilder().build(bundle, intent, context)
     record = orchestrator.run(
         bundle,
         intent,
         context,
+        problem,
         run_root=tmp_path / "runs",
         strategy_repository=repository,
         actor="workflow-test",
@@ -198,6 +203,7 @@ def test_unified_single_and_multi_workflows_resume_without_new_simulation(
         record.capability_snapshot.bundle,
         record.intent,
         record.context,
+        record.problem,
         run_root=tmp_path / "runs",
         strategy_repository=repository,
         actor="workflow-test",
@@ -218,7 +224,7 @@ def test_unified_single_and_multi_workflows_resume_without_new_simulation(
     assert repository.read(record.strategy.strategy_id, 1).current_state == "draft"
 
 
-def test_runtime_auto_inspect_strictly_replays_a_unified_run(
+def test_runtime_inspect_strictly_replays_a_unified_run(
     repo_root: Path,
     tmp_path: Path,
     make_bundle: Callable[..., SimulationRunBundle],
@@ -234,9 +240,8 @@ def test_runtime_auto_inspect_strictly_replays_a_unified_run(
     calls_before = simulator.evaluate_calls
     monkeypatch.setattr(runtime_api, "CduM7Simulator", lambda _: simulator)
 
-    inspected = runtime_api.inspect_offline_auto(
+    inspected = runtime_api.inspect_offline(
         record.run_dir,
-        repo_root=repo_root,
         library_root=tmp_path / "library",
     )
     summary = runtime_api.run_summary(inspected)
@@ -245,14 +250,12 @@ def test_runtime_auto_inspect_strictly_replays_a_unified_run(
     assert inspected.result == record.result
     assert inspected.manifest.fingerprint == record.manifest.fingerprint
     assert simulator.evaluate_calls == calls_before
-    assert summary["workflow_kind"] == "unified"
+    assert "workflow_kind" not in summary
     assert summary["objective_count"] == 3
     assert summary["control_authority"] == "none"
     assert summary["selected_setpoints"] == chat_summary["selected_setpoints"]
     assert chat_summary["status"] == "success"
-    assert chat_summary["claim_scope"] == "engineering_simulation_only"
-    assert chat_summary["field_validated"] is False
-    assert chat_summary["control_authority"] == "none"
+    assert not {"claim_scope", "field_validated", "control_authority"} & set(chat_summary)
     assert {item["unit"] for item in chat_summary["selected_setpoints"]} == {
         "K",
         "Pa(a)",
@@ -371,6 +374,44 @@ def test_manifest_and_relative_evidence_are_both_enforced(
         )
 
 
+def test_strict_replay_rejects_a_manifest_consistent_route_ref_tamper(
+    repo_root: Path,
+    tmp_path: Path,
+    make_bundle: Callable[..., SimulationRunBundle],
+) -> None:
+    record, _, repository, simulator = _run(
+        repo_root,
+        tmp_path,
+        make_bundle,
+        multi=False,
+        coverage_policy="point",
+    )
+    route_path = record.run_dir / "solver_route.json"
+    route = json.loads(route_path.read_text(encoding="utf-8"))
+    route["execution_route_ref"]["fingerprint"] = "0" * 64
+    route_path.write_text(
+        json.dumps(route, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    manifest_path = record.run_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["files"]["solver_route.json"] = hashlib.sha256(route_path.read_bytes()).hexdigest()
+    manifest.pop("manifest_fingerprint")
+    manifest["manifest_fingerprint"] = canonical_fingerprint(manifest)
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="stored solver route differs from deterministic routing"):
+        read_offline_run(
+            record.run_dir,
+            strategy_repository=repository,
+            request_factory=CduM7RequestFactory(),
+            simulator=simulator,
+        )
+
+
 @pytest.mark.parametrize(
     ("stage", "artifact_name"),
     [
@@ -412,6 +453,7 @@ def test_committed_event_without_artifact_never_reexecutes(
             record.capability_snapshot.bundle,
             record.intent,
             record.context,
+            record.problem,
             run_root=corrupt_root,
             strategy_repository=repository,
             actor="workflow-test",
@@ -459,6 +501,7 @@ def test_noncontiguous_event_branch_is_rejected_before_missing_stage_reexecutes(
             record.capability_snapshot.bundle,
             record.intent,
             record.context,
+            record.problem,
             run_root=corrupt_root,
             strategy_repository=repository,
             actor="workflow-test",
@@ -501,6 +544,72 @@ def test_strict_replay_recomputes_evaluation_from_immutable_evidence(
         )
 
 
+def test_strict_reload_checks_manifest_audit_identity_outside_semantic_identity(
+    repo_root: Path,
+    tmp_path: Path,
+    make_bundle: Callable[..., SimulationRunBundle],
+) -> None:
+    record, _, _, simulator = _run(
+        repo_root,
+        tmp_path,
+        make_bundle,
+        multi=False,
+        coverage_policy="point",
+    )
+    evidence = record.solver_execution.result.evaluations[0].evidence_refs[0]
+    tampered = replace(evidence, manifest_fingerprint="0" * 64)
+    assert tampered.fingerprint == evidence.fingerprint
+
+    def with_changed_audit(evaluation):
+        return replace(
+            evaluation,
+            evidence_refs=tuple(
+                replace(item, manifest_fingerprint="0" * 64) for item in evaluation.evidence_refs
+            ),
+        )
+
+    changed_result = replace(
+        record.solver_execution.result,
+        evaluations=tuple(
+            with_changed_audit(item) for item in record.solver_execution.result.evaluations
+        ),
+    )
+    changed_execution = replace(record.solver_execution, result=changed_result)
+    assert changed_execution.ref == record.solver_execution.ref
+    assert changed_execution.as_dict() != record.solver_execution.as_dict()
+
+    changed_dynamic = replace(
+        record.dynamic_verification,
+        evaluations=tuple(
+            with_changed_audit(item) for item in record.dynamic_verification.evaluations
+        ),
+    )
+    assert changed_dynamic.ref == record.dynamic_verification.ref
+    assert changed_dynamic.as_dict() != record.dynamic_verification.as_dict()
+
+    assert record.anchor_validation is not None
+    changed_anchors = replace(
+        record.anchor_validation,
+        attempts=tuple(
+            replace(
+                item,
+                static_evaluation=with_changed_audit(item.static_evaluation),
+                dynamic_evaluation=(
+                    None
+                    if item.dynamic_evaluation is None
+                    else with_changed_audit(item.dynamic_evaluation)
+                ),
+            )
+            for item in record.anchor_validation.attempts
+        ),
+    )
+    assert changed_anchors.ref == record.anchor_validation.ref
+    assert changed_anchors.as_dict() != record.anchor_validation.as_dict()
+
+    with pytest.raises(ValueError, match="simulator manifest differs"):
+        _reload_evidence(tampered, run_dir=record.run_dir, simulator=simulator)
+
+
 @pytest.mark.parametrize(
     ("fail_stage", "artifact_name", "event_stage"),
     [
@@ -540,6 +649,7 @@ def test_infrastructure_interruption_does_not_commit_unreplayable_stage(
             bundle,
             intent,
             context,
+            ProblemBuilder().build(bundle, intent, context),
             run_root=run_root,
             strategy_repository=StrategyRepository(tmp_path / "interrupted-library"),
             actor="workflow-test",
@@ -624,6 +734,7 @@ def test_manifest_preflight_rejects_unknown_directory_without_half_commit(
             record.capability_snapshot.bundle,
             record.intent,
             record.context,
+            record.problem,
             run_root=record.run_dir.parent,
             strategy_repository=repository,
             actor="workflow-test",
@@ -723,6 +834,7 @@ def test_unknown_manifest_version_and_incomplete_event_line_are_rejected(
             record.capability_snapshot.bundle,
             record.intent,
             record.context,
+            record.problem,
             run_root=record.run_dir.parent,
             strategy_repository=repository,
             actor="workflow-test",
@@ -751,6 +863,7 @@ def test_unowned_workflow_lock_file_does_not_block_strict_resume(
         record.capability_snapshot.bundle,
         record.intent,
         record.context,
+        record.problem,
         run_root=record.run_dir.parent,
         strategy_repository=repository,
         actor="workflow-test",
@@ -784,6 +897,7 @@ def test_active_workflow_kernel_lock_rejects_second_writer_without_simulation(
             record.capability_snapshot.bundle,
             record.intent,
             record.context,
+            record.problem,
             run_root=record.run_dir.parent,
             strategy_repository=repository,
             actor="workflow-test",
@@ -796,6 +910,7 @@ def test_active_workflow_kernel_lock_rejects_second_writer_without_simulation(
             record.capability_snapshot.bundle,
             record.intent,
             record.context,
+            record.problem,
             run_root=record.run_dir.parent,
             strategy_repository=repository,
             actor="workflow-test",
@@ -828,6 +943,7 @@ def test_valid_artifact_without_event_is_recovered_without_simulation(
         record.capability_snapshot.bundle,
         record.intent,
         record.context,
+        record.problem,
         run_root=record.run_dir.parent,
         strategy_repository=repository,
         actor="workflow-test",
@@ -865,7 +981,7 @@ def test_verified_success_cannot_drop_strategy_and_repository_stale_lock_recover
             None,
         )
 
-    lock_path = repository.root / ".unified-strategy-repository.lock"
+    lock_path = repository.root / ".strategy-repository.lock"
     lock_path.write_text("2147483647", encoding="ascii")
     approved = repository.approve(
         record.strategy.strategy_id if record.strategy is not None else "missing-strategy",
@@ -909,6 +1025,7 @@ def test_strategy_repository_mismatch_stops_before_manifest_commit(
             record.capability_snapshot.bundle,
             record.intent,
             record.context,
+            record.problem,
             run_root=record.run_dir.parent,
             strategy_repository=repository,
             actor="workflow-test",

@@ -12,8 +12,9 @@ from .credentials import load_local_dmx_api_key
 DMX_CHAT_URL: Final[str] = "https://www.dmxapi.cn/v1/chat/completions"
 DMX_CHAT_MODEL: Final[str] = "deepseek-v4-flash-0731"
 DMX_SYSTEM_PROMPT: Final[str] = (
-    "你是石油炼化RTO助手。请用清晰中文回答；解释RTO结果时必须保留原始数值和单位，"
-    "并明确结果仅来自离线工程仿真、未经现场验证且没有现场控制权。"
+    "你是石油炼化RTO助手。请用清晰、自然的中文直接回答，优先解释关键工艺含义；"
+    "解释RTO结果时保留原始数值和单位。只依据对话中提供的数据，不补造测量值、"
+    "设备状态或执行结果，并明确区分建议与已经执行的动作。"
 )
 
 

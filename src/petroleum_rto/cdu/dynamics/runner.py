@@ -12,6 +12,7 @@ from ..core.config import (
     ScenarioConfig,
     validate_config_compatibility,
 )
+from ..core.math_utils import ConvergenceError
 from ..core.types import MaterialStream
 from ..flowsheet.recycle import RecycleSettings, solve_recycle
 from ..properties.components import ComponentCatalog
@@ -92,16 +93,12 @@ def _preflight_scenario(scenario: ScenarioConfig) -> None:
         raise ValueError("scenario time step cannot exceed duration")
     if not isinstance(scenario.name, str) or not scenario.name.strip():
         raise ValueError("scenario name must be a non-empty string")
-    if (
-        not isinstance(scenario.scenario_version, str)
-        or not scenario.scenario_version.strip()
-    ):
+    if not isinstance(scenario.scenario_version, str) or not scenario.scenario_version.strip():
         raise ValueError("scenario version must be a non-empty string")
 
     metadata = scenario.metadata
     if not isinstance(metadata, Mapping) or any(
-        not isinstance(key, str) or not isinstance(value, str)
-        for key, value in metadata.items()
+        not isinstance(key, str) or not isinstance(value, str) for key, value in metadata.items()
     ):
         raise TypeError("scenario metadata must map string keys to string values")
     if metadata.get("synthetic") != "true":
@@ -114,14 +111,10 @@ def _preflight_scenario(scenario: ScenarioConfig) -> None:
     required_event_fields = {"time_s", "target", "value"}
     allowed_event_fields = {*required_event_fields, "duration_s"}
     for index, event in enumerate(scenario.events):
-        if not isinstance(event, Mapping) or any(
-            not isinstance(key, str) for key in event
-        ):
+        if not isinstance(event, Mapping) or any(not isinstance(key, str) for key in event):
             raise TypeError(f"scenario event {index} must be an object with string keys")
         event_fields = set(event)
-        if event_fields != required_event_fields and not (
-            event_fields == allowed_event_fields
-        ):
+        if event_fields != required_event_fields and not (event_fields == allowed_event_fields):
             raise ValueError(
                 f"scenario event {index} fields differ; "
                 f"missing={sorted(required_event_fields - event_fields)}, "
@@ -180,7 +173,7 @@ def run_dynamic_scenario(
     if not recycle.converged:
         stage = recycle.failure_stage or "unknown"
         reason = recycle.failure_reason or "M2 prerequisite did not converge"
-        raise RuntimeError(f"M3 prerequisite failed at {stage}: {reason}")
+        raise ConvergenceError(f"M3 prerequisite failed at {stage}: {reason}")
     dynamic_model = initialize_open_loop_dynamic_model(
         model,
         case,
@@ -189,9 +182,7 @@ def run_dynamic_scenario(
     )
     schedule = schedule_from_scenario(dynamic_model.baseline_commands, scenario)
     version_mapping = {
-        name: value
-        for name, value in versions.as_dict().items()
-        if value is not None
+        name: value for name, value in versions.as_dict().items() if value is not None
     }
     version_mapping["simulation_stage"] = "M3"
     return simulate_dynamic(

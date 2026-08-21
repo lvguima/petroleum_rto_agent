@@ -8,6 +8,7 @@ import pytest
 
 from petroleum_rto.cdu.control.results import ClosedLoopSimulationResult
 from petroleum_rto.cdu.control.scenario import SetpointEvent
+from petroleum_rto.cdu.core.math_utils import ConvergenceError
 from petroleum_rto.cdu.dynamics.simulation import DynamicSimulationResult
 from petroleum_rto.cdu.flowsheet.recycle import RecycleSolveResult
 from petroleum_rto.cdu.runtime import executor
@@ -32,17 +33,14 @@ def test_steady_execution_uses_m5_effective_basis_and_is_deterministic() -> None
     assert first.result_fingerprint == second.result_fingerprint
     assert first.summary == second.summary
     assert not first.timeseries
-    assert first.versions["derived_parameter_set_version"].startswith(
-        "cdu-parameters-m5-"
-    )
+    assert first.versions["derived_parameter_set_version"].startswith("cdu-parameters-m5-")
     assert "overlay.m5" in first.source_fingerprints
-    assert first.source_fingerprints["m6_formal_result"] == (
-        "76c8e86262f96e517c76083677500621bcf777e3e7d2a6e3dd84b4a94e3370ba"
-    )
+    assert "m6_formal_result" not in first.source_fingerprints
+    assert "validation.m6" not in first.source_fingerprints
 
 
 def test_rejected_requests_never_load_resources(monkeypatch: pytest.MonkeyPatch) -> None:
-    def unexpected_load() -> None:
+    def unexpected_load(*args: object) -> None:
         raise AssertionError("resource loader must not run")
 
     monkeypatch.setattr(executor, "load_runtime_resource_bundle", unexpected_load)
@@ -84,6 +82,34 @@ def test_m2_not_converged_status_and_last_valid_fields_are_preserved(
     assert outcome.failure_reason == "fixed point did not converge"
     assert outcome.last_valid is None
     assert outcome.errors[0].retryable
+
+
+def test_structured_convergence_error_maps_to_not_converged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_with_status(*args: object, **kwargs: object) -> None:
+        raise ConvergenceError("structured model convergence failure")
+
+    monkeypatch.setattr(executor, "_execute_steady", fail_with_status)
+
+    outcome = execute(load_preset("steady-baseline"))
+
+    assert outcome.runtime_status == "not_converged"
+    assert outcome.failure_reason == "structured model convergence failure"
+
+
+def test_runtime_error_text_cannot_impersonate_not_converged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_without_status(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("prerequisite failed because a service did not converge")
+
+    monkeypatch.setattr(executor, "_execute_steady", fail_without_status)
+
+    outcome = execute(load_preset("steady-baseline"))
+
+    assert outcome.runtime_status == "failed"
+    assert outcome.failure_reason == ("prerequisite failed because a service did not converge")
 
 
 def test_short_m3_and_m4_dispatch_keep_complete_timeseries_and_events(
@@ -163,17 +189,13 @@ def test_portable_m6_scenarios_preserve_limited_and_rejected_semantics(
     assert not first.errors
     assert len(first.timeseries) == 601
     assert first.result_fingerprint == second.result_fingerprint
-    assert first.summary["execution_profile"] == (
-        "portable_selected_scenario_replay"
-    )
+    assert first.summary["execution_profile"] == ("portable_selected_scenario_replay")
     assert [(event.time_s, event.event_type) for event in first.events] == [
         (60.0, "fault_command"),
         (60.0, "trip_pending"),
         (62.0, "triggered"),
     ]
-    assert all(
-        event.time_s is None or event.time_s >= 60.0 for event in first.events
-    )
+    assert all(event.time_s is None or event.time_s >= 60.0 for event in first.events)
 
     def solver_must_not_run(*args: object, **kwargs: object) -> None:
         raise AssertionError("structural rejection must precede solver execution")
@@ -190,7 +212,7 @@ def test_portable_m6_scenarios_preserve_limited_and_rejected_semantics(
 def test_resource_failure_is_a_failed_outcome_not_a_false_success(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def broken_loader() -> None:
+    def broken_loader(*args: object) -> None:
         raise ValueError("resource hash mismatch")
 
     monkeypatch.setattr(executor, "load_runtime_resource_bundle", broken_loader)

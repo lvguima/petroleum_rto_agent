@@ -20,7 +20,7 @@ from .common import (
 from .reference import ContractRef
 
 OPTIMIZATION_PROBLEM_SCHEMA_ID: Final[str] = "optimization-problem"
-OPTIMIZATION_PROBLEM_SCHEMA_VERSION: Final[str] = "1.0.0"
+OPTIMIZATION_PROBLEM_SCHEMA_VERSION: Final[str] = "2.0.0"
 ENGINEERING_CLAIM_SCOPE: Final[str] = "engineering_simulation_only"
 
 ObjectiveSense = Literal["minimize", "maximize"]
@@ -481,7 +481,6 @@ class SolveRequirements:
 
     maximum_evaluations: int
     deterministic_required: bool
-    gradient_availability: str
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -494,11 +493,6 @@ class SolveRequirements:
             "deterministic_required",
             boolean(self.deterministic_required, context="deterministic_required"),
         )
-        object.__setattr__(
-            self,
-            "gradient_availability",
-            identifier(self.gradient_availability, context="gradient_availability"),
-        )
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, object]) -> SolveRequirements:
@@ -507,7 +501,6 @@ class SolveRequirements:
             required={
                 "maximum_evaluations",
                 "deterministic_required",
-                "gradient_availability",
             },
             context="solve requirements",
         )
@@ -518,16 +511,12 @@ class SolveRequirements:
             deterministic_required=boolean(
                 value["deterministic_required"], context="deterministic_required"
             ),
-            gradient_availability=identifier(
-                value["gradient_availability"], context="gradient_availability"
-            ),
         )
 
     def as_dict(self) -> dict[str, object]:
         return {
             "maximum_evaluations": self.maximum_evaluations,
             "deterministic_required": self.deterministic_required,
-            "gradient_availability": self.gradient_availability,
         }
 
 
@@ -542,6 +531,7 @@ class OptimizationProblem:
     context_ref: ContractRef
     capability_catalog_ref: ContractRef
     system_policy_ref: ContractRef
+    execution_route_ref: ContractRef
     decision_domains: tuple[DecisionDomain, ...]
     objectives: tuple[ObjectiveSpec, ...]
     hard_constraints: tuple[ConstraintRule, ...]
@@ -563,6 +553,7 @@ class OptimizationProblem:
             "context_ref",
             "capability_catalog_ref",
             "system_policy_ref",
+            "execution_route_ref",
         ):
             if not isinstance(getattr(self, name), ContractRef):
                 raise TypeError(f"{name} must be ContractRef")
@@ -625,6 +616,7 @@ class OptimizationProblem:
             "context_ref": self.context_ref.as_dict(),
             "capability_catalog_ref": self.capability_catalog_ref.as_dict(),
             "system_policy_ref": self.system_policy_ref.as_dict(),
+            "execution_route_ref": self.execution_route_ref.as_dict(),
             "decision_domains": [item.as_dict() for item in self.decision_domains],
             "objectives": [item.as_dict() for item in self.objectives],
             "hard_constraints": [item.as_dict() for item in self.hard_constraints],
@@ -669,6 +661,7 @@ class OptimizationProblem:
                 "context_ref",
                 "capability_catalog_ref",
                 "system_policy_ref",
+                "execution_route_ref",
                 "decision_domains",
                 "objectives",
                 "hard_constraints",
@@ -697,6 +690,9 @@ class OptimizationProblem:
             ),
             system_policy_ref=ContractRef.from_mapping(
                 as_mapping(value["system_policy_ref"], context="system_policy_ref")
+            ),
+            execution_route_ref=ContractRef.from_mapping(
+                as_mapping(value["execution_route_ref"], context="execution_route_ref")
             ),
             decision_domains=tuple(
                 DecisionDomain.from_mapping(as_mapping(item, context="decision domain"))

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from petroleum_rto.rto.adapters import CduM7RequestFactory, CduM7Simulator
 from petroleum_rto.rto.capabilities import load_capability_bundle
-from petroleum_rto.rto.compilation import UnifiedCandidatePlanCompiler
+from petroleum_rto.rto.compilation import CandidatePlanCompiler
 from petroleum_rto.rto.context import load_operating_context
 from petroleum_rto.rto.contracts.candidate import (
     CANDIDATE_SCHEMA_VERSION,
@@ -12,9 +12,9 @@ from petroleum_rto.rto.contracts.candidate import (
     CandidateProposal,
 )
 from petroleum_rto.rto.contracts.problem import ENGINEERING_CLAIM_SCOPE
-from petroleum_rto.rto.evaluation import UnifiedM2EvaluationService
-from petroleum_rto.rto.problem import UnifiedProblemBuilder
-from petroleum_rto.rto.unified_inputs import load_optimization_intent
+from petroleum_rto.rto.evaluation import M2EvaluationService
+from petroleum_rto.rto.intent import load_optimization_intent
+from petroleum_rto.rto.problem import ProblemBuilder
 
 
 def test_one_unified_candidate_runs_through_real_cdu_m2_and_reloads_evidence(
@@ -26,7 +26,7 @@ def test_one_unified_candidate_runs_through_real_cdu_m2_and_reloads_evidence(
     intent = load_optimization_intent(
         repo_root / "configs/rto/intents/minimize_specific_furnace_energy.json"
     )
-    problem = UnifiedProblemBuilder().build(bundle, intent, context)
+    problem = ProblemBuilder().build(bundle, intent, context)
     proposal = CandidateProposal(
         schema_version=CANDIDATE_SCHEMA_VERSION,
         proposal_version="candidate-proposal",
@@ -43,11 +43,11 @@ def test_one_unified_candidate_runs_through_real_cdu_m2_and_reloads_evidence(
         claim_scope=ENGINEERING_CLAIM_SCOPE,
     )
     simulator = CduM7Simulator(tmp_path / "runs")
-    service = UnifiedM2EvaluationService(
+    service = M2EvaluationService(
         problem,
         context,
         bundle.catalog,
-        UnifiedCandidatePlanCompiler(bundle.catalog),
+        CandidatePlanCompiler(bundle.catalog),
         CduM7RequestFactory(),
         simulator,
     )

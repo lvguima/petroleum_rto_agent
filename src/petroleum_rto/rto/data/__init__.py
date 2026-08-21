@@ -1,1 +1,1 @@
-"""Packaged copy of the fixed RTO V1 policy bundle for offline installations."""
+"""Packaged copy of the RTO capability bundle."""

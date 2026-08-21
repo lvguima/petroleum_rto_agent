@@ -10,6 +10,10 @@ class NumericalError(RuntimeError):
     """Raised when a numerical routine cannot return a trustworthy result."""
 
 
+class ConvergenceError(NumericalError):
+    """Raised when a numerical or prerequisite solve explicitly does not converge."""
+
+
 def _require_finite(value: float, *, name: str) -> float:
     if not math.isfinite(value):
         raise ValueError(f"{name} must be finite")
@@ -90,9 +94,7 @@ def bisect_root(
         else:
             lower = midpoint
             f_lower = f_midpoint
-    raise NumericalError(
-        f"bisection did not converge after {max_iterations} iterations"
-    )
+    raise ConvergenceError(f"bisection did not converge after {max_iterations} iterations")
 
 
 def rk4_step(

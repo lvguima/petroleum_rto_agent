@@ -12,14 +12,13 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _CONTEXT_PATH = _REPO_ROOT / "configs" / "rto" / "contexts" / "case_20260604.json"
 
 
-def test_operating_status_projects_only_the_trusted_simulation_snapshot() -> None:
+def test_operating_status_projects_only_the_relevant_operating_facts() -> None:
     summary = build_chat_operating_status(load_operating_context(_CONTEXT_PATH))
 
     assert summary == {
         "state_kind": "configured_simulation_context",
         "simulator_mode": "on_demand_offline",
         "simulator_state": "idle",
-        "simulation_executed_for_this_query": False,
         "operating_mode": "normal-steady",
         "fresh_feed_load": {
             "kg_per_s": 113.1388888888889,
@@ -45,10 +44,6 @@ def test_operating_status_projects_only_the_trusted_simulation_snapshot() -> Non
         },
         "data_timestamp": "2026-06-04T09:16:00+08:00",
         "data_quality": "weak-time-alignment",
-        "claim_scope": "engineering_simulation_only",
-        "live_plant_data": False,
-        "field_validated": False,
-        "control_authority": "none",
     }
     serialized = repr(summary)
     for forbidden in (
@@ -58,6 +53,11 @@ def test_operating_status_projects_only_the_trusted_simulation_snapshot() -> Non
         "fingerprint",
         "solver",
         "run_dir",
+        "simulation_executed_for_this_query",
+        "claim_scope",
+        "live_plant_data",
+        "field_validated",
+        "control_authority",
     ):
         assert forbidden not in serialized
 

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from petroleum_rto.rto.capabilities import (
-    build_solver_routing_policy,
+    BundleCapabilityView,
     load_capability_bundle,
 )
 from petroleum_rto.rto.contracts.context import (
@@ -11,14 +13,14 @@ from petroleum_rto.rto.contracts.context import (
 )
 from petroleum_rto.rto.contracts.problem import ENGINEERING_CLAIM_SCOPE, OptimizationProblem
 from petroleum_rto.rto.contracts.reference import ContractRef
-from petroleum_rto.rto.problem import ProblemFeatureAnalyzer, UnifiedProblemBuilder
+from petroleum_rto.rto.intent import OptimizationIntent
+from petroleum_rto.rto.problem import ProblemBuilder, ProblemFeatureAnalyzer
 from petroleum_rto.rto.solvers import (
     CoarseRefineGridSolver,
     FullGridParetoSolver,
     SolverRegistry,
     SolverRouter,
 )
-from petroleum_rto.rto.unified_inputs import OptimizationIntent
 from tests.rto.unit.test_unified_intent import _raw as _intent_raw
 
 
@@ -28,7 +30,6 @@ def _context(bundle) -> OperatingContext:
         schema_version=OPERATING_CONTEXT_SCHEMA_VERSION,
         context_version="case-20260604",
         context_id="case-20260604-nominal",
-        context_schema_ref=bundle.context_schema.ref,
         provider_id="cdu-m7",
         model_ref=ContractRef("cdu-effective-model", "1" * 64),
         case_ref=ContractRef("case-20260604-effective", "2" * 64),
@@ -55,7 +56,7 @@ def _context(bundle) -> OperatingContext:
 def test_same_builder_constructs_single_and_multi_problems_and_routes(repo_root) -> None:
     bundle = load_capability_bundle(repo_root)
     context = _context(bundle)
-    builder = UnifiedProblemBuilder()
+    builder = ProblemBuilder()
     single = builder.build(
         bundle,
         OptimizationIntent.from_mapping(_intent_raw(multi=False)),
@@ -90,9 +91,19 @@ def test_same_builder_constructs_single_and_multi_problems_and_routes(repo_root)
     assert "algorithm" not in str(multi.as_dict()).lower()
 
     registry = SolverRegistry((CoarseRefineGridSolver(), FullGridParetoSolver()))
-    policy = build_solver_routing_policy(bundle)
-    single_route = SolverRouter().route(ProblemFeatureAnalyzer().analyze(single), registry, policy)
-    multi_route = SolverRouter().route(ProblemFeatureAnalyzer().analyze(multi), registry, policy)
+    view = BundleCapabilityView(bundle)
+    single_route = SolverRouter().route(
+        single,
+        ProblemFeatureAnalyzer().analyze(single),
+        registry,
+        view.route_by_ref(single.execution_route_ref),
+    )
+    multi_route = SolverRouter().route(
+        multi,
+        ProblemFeatureAnalyzer().analyze(multi),
+        registry,
+        view.route_by_ref(multi.execution_route_ref),
+    )
 
     assert single_route.decision.selected_solver_id == "coarse-grid-local-refine"
     assert multi_route.decision.selected_solver_id == "deterministic-full-grid"
@@ -101,9 +112,8 @@ def test_same_builder_constructs_single_and_multi_problems_and_routes(repo_root)
 def test_all_objective_and_output_shapes_route_without_schema_forks(repo_root) -> None:
     bundle = load_capability_bundle(repo_root)
     context = _context(bundle)
-    builder = UnifiedProblemBuilder()
+    builder = ProblemBuilder()
     registry = SolverRegistry((CoarseRefineGridSolver(), FullGridParetoSolver()))
-    policy = build_solver_routing_policy(bundle)
     expected = {
         (False, False): ("selected", "coarse-grid-local-refine"),
         (False, True): ("ranked-and-selected", "coarse-grid-local-refine"),
@@ -120,9 +130,10 @@ def test_all_objective_and_output_shapes_route_without_schema_forks(repo_root) -
         }
         problem = builder.build(bundle, OptimizationIntent.from_mapping(raw), context)
         route = SolverRouter().route(
+            problem,
             ProblemFeatureAnalyzer().analyze(problem),
             registry,
-            policy,
+            BundleCapabilityView(bundle).route_by_ref(problem.execution_route_ref),
         )
 
         assert problem.result_request.mode == result_mode
@@ -134,7 +145,7 @@ def test_builder_allows_atomic_decision_subset_without_a_profile(repo_root) -> N
     raw = _intent_raw(multi=False)
     raw["decision_variables"] = ["furnace_temperature_target_k"]
 
-    problem = UnifiedProblemBuilder().build(
+    problem = ProblemBuilder().build(
         bundle,
         OptimizationIntent.from_mapping(raw),
         _context(bundle),
@@ -144,25 +155,25 @@ def test_builder_allows_atomic_decision_subset_without_a_profile(repo_root) -> N
         "furnace_temperature_target_k",
     )
     registry = SolverRegistry((CoarseRefineGridSolver(), FullGridParetoSolver()))
-    policy = build_solver_routing_policy(bundle)
-    route = SolverRouter().route(ProblemFeatureAnalyzer().analyze(problem), registry, policy)
+    route = SolverRouter().route(
+        problem,
+        ProblemFeatureAnalyzer().analyze(problem),
+        registry,
+        BundleCapabilityView(bundle).route_by_ref(problem.execution_route_ref),
+    )
     assert route.decision.selected_solver_id == "coarse-grid-local-refine"
 
 
-def test_builder_requires_trusted_context_fields_and_matching_schema(repo_root) -> None:
+def test_operating_context_directly_requires_fixed_trusted_facts(repo_root) -> None:
     bundle = load_capability_bundle(repo_root)
     intent = OptimizationIntent.from_mapping(_intent_raw(multi=False))
     context = _context(bundle)
-    missing = OperatingContext(
-        **{
-            **context.__dict__,
-            "facts": {"feed_composition": {"naphtha": 0.2, "residue": 0.8}},
-        }
-    )
+    with pytest.raises((TypeError, ValueError), match="fresh_feed_load_kg_s"):
+        OperatingContext(
+            **{
+                **context.__dict__,
+                "facts": {"feed_composition": {"naphtha": 0.2, "residue": 0.8}},
+            }
+        )
 
-    try:
-        UnifiedProblemBuilder().build(bundle, intent, missing)
-    except ValueError as exc:
-        assert "fresh_feed_load_kg_s" in str(exc)
-    else:  # pragma: no cover - defensive assertion
-        raise AssertionError("builder accepted an incomplete trusted context")
+    assert ProblemBuilder().build(bundle, intent, context).context_ref == context.ref

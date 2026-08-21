@@ -1,54 +1,9 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "2.0.0",
   "policy_id": "cdu-rto-system-policy",
-  "policy_version": "1.0.0",
+  "policy_version": "2.0.0",
   "capability_catalog_id": "cdu-rto-capability-catalog",
-  "context_schema_id": "cdu-operating-context-schema",
   "claim_scope": "engineering_simulation_only",
-  "compatibility_rules": [
-    {
-      "rule_id": "available-decision-cardinality",
-      "rule_type": "cardinality",
-      "subject_kind": "decision",
-      "subject_ids": [
-        "furnace_temperature_target_k",
-        "tower_top_pressure_target_pa_a"
-      ],
-      "related_ids": [],
-      "minimum_count": 1,
-      "maximum_count": 2,
-      "message": "意图必须显式选择一个或两个端到端可用的高层设定值。"
-    },
-    {
-      "rule_id": "feed-remains-trusted-context",
-      "rule_type": "requires-context",
-      "subject_kind": "decision",
-      "subject_ids": [
-        "furnace_temperature_target_k",
-        "tower_top_pressure_target_pa_a"
-      ],
-      "related_ids": [
-        "fresh_feed_load_kg_s"
-      ],
-      "minimum_count": null,
-      "maximum_count": null,
-      "message": "进料负荷由受信上下文注入，不作为当前RTO决策变量。"
-    },
-    {
-      "rule_id": "objective-cardinality",
-      "rule_type": "cardinality",
-      "subject_kind": "objective",
-      "subject_ids": [
-        "maximize-valuable-distillate-yield",
-        "minimize-quality-proxy-change",
-        "minimize-specific-furnace-energy"
-      ],
-      "related_ids": [],
-      "minimum_count": 1,
-      "maximum_count": 3,
-      "message": "意图可以选择一至三个已发布目标，不需要预先枚举目标组合。"
-    }
-  ],
   "execution_routes": [
     {
       "route_id": "multiobjective-pareto-route",
@@ -57,7 +12,6 @@
       "maximum_objectives": 3,
       "search_algorithm_id": "deterministic-full-grid",
       "search_algorithm_version": "2.0.0",
-      "points_per_dimension": 9,
       "maximum_m2_candidates": 81,
       "m2_preset_id": "steady-baseline",
       "m4_preset_id": "closed-loop-feed-step",
@@ -70,7 +24,6 @@
         1.0,
         1.05
       ],
-      "cache_policy": "canonical-si-vector-v1",
       "tie_breaks": [
         "minimum-hard-constraint-margin-desc",
         "normalized-action-l1-asc",
@@ -84,7 +37,6 @@
       "maximum_objectives": 1,
       "search_algorithm_id": "coarse-grid-local-refine",
       "search_algorithm_version": "1.0.0",
-      "points_per_dimension": null,
       "maximum_m2_candidates": 33,
       "m2_preset_id": "steady-baseline",
       "m4_preset_id": "closed-loop-feed-step",
@@ -97,7 +49,6 @@
         1.0,
         1.05
       ],
-      "cache_policy": "canonical-si-vector-v1",
       "tie_breaks": [
         "minimum-hard-constraint-margin-desc",
         "normalized-action-l1-asc",
@@ -143,8 +94,5 @@
       "limit": 0.005,
       "normalization_scale": 0.005
     }
-  ],
-  "allowed_assumptions": [
-    "current-crude-and-equipment-mode-remain-fixed"
   ]
 }

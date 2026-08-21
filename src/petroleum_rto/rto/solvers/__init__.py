@@ -3,10 +3,8 @@
 from .models import (
     SOLVER_ROUTING_SCHEMA_VERSION,
     ProblemFeatures,
-    SolverConsideration,
     SolverDescriptor,
     SolverRoutingDecision,
-    SolverRoutingPolicy,
     SolverSupport,
 )
 from .pareto_grid import FullGridParetoSolver
@@ -21,13 +19,11 @@ __all__ = [
     "CoarseRefineGridSolver",
     "FullGridParetoSolver",
     "ProblemFeatures",
-    "SolverConsideration",
     "SolverDescriptor",
     "SolverPort",
     "SolverRegistry",
     "SolverRoute",
     "SolverRouter",
     "SolverRoutingDecision",
-    "SolverRoutingPolicy",
     "SolverSupport",
 ]

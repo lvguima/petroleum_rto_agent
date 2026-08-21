@@ -19,18 +19,16 @@ from petroleum_rto.cdu.runtime import (
     run,
 )
 
-from ..contracts import (
-    CLAIM_SCOPE,
-    RTO_SCHEMA_VERSION,
-    ContractRef,
-    JsonValue,
-    OperatingContextV1,
-    SimulationEvaluationRequestV1,
-    SimulationPreviewV1,
-    SimulationRunBundleV1,
-)
-from ..contracts.common import thaw_json
+from ..contracts.common import JsonValue, thaw_json
 from ..contracts.context import OperatingContext
+from ..contracts.problem import ENGINEERING_CLAIM_SCOPE
+from ..contracts.reference import ContractRef
+from ..contracts.simulation import (
+    SIMULATION_SCHEMA_VERSION,
+    SimulationEvaluationRequest,
+    SimulationPreview,
+    SimulationRunBundle,
+)
 
 ATMOSPHERIC_PRESSURE_PA: Final[float] = 101_325.0
 
@@ -47,19 +45,17 @@ class CduM7RequestFactory:
         return "cdu-m7-candidate-compiler-v1"
 
     @staticmethod
-    def _validate_context(context: OperatingContextV1 | OperatingContext) -> None:
-        if context.provider_id not in {"cdu-m7", "cdu-m7-v1"}:
+    def _validate_context(context: OperatingContext) -> None:
+        if context.provider_id != "cdu-m7":
             raise ValueError("operating context belongs to another simulator provider")
 
     @staticmethod
     def _context_feed_mass_flow_kg_s(
-        context: OperatingContextV1 | OperatingContext,
+        context: OperatingContext,
     ) -> float:
-        if isinstance(context, OperatingContextV1):
-            return context.feed_mass_flow_kg_s
         value = context.facts.get("fresh_feed_load_kg_s")
         if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise TypeError("unified context requires numeric fresh_feed_load_kg_s")
+            raise TypeError("context requires numeric fresh_feed_load_kg_s")
         result = float(value)
         if not math.isfinite(result) or result <= 0.0:
             raise ValueError("fresh_feed_load_kg_s must be positive and finite")
@@ -67,7 +63,7 @@ class CduM7RequestFactory:
 
     @staticmethod
     def _complete_decisions(
-        context: OperatingContextV1 | OperatingContext,
+        context: OperatingContext,
         decision_values: Mapping[str, float],
     ) -> tuple[dict[str, float], frozenset[str]]:
         expected = {
@@ -91,7 +87,7 @@ class CduM7RequestFactory:
 
     @staticmethod
     def _parameters(
-        context: OperatingContextV1 | OperatingContext,
+        context: OperatingContext,
         decision_values: Mapping[str, float],
     ) -> dict[str, float]:
         completed, _ = CduM7RequestFactory._complete_decisions(context, decision_values)
@@ -111,13 +107,9 @@ class CduM7RequestFactory:
 
     @staticmethod
     def _initial_state(
-        context: OperatingContextV1 | OperatingContext,
+        context: OperatingContext,
     ) -> dict[str, float]:
-        ratios = (
-            context.initial_inventory_ratios
-            if isinstance(context, OperatingContextV1)
-            else context.initial_state
-        )
+        ratios = context.initial_state
         return {
             "inventory.flash_drum_ratio": ratios["flash_drum"],
             "inventory.reflux_drum_ratio": ratios["reflux_drum"],
@@ -126,7 +118,7 @@ class CduM7RequestFactory:
 
     def build_m2_request(
         self,
-        context: OperatingContextV1 | OperatingContext,
+        context: OperatingContext,
         decision_values: Mapping[str, float],
     ) -> Mapping[str, JsonValue]:
         self._validate_context(context)
@@ -136,7 +128,7 @@ class CduM7RequestFactory:
 
     def build_m4_request(
         self,
-        context: OperatingContextV1 | OperatingContext,
+        context: OperatingContext,
         decision_values: Mapping[str, float],
         *,
         candidate: bool,
@@ -189,7 +181,7 @@ class CduM7Simulator:
         self._output_root = output_root
 
     @staticmethod
-    def _provider_request(request: SimulationEvaluationRequestV1) -> RunRequest:
+    def _provider_request(request: SimulationEvaluationRequest) -> RunRequest:
         if request.provider_id != "cdu-m7-v1":
             raise ValueError("simulation request targets another provider")
         raw = thaw_json(cast(JsonValue, request.provider_request))
@@ -205,32 +197,32 @@ class CduM7Simulator:
         return provider_request
 
     @staticmethod
-    def _request_ref(request: SimulationEvaluationRequestV1) -> ContractRef:
+    def _request_ref(request: SimulationEvaluationRequest) -> ContractRef:
         return ContractRef(request.request_id, request.fingerprint)
 
-    def preview(self, request: SimulationEvaluationRequestV1) -> SimulationPreviewV1:
-        if not isinstance(request, SimulationEvaluationRequestV1):
-            raise TypeError("preview requires a SimulationEvaluationRequestV1")
+    def preview(self, request: SimulationEvaluationRequest) -> SimulationPreview:
+        if not isinstance(request, SimulationEvaluationRequest):
+            raise TypeError("preview requires a SimulationEvaluationRequest")
         resolved = preview(self._provider_request(request))
-        return SimulationPreviewV1(
-            schema_version=RTO_SCHEMA_VERSION,
-            preview_version="simulation-preview-v1",
+        return SimulationPreview(
+            schema_version=SIMULATION_SCHEMA_VERSION,
+            preview_version="simulation-preview",
             simulation_request_ref=self._request_ref(request),
             provider_id="cdu-m7-v1",
             provider_preview_fingerprint=resolved.preview_fingerprint,
             effective_input_fingerprint=resolved.execution_input_fingerprint,
             base_object_fingerprints=resolved.base_object_fingerprints,
             effective_object_fingerprints=resolved.effective_object_fingerprints,
-            claim_scope=CLAIM_SCOPE,
+            claim_scope=ENGINEERING_CLAIM_SCOPE,
         )
 
     def evaluate(
         self,
-        request: SimulationEvaluationRequestV1,
+        request: SimulationEvaluationRequest,
         expected_preview_fingerprint: str,
-    ) -> SimulationRunBundleV1:
-        if not isinstance(request, SimulationEvaluationRequestV1):
-            raise TypeError("evaluate requires a SimulationEvaluationRequestV1")
+    ) -> SimulationRunBundle:
+        if not isinstance(request, SimulationEvaluationRequest):
+            raise TypeError("evaluate requires a SimulationEvaluationRequest")
         provider_request = self._provider_request(request)
         current_preview = preview(provider_request)
         if expected_preview_fingerprint != current_preview.preview_fingerprint:
@@ -243,16 +235,16 @@ class CduM7Simulator:
         verified = read_run(record.run_dir)
         return self._bundle(verified)
 
-    def read_evidence(self, run_ref: Path) -> SimulationRunBundleV1:
+    def read_evidence(self, run_ref: Path) -> SimulationRunBundle:
         if not isinstance(run_ref, Path):
             raise TypeError("run_ref must be a pathlib.Path")
         return self._bundle(read_run(run_ref))
 
     @staticmethod
-    def _bundle(record: RunRecord) -> SimulationRunBundleV1:
-        return SimulationRunBundleV1(
-            schema_version=RTO_SCHEMA_VERSION,
-            bundle_version="simulation-run-bundle-v1",
+    def _bundle(record: RunRecord) -> SimulationRunBundle:
+        return SimulationRunBundle(
+            schema_version=SIMULATION_SCHEMA_VERSION,
+            bundle_version="simulation-run-bundle",
             provider_id="cdu-m7-v1",
             provider_request_fingerprint=record.request.request_fingerprint,
             run_ref=str(record.run_dir.resolve()),
@@ -270,5 +262,5 @@ class CduM7Simulator:
             failure_stage=record.payload.failure_stage,
             failure_reason=record.payload.failure_reason,
             synthetic=record.manifest.synthetic,
-            claim_scope=CLAIM_SCOPE,
+            claim_scope=ENGINEERING_CLAIM_SCOPE,
         )

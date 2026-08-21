@@ -1,7 +1,7 @@
 """Public protocol boundary for a future vertical-domain model."""
 
 from ..contracts.reference import ContractRef
-from ..unified_inputs import OptimizationIntent
+from ..intent import OptimizationIntent
 from .factory import build_intent_communication_service
 from .invocation import (
     DOMAIN_MODEL_INVOCATION_RESULT_SCHEMA_ID,

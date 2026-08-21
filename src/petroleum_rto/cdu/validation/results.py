@@ -12,15 +12,17 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Final, Literal
+from typing import TYPE_CHECKING, Final, Literal
 
 from ... import __version__ as SOFTWARE_VERSION
 from ..core.config import canonical_fingerprint
-from .basis import M6Basis
 from .domain import ApplicabilityAssessment
 from .protection import ProtectionTrace
 from .tracking import ControllerTrackingEvidence
 from .uncertainty import LocalSensitivityAnalysis, UncertaintyPropagationResult
+
+if TYPE_CHECKING:
+    from .basis import M6Basis
 
 type ScenarioStatus = Literal["passed", "limited", "rejected", "failed"]
 type ExpectedScenarioStatus = Literal["passed", "limited", "rejected"]
@@ -68,16 +70,10 @@ M6_RESULT_METADATA: Final[Mapping[str, str]] = MappingProxyType(
     }
 )
 
-_IDENTIFIER: Final[re.Pattern[str]] = re.compile(
-    r"^[A-Za-z0-9][A-Za-z0-9._-]*$"
-)
+_IDENTIFIER: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _SHA256: Final[re.Pattern[str]] = re.compile(r"^[0-9a-f]{64}$")
-_SCENARIO_STATUSES: Final[frozenset[str]] = frozenset(
-    {"passed", "limited", "rejected", "failed"}
-)
-_EXPECTED_STATUSES: Final[frozenset[str]] = frozenset(
-    {"passed", "limited", "rejected"}
-)
+_SCENARIO_STATUSES: Final[frozenset[str]] = frozenset({"passed", "limited", "rejected", "failed"})
+_EXPECTED_STATUSES: Final[frozenset[str]] = frozenset({"passed", "limited", "rejected"})
 _VERIFICATION_OUTCOMES: Final[frozenset[str]] = frozenset({"passed", "failed"})
 _EXECUTION_LAYERS: Final[frozenset[str]] = frozenset(
     {
@@ -122,8 +118,7 @@ def _identifiers(values: Sequence[str], *, context: str) -> tuple[str, ...]:
     if isinstance(values, (str, bytes, bytearray)):
         raise TypeError(f"{context} must be a sequence of identifiers")
     copied = tuple(
-        _identifier(value, context=f"{context}[{index}]")
-        for index, value in enumerate(values)
+        _identifier(value, context=f"{context}[{index}]") for index, value in enumerate(values)
     )
     if not copied:
         raise ValueError(f"{context} cannot be empty")
@@ -180,9 +175,7 @@ def _source_origins(values: Sequence[str]) -> tuple[str, ...]:
 def _trace_summary(trace: ProtectionTrace) -> dict[str, object]:
     event_kind_counts: dict[str, int] = {}
     for event in trace.events:
-        event_kind_counts[event.event_kind] = (
-            event_kind_counts.get(event.event_kind, 0) + 1
-        )
+        event_kind_counts[event.event_kind] = event_kind_counts.get(event.event_kind, 0) + 1
     return {
         "rule_ids": [rule.rule_id for rule in trace.rules],
         "frame_count": len(trace.frames),
@@ -190,18 +183,10 @@ def _trace_summary(trace: ProtectionTrace) -> dict[str, object]:
         "last_time_s": trace.last_time_s,
         "active_rule_ids": list(trace.active_actions),
         "triggered_rule_ids": sorted(
-            {
-                event.rule_id
-                for event in trace.events
-                if event.event_kind == "triggered"
-            }
+            {event.rule_id for event in trace.events if event.event_kind == "triggered"}
         ),
-        "final_phases": {
-            rule.rule_id: trace.states[rule.rule_id].phase for rule in trace.rules
-        },
-        "event_kind_counts": {
-            name: event_kind_counts[name] for name in sorted(event_kind_counts)
-        },
+        "final_phases": {rule.rule_id: trace.states[rule.rule_id].phase for rule in trace.rules},
+        "event_kind_counts": {name: event_kind_counts[name] for name in sorted(event_kind_counts)},
         "trace_fingerprint": canonical_fingerprint(trace.as_dict()),
     }
 
@@ -294,9 +279,7 @@ class ScenarioValidationResult:
             if self.solver_called:
                 raise ValueError("a structurally rejected scenario cannot call a solver")
             if metrics or direction_checks or conservation_checks:
-                raise ValueError(
-                    "a structurally rejected scenario cannot expose numerical results"
-                )
+                raise ValueError("a structurally rejected scenario cannot expose numerical results")
             if self.protection_trace is not None:
                 raise ValueError(
                     "a structurally rejected scenario cannot expose a protection trace"
@@ -314,17 +297,11 @@ class ScenarioValidationResult:
         elif self.scenario_status == "limited":
             if self.solver_called:
                 if not metrics or not conservation_checks:
-                    raise ValueError(
-                        "a solver-called limited scenario requires numerical evidence"
-                    )
+                    raise ValueError("a solver-called limited scenario requires numerical evidence")
                 if self.engine_status != "success":
-                    raise ValueError(
-                        "a non-failed limited scenario requires engine_status=success"
-                    )
+                    raise ValueError("a non-failed limited scenario requires engine_status=success")
             elif self.protection_trace is None:
-                raise ValueError(
-                    "a limited scenario without a solver requires protection evidence"
-                )
+                raise ValueError("a limited scenario without a solver requires protection evidence")
 
         if self.scenario_status == "failed":
             if self.failure_stage is None or self.failure_reason is None:
@@ -334,19 +311,12 @@ class ScenarioValidationResult:
         elif self.failure_stage is not None or self.failure_reason is not None:
             raise ValueError("a non-failed scenario cannot have failure information")
 
-        checks_passed = all(direction_checks.values()) and all(
-            conservation_checks.values()
-        )
+        checks_passed = all(direction_checks.values()) and all(conservation_checks.values())
         expected_verification = (
-            "passed"
-            if self.scenario_status == self.expected_status
-            and checks_passed
-            else "failed"
+            "passed" if self.scenario_status == self.expected_status and checks_passed else "failed"
         )
         if self.verification_outcome != expected_verification:
-            raise ValueError(
-                "verification_outcome differs from status and check evidence"
-            )
+            raise ValueError("verification_outcome differs from status and check evidence")
 
         object.__setattr__(self, "metrics", metrics)
         object.__setattr__(self, "direction_checks", direction_checks)
@@ -378,9 +348,7 @@ class ScenarioValidationResult:
             "direction_checks": dict(self.direction_checks),
             "conservation_checks": dict(self.conservation_checks),
             "protection_trace": (
-                None
-                if self.protection_trace is None
-                else self.protection_trace.as_dict()
+                None if self.protection_trace is None else self.protection_trace.as_dict()
             ),
             "protection_trace_summary": self.protection_trace_summary,
             "source_origins": list(self.source_origins),
@@ -431,6 +399,8 @@ class M6ValidationResult:
     failure_time_s: float | None = None
 
     def __post_init__(self) -> None:
+        from .basis import M6Basis
+
         if self.schema_version != M6_RESULT_SCHEMA_VERSION:
             raise ValueError("schema_version differs from the M6 result contract")
         if self.status not in _RESULT_STATUSES:
@@ -456,9 +426,7 @@ class M6ValidationResult:
         if any(not isinstance(item, ScenarioValidationResult) for item in scenarios):
             raise TypeError("scenarios must contain ScenarioValidationResult values")
         if tuple(item.scenario_id for item in scenarios) != required_scenario_ids:
-            raise ValueError(
-                "scenarios must exactly cover required_scenario_ids in config order"
-            )
+            raise ValueError("scenarios must exactly cover required_scenario_ids in config order")
 
         required_plan_ids = _identifiers(
             self.required_plan_ids,
@@ -482,13 +450,9 @@ class M6ValidationResult:
             analysis = analyses[plan_id]
             propagation = uncertainty[plan_id]
             if not isinstance(analysis, LocalSensitivityAnalysis):
-                raise TypeError(
-                    f"sensitivity_analyses.{plan_id} must be a local analysis"
-                )
+                raise TypeError(f"sensitivity_analyses.{plan_id} must be a local analysis")
             if not isinstance(propagation, UncertaintyPropagationResult):
-                raise TypeError(
-                    f"uncertainty_results.{plan_id} must be a propagation result"
-                )
+                raise TypeError(f"uncertainty_results.{plan_id} must be a propagation result")
             if not analysis.complete:
                 raise ValueError(f"sensitivity_analyses.{plan_id} is incomplete")
             if analysis.basis_fingerprint != self.basis.analysis_basis_fingerprint:
@@ -496,16 +460,12 @@ class M6ValidationResult:
             if propagation.basis_fingerprint != analysis.basis_fingerprint:
                 raise ValueError(f"uncertainty_results.{plan_id} uses another basis")
             if propagation.sensitivity_fingerprint != analysis.analysis_fingerprint:
-                raise ValueError(
-                    f"uncertainty_results.{plan_id} uses another sensitivity analysis"
-                )
+                raise ValueError(f"uncertainty_results.{plan_id} uses another sensitivity analysis")
 
         raw_unquantified = dict(self.plan_unquantified_sources)
         raw_plan_origins = dict(self.plan_source_origins)
         if set(raw_unquantified) != set(required_plan_ids):
-            raise ValueError(
-                "plan_unquantified_sources must exactly cover required_plan_ids"
-            )
+            raise ValueError("plan_unquantified_sources must exactly cover required_plan_ids")
         if set(raw_plan_origins) != set(required_plan_ids):
             raise ValueError("plan_source_origins must exactly cover required_plan_ids")
         plan_unquantified: dict[str, tuple[str, ...]] = {}
@@ -539,9 +499,7 @@ class M6ValidationResult:
         )
         raw_traces = dict(self.protection_traces)
         if set(raw_traces) != set(required_rule_ids):
-            raise ValueError(
-                "protection_traces must exactly cover required_protection_rule_ids"
-            )
+            raise ValueError("protection_traces must exactly cover required_protection_rule_ids")
         traces: dict[str, ProtectionTrace] = {}
         expected_tracking: dict[str, str] = {}
         for rule_id in required_rule_ids:
@@ -549,9 +507,7 @@ class M6ValidationResult:
             if not isinstance(trace, ProtectionTrace):
                 raise TypeError(f"protection_traces.{rule_id} must be a ProtectionTrace")
             if tuple(rule.rule_id for rule in trace.rules) != (rule_id,):
-                raise ValueError(
-                    f"protection_traces.{rule_id} must contain exactly its named rule"
-                )
+                raise ValueError(f"protection_traces.{rule_id} must contain exactly its named rule")
             rule = trace.rules[0]
             for loop_id in rule.action.manual_tracking_loop_ids:
                 expected_tracking[f"{rule_id}.{loop_id}"] = loop_id
@@ -567,21 +523,15 @@ class M6ValidationResult:
             _identifier(evidence_id, context="controller_tracking evidence_id")
             evidence = raw_tracking[evidence_id]
             if not isinstance(evidence, ControllerTrackingEvidence):
-                raise TypeError(
-                    f"controller_tracking.{evidence_id} must be tracking evidence"
-                )
+                raise TypeError(f"controller_tracking.{evidence_id} must be tracking evidence")
             if evidence.loop_id != expected_tracking[evidence_id]:
-                raise ValueError(
-                    f"controller_tracking.{evidence_id} loop_id differs from its rule"
-                )
+                raise ValueError(f"controller_tracking.{evidence_id} loop_id differs from its rule")
             expected_pass = (
                 evidence.final_tracking_error <= evidence.tolerance
                 and evidence.automatic_return_jump <= evidence.tolerance
             )
             if evidence.passed != expected_pass:
-                raise ValueError(
-                    f"controller_tracking.{evidence_id} pass flag differs from errors"
-                )
+                raise ValueError(f"controller_tracking.{evidence_id} pass flag differs from errors")
             tracking[evidence_id] = evidence
 
         checks = dict(self.completion_checks)
@@ -589,9 +539,7 @@ class M6ValidationResult:
             raise ValueError("completion_checks differ from the fixed M6 gate set")
         if any(not isinstance(value, bool) for value in checks.values()):
             raise TypeError("completion_checks values must be boolean")
-        ordered_checks = MappingProxyType(
-            {name: checks[name] for name in M6_COMPLETION_CHECK_IDS}
-        )
+        ordered_checks = MappingProxyType({name: checks[name] for name in M6_COMPLETION_CHECK_IDS})
 
         source_composition = dict(self.source_composition)
         if source_composition != dict(M6_SOURCE_COMPOSITION):
@@ -615,9 +563,7 @@ class M6ValidationResult:
         object.__setattr__(
             self,
             "plan_source_origins",
-            MappingProxyType(
-                {plan_id: plan_origins[plan_id] for plan_id in required_plan_ids}
-            ),
+            MappingProxyType({plan_id: plan_origins[plan_id] for plan_id in required_plan_ids}),
         )
         object.__setattr__(self, "required_protection_rule_ids", required_rule_ids)
         object.__setattr__(
@@ -641,8 +587,7 @@ class M6ValidationResult:
         valid_scenario_ids = tuple(
             scenario.scenario_id
             for scenario in scenarios
-            if scenario.scenario_status != "failed"
-            and scenario.verification_outcome == "passed"
+            if scenario.scenario_status != "failed" and scenario.verification_outcome == "passed"
         )
         last_valid_ids = tuple(self.last_valid_scenario_ids)
         if last_valid_ids != valid_scenario_ids:
@@ -690,31 +635,27 @@ class M6ValidationResult:
                 default=0.0,
             )
             if float(self.failure_time_s) < retained_trace_time:
-                raise ValueError(
-                    "M6 failure_time_s cannot precede retained scenario evidence"
-                )
+                raise ValueError("M6 failure_time_s cannot precede retained scenario evidence")
             object.__setattr__(self, "failure_time_s", float(self.failure_time_s))
 
     @property
     def completion_passed(self) -> bool:
         scenario_gate = all(
-            scenario.verification_outcome == "passed"
-            and scenario.scenario_status != "failed"
+            scenario.verification_outcome == "passed" and scenario.scenario_status != "failed"
             for scenario in self.scenarios
         )
-        solver_scenarios = tuple(
-            scenario for scenario in self.scenarios if scenario.solver_called
-        )
+        solver_scenarios = tuple(scenario for scenario in self.scenarios if scenario.solver_called)
         conservation_gate = bool(solver_scenarios) and all(
-            bool(scenario.conservation_checks)
-            and all(scenario.conservation_checks.values())
+            bool(scenario.conservation_checks) and all(scenario.conservation_checks.values())
             for scenario in solver_scenarios
         )
-        protection_gate = bool(self.protection_traces) and all(
-            any(event.event_kind == "triggered" for event in trace.events)
-            for trace in self.protection_traces.values()
-        ) and all(
-            evidence.passed for evidence in self.controller_tracking.values()
+        protection_gate = (
+            bool(self.protection_traces)
+            and all(
+                any(event.event_kind == "triggered" for event in trace.events)
+                for trace in self.protection_traces.values()
+            )
+            and all(evidence.passed for evidence in self.controller_tracking.values())
         )
         return (
             scenario_gate
@@ -731,9 +672,7 @@ class M6ValidationResult:
                 "model_version": self.basis.model.model_version,
                 "model_config_version": self.basis.model.config_version,
                 "base_parameter_set_version": self.basis.base_parameter_set_version,
-                "derived_parameter_set_version": (
-                    self.basis.derived_parameter_set_version
-                ),
+                "derived_parameter_set_version": (self.basis.derived_parameter_set_version),
                 "base_case_version": self.basis.base_case_version,
                 "derived_case_version": self.basis.derived_case_version,
                 "control_version": self.control_version,
@@ -750,9 +689,7 @@ class M6ValidationResult:
             {
                 "scenario_set_version": self.scenario_set_version,
                 "required_scenario_ids": list(self.required_scenario_ids),
-                "scenario_results": [
-                    scenario.result_fingerprint for scenario in self.scenarios
-                ],
+                "scenario_results": [scenario.result_fingerprint for scenario in self.scenarios],
             }
         )
         plan_fingerprint = canonical_fingerprint(
@@ -827,9 +764,7 @@ class M6ValidationResult:
                 plan_id: list(self.plan_source_origins[plan_id])
                 for plan_id in self.required_plan_ids
             },
-            "required_protection_rule_ids": list(
-                self.required_protection_rule_ids
-            ),
+            "required_protection_rule_ids": list(self.required_protection_rule_ids),
             "protection_traces": {
                 rule_id: self.protection_traces[rule_id].as_dict()
                 for rule_id in self.required_protection_rule_ids

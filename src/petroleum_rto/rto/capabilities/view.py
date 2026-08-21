@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from ..unified_inputs.models import ObjectiveSense, PreferenceRequest, ResultRequest
-from .models import ExecutionRoute, UnifiedCapabilityBundle
+from ..contracts.reference import ContractRef
+from ..intent.models import ObjectiveSense, PreferenceRequest, ResultRequest
+from .models import CapabilityBundle, ExecutionRoute
 
 
 class BundleCapabilityView:
     """Expose only the semantic checks required by IntentResolver."""
 
-    def __init__(self, bundle: UnifiedCapabilityBundle) -> None:
-        if not isinstance(bundle, UnifiedCapabilityBundle):
-            raise TypeError("bundle must be UnifiedCapabilityBundle")
+    def __init__(self, bundle: CapabilityBundle) -> None:
+        if not isinstance(bundle, CapabilityBundle):
+            raise TypeError("bundle must be CapabilityBundle")
         self._bundle = bundle
 
     def objective_sense(self, metric_id: str) -> ObjectiveSense | None:
@@ -66,3 +67,15 @@ class BundleCapabilityView:
         if len(matches) > 1:
             raise ValueError("system policy contains overlapping execution routes")
         return None if not matches else matches[0]
+
+    def route_by_ref(self, route_ref: ContractRef) -> ExecutionRoute:
+        """Resolve exactly one immutable route already bound into a problem."""
+
+        if not isinstance(route_ref, ContractRef):
+            raise TypeError("route_ref must be ContractRef")
+        matches = tuple(
+            item for item in self._bundle.system_policy.execution_routes if item.ref == route_ref
+        )
+        if len(matches) != 1:
+            raise ValueError("execution route reference is not present exactly once in policy")
+        return matches[0]

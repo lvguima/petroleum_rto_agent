@@ -1,4 +1,4 @@
-"""Load the unified capability inputs from fixed, source-controlled paths."""
+"""Load the capability inputs from fixed, source-controlled paths."""
 
 from __future__ import annotations
 
@@ -9,22 +9,19 @@ from pathlib import Path
 
 from ..contracts.common import as_mapping, digest, strict_keys
 from ..contracts.reference import ContractRef
-from .models import CapabilityCatalog, ContextSchema, SystemPolicy, UnifiedCapabilityBundle
+from .models import CapabilityBundle, CapabilityCatalog, SystemPolicy
 
 _MAX_CONFIG_BYTES = 1_000_000
 _FILES = {
     "catalog": "catalog.json",
-    "context_schema": "context_schema.json",
     "system_policy": "system_policy.json",
 }
 _RESOURCE_PACKAGE = "petroleum_rto.rto.data"
-_RESOURCE_NAME = "unified_bundle.json"
+_RESOURCE_NAME = "capability_bundle.json"
 _BUNDLE_FIELDS = {
     "catalog",
-    "context_schema",
     "system_policy",
     "catalog_ref",
-    "context_schema_ref",
     "system_policy_ref",
     "bundle_fingerprint",
 }
@@ -65,39 +62,35 @@ def _load_strict_object(path: Path, *, context: str) -> object:
 
 def _bundle_from_components(
     catalog_raw: Mapping[str, object],
-    context_raw: Mapping[str, object],
     policy_raw: Mapping[str, object],
-) -> UnifiedCapabilityBundle:
-    return UnifiedCapabilityBundle(
+) -> CapabilityBundle:
+    return CapabilityBundle(
         catalog=CapabilityCatalog.from_mapping(catalog_raw),
-        context_schema=ContextSchema.from_mapping(context_raw),
         system_policy=SystemPolicy.from_mapping(policy_raw),
     )
 
 
-def _packaged_bundle() -> UnifiedCapabilityBundle:
+def _packaged_bundle() -> CapabilityBundle:
     try:
         resource = resources.files(_RESOURCE_PACKAGE).joinpath(_RESOURCE_NAME)
         value = _parse_strict_object(
             resource.read_bytes(),
-            context="packaged unified capability bundle",
+            context="packaged capability bundle",
         )
     except (FileNotFoundError, ModuleNotFoundError) as exc:
-        raise ValueError("packaged unified capability bundle is missing") from exc
-    raw = as_mapping(value, context="packaged unified capability bundle")
+        raise ValueError("packaged capability bundle is missing") from exc
+    raw = as_mapping(value, context="packaged capability bundle")
     strict_keys(
         raw,
         required=_BUNDLE_FIELDS,
-        context="packaged unified capability bundle",
+        context="packaged capability bundle",
     )
     bundle = _bundle_from_components(
         as_mapping(raw["catalog"], context="packaged bundle.catalog"),
-        as_mapping(raw["context_schema"], context="packaged bundle.context_schema"),
         as_mapping(raw["system_policy"], context="packaged bundle.system_policy"),
     )
     expected_refs = {
         "catalog_ref": bundle.catalog.ref,
-        "context_schema_ref": bundle.context_schema.ref,
         "system_policy_ref": bundle.system_policy.ref,
     }
     for field, expected in expected_refs.items():
@@ -111,8 +104,8 @@ def _packaged_bundle() -> UnifiedCapabilityBundle:
     return bundle
 
 
-def load_capability_bundle(repo_root: Path | None = None) -> UnifiedCapabilityBundle:
-    """Load fixed unified capabilities from a checkout or the installed package."""
+def load_capability_bundle(repo_root: Path | None = None) -> CapabilityBundle:
+    """Load fixed capabilities from a checkout or the installed package."""
 
     if repo_root is not None and not isinstance(repo_root, Path):
         raise TypeError("repo_root must be pathlib.Path or None")
@@ -125,22 +118,18 @@ def load_capability_bundle(repo_root: Path | None = None) -> UnifiedCapabilityBu
     for name, relative in _FILES.items():
         path = (config_root / relative).resolve()
         if not path.is_relative_to(config_root) or not path.is_file():
-            raise ValueError(f"required unified capability config is missing or unsafe: {relative}")
+            raise ValueError(f"required capability config is missing or unsafe: {relative}")
         resolved[name] = path
 
     catalog_raw = as_mapping(
         _load_strict_object(resolved["catalog"], context="capability catalog"),
         context="capability catalog",
     )
-    context_raw = as_mapping(
-        _load_strict_object(resolved["context_schema"], context="context schema"),
-        context="context schema",
-    )
     policy_raw = as_mapping(
         _load_strict_object(resolved["system_policy"], context="system policy"),
         context="system policy",
     )
-    checkout = _bundle_from_components(catalog_raw, context_raw, policy_raw)
+    checkout = _bundle_from_components(catalog_raw, policy_raw)
     if checkout != packaged or checkout.fingerprint != packaged.fingerprint:
-        raise ValueError("checkout unified capability configs differ from packaged bundle")
+        raise ValueError("checkout capability configs differ from packaged bundle")
     return checkout

@@ -1,13 +1,10 @@
 """Public M6 engineering-validation API."""
 
-from .artifacts import (
-    M6_ARTIFACT_PATHS,
-    M6ArtifactManifest,
-    m6_failure_payload,
-    verify_m6_artifacts,
-    write_m6_artifacts,
-)
-from .basis import M6Basis, load_m6_basis
+from __future__ import annotations
+
+from importlib import import_module
+from typing import TYPE_CHECKING, Final
+
 from .config import (
     M6ValidationConfig,
     ReportAcceptanceThresholds,
@@ -46,7 +43,6 @@ from .results import (
     M6ValidationResult,
     ScenarioValidationResult,
 )
-from .runner import M6ValidationExecutionError, run_m6_validation
 from .scenarios import (
     DYNAMIC_COMMAND_FACTOR_TARGETS,
     STEADY_FACTOR_IDS,
@@ -67,6 +63,42 @@ from .uncertainty import (
     propagate_uncertainty,
     run_local_sensitivity,
 )
+
+if TYPE_CHECKING:
+    from .artifacts import (
+        M6_ARTIFACT_PATHS,
+        M6ArtifactManifest,
+        m6_failure_payload,
+        verify_m6_artifacts,
+        write_m6_artifacts,
+    )
+    from .basis import M6Basis, load_m6_basis
+    from .runner import M6ValidationExecutionError, run_m6_validation
+
+_DEFERRED_EXPORTS: Final[dict[str, tuple[str, str]]] = {
+    "M6_ARTIFACT_PATHS": (".artifacts", "M6_ARTIFACT_PATHS"),
+    "M6ArtifactManifest": (".artifacts", "M6ArtifactManifest"),
+    "m6_failure_payload": (".artifacts", "m6_failure_payload"),
+    "verify_m6_artifacts": (".artifacts", "verify_m6_artifacts"),
+    "write_m6_artifacts": (".artifacts", "write_m6_artifacts"),
+    "M6Basis": (".basis", "M6Basis"),
+    "load_m6_basis": (".basis", "load_m6_basis"),
+    "M6ValidationExecutionError": (".runner", "M6ValidationExecutionError"),
+    "run_m6_validation": (".runner", "run_m6_validation"),
+}
+
+
+def __getattr__(name: str) -> object:
+    """Load source-reconstruction APIs only when callers explicitly request them."""
+
+    try:
+        module_name, attribute_name = _DEFERRED_EXPORTS[name]
+    except KeyError as exc:
+        raise AttributeError(name) from exc
+    value: object = getattr(import_module(module_name, __name__), attribute_name)
+    globals()[name] = value
+    return value
+
 
 __all__ = [
     "DYNAMIC_COMMAND_FACTOR_TARGETS",

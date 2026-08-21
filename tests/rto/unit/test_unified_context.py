@@ -20,13 +20,12 @@ def test_operating_context_is_generic_trusted_input_and_round_trips() -> None:
         schema_version=OPERATING_CONTEXT_SCHEMA_VERSION,
         context_version="case-20260604",
         context_id="case-20260604-nominal",
-        context_schema_ref=_ref("cdu-context-schema", "1"),
         provider_id="cdu-m7",
         model_ref=_ref("cdu-effective-model", "2"),
         case_ref=_ref("case-20260604-effective", "3"),
         operating_mode="normal-steady",
         facts={
-            "feed_mass_flow_kg_s": 113.1388888888889,
+            "fresh_feed_load_kg_s": 113.1388888888889,
             "feed_composition": {"naphtha": 0.2, "residue": 0.8},
         },
         current_setpoints={
@@ -47,7 +46,7 @@ def test_operating_context_is_generic_trusted_input_and_round_trips() -> None:
     assert "algorithm" not in restored.as_dict()
 
 
-def test_versioned_context_fixture_uses_the_unified_schema(repo_root) -> None:
+def test_versioned_context_fixture_uses_the_current_schema(repo_root) -> None:
     context = load_operating_context(
         repo_root / "configs" / "rto" / "contexts" / "case_20260604.json"
     )

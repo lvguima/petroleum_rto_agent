@@ -1,4 +1,4 @@
-"""Synchronous, resumable R6 orchestration over the neutral simulator port."""
+"""Synchronous, resumable, objective-count-neutral offline RTO workflow."""
 
 from __future__ import annotations
 
@@ -8,78 +8,148 @@ import os
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
-from ..catalogs import RtoCatalogBundle
+from .._file_lock import exclusive_file_lock
+from ..capabilities import (
+    BundleCapabilityView,
+    CapabilityBundle,
+    CapabilityCatalog,
+)
 from ..compilation import CandidatePlanCompiler
-from ..contracts import (
-    CLAIM_SCOPE,
-    RTO_SCHEMA_VERSION,
-    CandidateEvaluationV1,
-    CandidateProposalV1,
-    ContractRef,
-    OptimizationProblemV1,
-    OptimizationResultV1,
-    RunEvidenceRefV1,
-    StaticSearchResultV1,
+from ..contracts.candidate import (
+    CANDIDATE_SCHEMA_VERSION,
+    CandidateEvaluation,
+    CandidateProposal,
 )
-from ..contracts.common import canonical_json_bytes
-from ..evaluation import DynamicEvaluationService, SteadyEvaluationService
-from ..optimizer import DeterministicGridOptimizer, DynamicFinalSelector
-from ..ports import ProviderRequestFactory, SimulatorPort
-from ..problem import ProblemBuilder
-from ..strategies import (
-    StrategyBuilder,
-    StrategyEntryV1,
-    StrategyRepository,
-    anchor_from_evaluations,
-    optimization_result_ref,
-    utc_now,
+from ..contracts.common import (
+    JsonValue,
+    as_mapping,
+    canonical_json_bytes,
+    identifier,
+    thaw_json,
 )
+from ..contracts.context import OperatingContext
+from ..contracts.evidence import RunEvidenceRef
+from ..contracts.finalization import StaticPreferenceSelection
+from ..contracts.problem import ENGINEERING_CLAIM_SCOPE, OptimizationProblem
+from ..contracts.reference import ContractRef
+from ..contracts.simulation import SimulationRunBundle
+from ..contracts.solver_result import SOLVER_RESULT_SCHEMA_VERSION, SolverResult
+from ..evaluation import (
+    M2EvaluationService,
+    M2PairedEvaluator,
+    M4EvaluationService,
+    M4PairedEvaluator,
+)
+from ..intent import OptimizationIntent
+from ..ports.interfaces import ProviderRequestFactory, SimulatorPort
+from ..problem import ProblemBuilder, ProblemFeatureAnalyzer
+from ..selection import FinalizationArtifacts, FinalSelector
+from ..solvers import (
+    CoarseRefineGridSolver,
+    FullGridParetoSolver,
+    SolverRegistry,
+    SolverRouter,
+    SolverRoutingDecision,
+)
+from ..strategies.models import StrategyEntry
 from .models import (
-    AnchorAttemptV1,
-    AnchorValidationResultV1,
-    OfflineRtoManifestV1,
-    OfflineRtoRequestV1,
-    OfflineRtoResultV1,
+    OFFLINE_MANIFEST_VERSION,
+    OFFLINE_WORKFLOW_SCHEMA_ID,
+    OFFLINE_WORKFLOW_SCHEMA_VERSION,
+    AnchorAttempt,
+    AnchorValidationResult,
+    CapabilityBundleSnapshot,
+    CoveragePolicy,
+    DynamicVerificationArtifact,
+    FinalizationArtifact,
+    OfflineRtoManifest,
+    OfflineRtoRequest,
+    OfflineRtoResult,
     OfflineRunStatus,
-    WorkflowEventV1,
+    SolverExecutionArtifact,
+    WorkflowEvent,
+    routing_ref,
 )
+
+if TYPE_CHECKING:
+    from ..strategies.repository import StrategyRepository
 
 SimulatorFactory = Callable[[Path], SimulatorPort]
+
+_SOFTWARE_VERSIONS = {
+    "offline_workflow": "2.0.0",
+    "optimization_problem": "2.0.0",
+    "candidate_evaluation": "2.0.0",
+    "strategy_entry": "2.0.0",
+}
+_STATIC_STAGES = (
+    "inputs-ready",
+    "problem-ready",
+    "route-ready",
+    "static-solve-ready",
+    "static-selection-ready",
+    "dynamic-evaluations-ready",
+    "finalization-ready",
+)
+_REQUIRED_MANIFEST_FILES = frozenset(
+    {
+        "request.json",
+        "intent.json",
+        "context.json",
+        "capability_bundle.json",
+        "problem.json",
+        "solver_route.json",
+        "static_solve.json",
+        "static_selection.json",
+        "dynamic_evaluations.json",
+        "finalization.json",
+        "result.json",
+        "events.jsonl",
+    }
+)
+_OPTIONAL_MANIFEST_FILES = frozenset({"anchor_validation.json", "strategy_draft.json"})
 
 
 @dataclass(frozen=True)
 class OfflineRtoRunRecord:
     run_dir: Path
-    request: OfflineRtoRequestV1
-    problem: OptimizationProblemV1
-    static_search: StaticSearchResultV1
-    optimization_result: OptimizationResultV1
-    anchor_validation: AnchorValidationResultV1 | None
-    strategy: StrategyEntryV1 | None
-    result: OfflineRtoResultV1
-    manifest: OfflineRtoManifestV1
-    events: tuple[WorkflowEventV1, ...]
+    request: OfflineRtoRequest
+    intent: OptimizationIntent
+    context: OperatingContext
+    capability_snapshot: CapabilityBundleSnapshot
+    problem: OptimizationProblem
+    routing: SolverRoutingDecision
+    solver_execution: SolverExecutionArtifact
+    static_selection: StaticPreferenceSelection
+    dynamic_verification: DynamicVerificationArtifact
+    finalization: FinalizationArtifact
+    anchor_validation: AnchorValidationResult | None
+    strategy: StrategyEntry | None
+    result: OfflineRtoResult
+    manifest: OfflineRtoManifest
+    events: tuple[WorkflowEvent, ...]
     recovered_stages: tuple[str, ...]
     physical_m2_executions: int
     physical_m4_executions: int
 
 
-class _ReplayDynamicEvaluator:
-    def __init__(self, evaluations: tuple[CandidateEvaluationV1, ...]) -> None:
+class _ReplayEvaluator:
+    def __init__(self, evaluations: tuple[CandidateEvaluation, ...]) -> None:
         self._evaluations = {item.proposal_ref: item for item in evaluations}
 
-    def evaluate(self, proposal: CandidateProposalV1) -> CandidateEvaluationV1:
+    def evaluate(self, proposal: CandidateProposal) -> CandidateEvaluation:
         try:
             return self._evaluations[proposal.ref]
         except KeyError as exc:
-            raise ValueError("replayed dynamic evidence lacks a shortlisted proposal") from exc
+            raise ValueError("stored solver execution lacks a generated proposal") from exc
 
 
 class OfflineRtoOrchestrator:
-    """Run or resume one deterministic offline RTO workflow without auto-approval."""
+    """Execute or strictly resume one offline workflow."""
 
     def __init__(
         self,
@@ -91,657 +161,1354 @@ class OfflineRtoOrchestrator:
 
     def run(
         self,
-        bundle: RtoCatalogBundle,
+        bundle: CapabilityBundle,
+        intent: OptimizationIntent,
+        context: OperatingContext,
+        problem: OptimizationProblem,
         *,
         run_root: Path,
         strategy_repository: StrategyRepository,
         actor: str,
-        coverage_policy: str = "sampled-anchors",
-        external_request_ref: ContractRef | None = None,
+        coverage_policy: CoveragePolicy = "point",
     ) -> OfflineRtoRunRecord:
-        request = _request_from_bundle(
-            bundle,
+        actor = identifier(actor, context="actor")
+        if (
+            problem.intent_ref != ContractRef(intent.intent_id, intent.fingerprint)
+            or problem.context_ref != context.ref
+            or problem.capability_catalog_ref != bundle.catalog.ref
+            or problem.system_policy_ref != bundle.system_policy.ref
+        ):
+            raise ValueError("supplied problem differs from the immutable workflow inputs")
+        execution_route = BundleCapabilityView(bundle).route_by_ref(problem.execution_route_ref)
+        request = OfflineRtoRequest(
+            schema_id=OFFLINE_WORKFLOW_SCHEMA_ID,
+            schema_version=OFFLINE_WORKFLOW_SCHEMA_VERSION,
+            request_version="offline-rto-request",
+            intent_ref=ContractRef(intent.intent_id, intent.fingerprint),
+            context_ref=context.ref,
+            capability_catalog_ref=bundle.catalog.ref,
+            system_policy_ref=bundle.system_policy.ref,
+            execution_route_ref=execution_route.ref,
+            provider_id=self._request_factory.provider_id,
             coverage_policy=coverage_policy,
-            external_request_ref=external_request_ref,
+            claim_scope=ENGINEERING_CLAIM_SCOPE,
         )
-        run_dir = run_root / request.workflow_id
+        snapshot = CapabilityBundleSnapshot(
+            schema_id=OFFLINE_WORKFLOW_SCHEMA_ID,
+            schema_version=OFFLINE_WORKFLOW_SCHEMA_VERSION,
+            snapshot_version="capability-bundle-snapshot",
+            bundle=bundle,
+            claim_scope=ENGINEERING_CLAIM_SCOPE,
+        )
+        run_dir = run_root.resolve() / request.workflow_id
         run_dir.mkdir(parents=True, exist_ok=True)
         simulator = self._simulator_factory(run_dir / "simulator")
         with _workflow_lock(run_dir):
             if (run_dir / "manifest.json").exists():
                 return read_offline_run(
                     run_dir,
-                    bundle=bundle,
                     strategy_repository=strategy_repository,
+                    request_factory=self._request_factory,
                     simulator=simulator,
-                    recovered_stages=("manifest",),
-                    external_request_ref=external_request_ref,
+                    expected_intent=intent,
+                    expected_context=context,
+                    expected_bundle=bundle,
+                    expected_problem=problem,
                 )
-            recovered: list[str] = []
-            events = list(_read_events(run_dir / "events.jsonl", request.ref, allow_missing=True))
-            _write_or_verify(run_dir / "request.json", request.as_dict())
-            _ensure_event(events, run_dir, request.ref, "request-ready", request.ref)
 
-            expected_problem = ProblemBuilder().build(bundle)
+            events = list(_read_events(run_dir / "events.jsonl", request.ref, allow_missing=True))
+            input_paths = (
+                run_dir / "request.json",
+                run_dir / "intent.json",
+                run_dir / "context.json",
+                run_dir / "capability_bundle.json",
+            )
+            _reject_event_without_artifacts(events, "inputs-ready", input_paths)
+            inputs_were_complete = all(path.exists() for path in input_paths)
+            _write_or_verify(run_dir / "request.json", request.as_dict())
+            _write_or_verify(run_dir / "intent.json", intent.as_dict())
+            _write_or_verify(run_dir / "context.json", context.as_dict())
+            _write_or_verify(run_dir / "capability_bundle.json", snapshot.as_dict())
+            _ensure_event(events, run_dir, request.ref, "inputs-ready", request.ref)
+            recovered: list[str] = ["inputs-ready"] if inputs_were_complete else []
+            physical_m2 = 0
+            physical_m4 = 0
+
+            expected_problem = problem
             problem_path = run_dir / "problem.json"
+            _reject_event_without_artifacts(events, "problem-ready", (problem_path,))
             if problem_path.exists():
-                problem = OptimizationProblemV1.from_mapping(_read_json(problem_path))
+                problem = OptimizationProblem.from_mapping(_read_json(problem_path))
                 if problem != expected_problem:
-                    raise ValueError("recovered problem differs from current deterministic inputs")
-                recovered.append("problem")
+                    raise ValueError("stored problem differs from deterministic reconstruction")
+                recovered.append("problem-ready")
             else:
-                problem = expected_problem
                 _write_or_verify(problem_path, problem.as_dict())
             _ensure_event(events, run_dir, request.ref, "problem-ready", problem.ref)
 
-            static_path = run_dir / "static_search.json"
-            m2_executions = 0
-            if static_path.exists():
-                static = StaticSearchResultV1.from_mapping(_read_json(static_path))
-                _validate_static(problem, static)
-                _verify_evaluations(simulator, static.evaluations)
-                recovered.append("static-search")
+            registry = _solver_registry()
+            features = ProblemFeatureAnalyzer().analyze(problem)
+            expected_route = SolverRouter().route(problem, features, registry, execution_route)
+            route_path = run_dir / "solver_route.json"
+            _reject_event_without_artifacts(events, "route-ready", (route_path,))
+            if route_path.exists():
+                routing = SolverRoutingDecision.from_mapping(_read_json(route_path))
+                if routing != expected_route.decision:
+                    raise ValueError("stored solver route differs from deterministic routing")
+                recovered.append("route-ready")
             else:
-                steady = SteadyEvaluationService(
-                    problem,
-                    bundle.context,
-                    bundle.kpi_catalog,
-                    CandidatePlanCompiler(),
-                    self._request_factory,
-                    simulator,
-                )
-                static = DeterministicGridOptimizer().search(
-                    problem,
-                    bundle.context,
-                    steady,
-                )
-                m2_executions += steady.physical_execution_count
-                _write_or_verify(static_path, static.as_dict())
-            _ensure_event(events, run_dir, request.ref, "static-search-ready", static.ref)
+                routing = expected_route.decision
+                _write_or_verify(route_path, routing.as_dict())
+            route_contract_ref = routing_ref(routing)
+            _ensure_event(events, run_dir, request.ref, "route-ready", route_contract_ref)
 
-            optimization_path = run_dir / "optimization_result.json"
-            m4_executions = 0
-            if optimization_path.exists():
-                optimization = OptimizationResultV1.from_mapping(_read_json(optimization_path))
-                _validate_optimization(problem, static, optimization)
-                _verify_evaluations(simulator, optimization.dynamic_evaluations)
-                recovered.append("optimization-result")
-            else:
-                dynamic = DynamicEvaluationService(
-                    problem,
-                    bundle.context,
-                    bundle.kpi_catalog,
-                    CandidatePlanCompiler(),
-                    self._request_factory,
-                    simulator,
+            execution_path = run_dir / "static_solve.json"
+            _reject_event_without_artifacts(events, "static-solve-ready", (execution_path,))
+            if execution_path.exists():
+                solver_execution = SolverExecutionArtifact.from_mapping(_read_json(execution_path))
+                _validate_solver_execution(
+                    problem, routing, solver_execution, expected_route.solver
                 )
-                optimization = DynamicFinalSelector().select(problem, static, dynamic)
-                m4_executions += dynamic.physical_execution_count
-                _write_or_verify(optimization_path, optimization.as_dict())
-            optimization_ref = optimization_result_ref(optimization)
+                recovered.append("static-solve-ready")
+            else:
+                if expected_route.solver is None:
+                    solver_result = _unsupported_solver_result(problem, routing)
+                else:
+                    steady = M2EvaluationService(
+                        problem,
+                        context,
+                        bundle.catalog,
+                        CandidatePlanCompiler(bundle.catalog),
+                        self._request_factory,
+                        simulator,
+                    )
+                    solver_result = expected_route.solver.solve(problem, steady)
+                    physical_m2 += steady.physical_execution_count
+                    solver_result = _relativize_solver_result(solver_result, run_dir)
+                solver_execution = SolverExecutionArtifact(
+                    schema_id=OFFLINE_WORKFLOW_SCHEMA_ID,
+                    schema_version=OFFLINE_WORKFLOW_SCHEMA_VERSION,
+                    execution_version="solver-execution",
+                    routing_fingerprint=routing.fingerprint,
+                    result=solver_result,
+                    claim_scope=ENGINEERING_CLAIM_SCOPE,
+                )
+            _replay_evaluations(
+                solver_execution.result.evaluations,
+                proposals=solver_execution.result.proposals,
+                problem=problem,
+                context=context,
+                catalog=bundle.catalog,
+                request_factory=self._request_factory,
+                run_dir=run_dir,
+                simulator=simulator,
+            )
+            _write_or_verify(execution_path, solver_execution.as_dict())
             _ensure_event(
                 events,
                 run_dir,
                 request.ref,
-                "optimization-result-ready",
-                optimization_ref,
+                "static-solve-ready",
+                solver_execution.ref,
             )
 
-            anchor_validation: AnchorValidationResultV1 | None = None
-            strategy: StrategyEntryV1 | None = None
-            if optimization.status == "success":
-                anchors_path = run_dir / "anchor_validation.json"
-                if anchors_path.exists():
-                    anchor_validation = AnchorValidationResultV1.from_mapping(
-                        _read_json(anchors_path)
-                    )
-                    _validate_anchor_result(
-                        bundle, problem, static, optimization, anchor_validation
-                    )
-                    _verify_anchor_evidence(simulator, anchor_validation)
-                    recovered.append("anchor-validation")
-                else:
-                    anchor_validation, added_m2, added_m4 = self._validate_anchors(
-                        bundle,
-                        problem,
-                        static,
-                        optimization,
-                        simulator,
-                        coverage_policy=coverage_policy,
-                    )
-                    m2_executions += added_m2
-                    m4_executions += added_m4
-                    _write_or_verify(anchors_path, anchor_validation.as_dict())
-                _ensure_event(
-                    events,
-                    run_dir,
-                    request.ref,
-                    "anchor-validation-ready",
-                    anchor_validation.ref,
+            m2 = {item.proposal_ref: item for item in solver_execution.result.evaluations}
+            selector = FinalSelector()
+            expected_selection = selector.rank_static(problem, solver_execution.result, m2)
+            selection_path = run_dir / "static_selection.json"
+            _reject_event_without_artifacts(events, "static-selection-ready", (selection_path,))
+            if selection_path.exists():
+                static_selection = StaticPreferenceSelection.from_mapping(
+                    _read_json(selection_path)
                 )
-                if any(
-                    item.static_evaluation.status in {"invalid_request", "evaluation_error"}
-                    or (
-                        item.dynamic_evaluation is not None
-                        and item.dynamic_evaluation.status
-                        in {"invalid_request", "evaluation_error"}
-                    )
-                    for item in anchor_validation.attempts
-                ):
-                    strategy = None
-                else:
-                    anchors = tuple(
-                        anchor_from_evaluations(
-                            item.context,
-                            item.proposal,
-                            item.static_evaluation,
-                            cast(CandidateEvaluationV1, item.dynamic_evaluation),
-                        )
-                        for item in anchor_validation.passed_attempts
-                    )
-                    strategy = StrategyBuilder().build(
-                        problem,
-                        bundle.context,
-                        static,
-                        optimization,
-                        anchors,
-                    )
-                    strategy_path = run_dir / "strategy.json"
-                    _write_or_verify(strategy_path, strategy.as_dict())
-                    stored = strategy_repository.create_draft(strategy, actor=actor)
-                    if stored.entry != strategy or stored.current_state != "draft":
-                        raise ValueError(
-                            "workflow strategy repository entry is not an unchanged draft"
-                        )
-                    _ensure_event(
-                        events,
-                        run_dir,
-                        request.ref,
-                        "strategy-draft-ready",
-                        strategy.ref,
-                    )
-
-            requested_anchors = 0 if anchor_validation is None else len(anchor_validation.attempts)
-            passed_anchors = (
-                0 if anchor_validation is None else len(anchor_validation.passed_attempts)
-            )
-            if strategy is not None:
-                workflow_status: OfflineRunStatus = "completed_draft"
-                reason = (
-                    "sampled-anchor-draft-created"
-                    if passed_anchors == requested_anchors
-                    else "partial-anchor-draft-created"
-                )
-            elif optimization.status == "evaluation_error" or (
-                anchor_validation is not None
-                and any(
-                    item.static_evaluation.status in {"invalid_request", "evaluation_error"}
-                    or (
-                        item.dynamic_evaluation is not None
-                        and item.dynamic_evaluation.status
-                        in {"invalid_request", "evaluation_error"}
-                    )
-                    for item in anchor_validation.attempts
-                )
-            ):
-                workflow_status = "failed"
-                reason = "offline-evaluation-error"
+                if static_selection != expected_selection:
+                    raise ValueError("stored static selection differs from deterministic replay")
+                recovered.append("static-selection-ready")
             else:
-                workflow_status = "completed_without_strategy"
-                reason = "optimization-not-publishable"
-            result = OfflineRtoResultV1(
-                schema_version=RTO_SCHEMA_VERSION,
-                result_version="offline-rto-result-v1",
-                status=workflow_status,
-                request_ref=request.ref,
-                problem_ref=problem.ref,
-                static_search_ref=static.ref,
-                optimization_result_ref=optimization_ref,
-                strategy_ref=None if strategy is None else strategy.ref,
-                requested_anchor_count=requested_anchors,
-                passed_anchor_count=passed_anchors,
-                termination_reason=reason,
-                claim_scope=CLAIM_SCOPE,
+                static_selection = expected_selection
+                _write_or_verify(selection_path, static_selection.as_dict())
+            _ensure_event(
+                events,
+                run_dir,
+                request.ref,
+                "static-selection-ready",
+                static_selection.ref,
             )
-            _write_or_verify(run_dir / "result.json", result.as_dict())
-            _ensure_event(events, run_dir, request.ref, "workflow-complete", result.ref)
-            _commit_manifest(run_dir, request, result)
-        verified = read_offline_run(
-            run_dir,
-            bundle=bundle,
-            strategy_repository=strategy_repository,
-            simulator=simulator,
-            recovered_stages=tuple(recovered),
-            external_request_ref=external_request_ref,
-        )
-        return replace(
-            verified,
-            physical_m2_executions=m2_executions,
-            physical_m4_executions=m4_executions,
-        )
 
-    def _validate_anchors(
+            dynamic_path = run_dir / "dynamic_evaluations.json"
+            _reject_event_without_artifacts(events, "dynamic-evaluations-ready", (dynamic_path,))
+            if dynamic_path.exists():
+                dynamic = DynamicVerificationArtifact.from_mapping(_read_json(dynamic_path))
+                _validate_dynamic_artifact(problem, static_selection, dynamic)
+                recovered.append("dynamic-evaluations-ready")
+            else:
+                dynamic_evaluations: tuple[CandidateEvaluation, ...] = ()
+                if static_selection.status == "ready":
+                    proposal_by_ref = {item.ref: item for item in solver_execution.result.proposals}
+                    service = M4EvaluationService(
+                        problem,
+                        context,
+                        bundle.catalog,
+                        CandidatePlanCompiler(bundle.catalog),
+                        self._request_factory,
+                        simulator,
+                    )
+                    dynamic_evaluations = tuple(
+                        _relativize_evaluation(service.evaluate(proposal_by_ref[ref]), run_dir)
+                        for ref in static_selection.shortlist_proposal_refs
+                    )
+                    physical_m4 += service.physical_execution_count
+                dynamic = DynamicVerificationArtifact(
+                    schema_id=OFFLINE_WORKFLOW_SCHEMA_ID,
+                    schema_version=OFFLINE_WORKFLOW_SCHEMA_VERSION,
+                    verification_version="dynamic-verification",
+                    problem_ref=problem.ref,
+                    static_selection_ref=static_selection.ref,
+                    evaluations=dynamic_evaluations,
+                    applicable=bool(dynamic_evaluations),
+                    termination_reason=(
+                        "dynamic-shortlist-evaluated"
+                        if dynamic_evaluations
+                        else "static-selection-not-ready"
+                    ),
+                    claim_scope=ENGINEERING_CLAIM_SCOPE,
+                )
+            _replay_evaluations(
+                dynamic.evaluations,
+                proposals=solver_execution.result.proposals,
+                problem=problem,
+                context=context,
+                catalog=bundle.catalog,
+                request_factory=self._request_factory,
+                run_dir=run_dir,
+                simulator=simulator,
+            )
+            _write_or_verify(dynamic_path, dynamic.as_dict())
+            _ensure_event(
+                events,
+                run_dir,
+                request.ref,
+                "dynamic-evaluations-ready",
+                dynamic.ref,
+            )
+
+            m4 = {item.proposal_ref: item for item in dynamic.evaluations}
+            expected_finalization = selector.select(
+                problem,
+                solver_execution.result,
+                m2,
+                m4,
+                bundle,
+            )
+            expected_final_artifact = FinalizationArtifact(
+                schema_id=OFFLINE_WORKFLOW_SCHEMA_ID,
+                schema_version=OFFLINE_WORKFLOW_SCHEMA_VERSION,
+                artifact_version="finalization-artifact",
+                static_selection_ref=expected_finalization.static_selection.ref,
+                publishability=expected_finalization.publishability,
+                result=expected_finalization.result,
+                claim_scope=ENGINEERING_CLAIM_SCOPE,
+            )
+            final_path = run_dir / "finalization.json"
+            _reject_event_without_artifacts(events, "finalization-ready", (final_path,))
+            if final_path.exists():
+                finalization = FinalizationArtifact.from_mapping(_read_json(final_path))
+                if finalization != expected_final_artifact:
+                    raise ValueError("stored finalization differs from deterministic replay")
+                recovered.append("finalization-ready")
+            else:
+                finalization = expected_final_artifact
+                _write_or_verify(final_path, finalization.as_dict())
+            _ensure_event(
+                events,
+                run_dir,
+                request.ref,
+                "finalization-ready",
+                finalization.ref,
+            )
+
+            anchor_validation, anchor_m2, anchor_m4 = self._anchors(
+                run_dir,
+                request,
+                intent,
+                context,
+                bundle,
+                problem,
+                solver_execution,
+                dynamic,
+                expected_finalization,
+                simulator,
+                events,
+                recovered,
+            )
+            physical_m2 += anchor_m2
+            physical_m4 += anchor_m4
+
+            strategy = self._strategy(
+                run_dir,
+                strategy_repository,
+                actor,
+                problem,
+                context,
+                solver_execution,
+                dynamic,
+                expected_finalization,
+                anchor_validation,
+                events,
+                request,
+                recovered,
+            )
+
+            result = _offline_result(
+                request,
+                problem,
+                routing,
+                solver_execution,
+                static_selection,
+                dynamic,
+                finalization,
+                anchor_validation,
+                strategy,
+            )
+            result_path = run_dir / "result.json"
+            _reject_event_without_artifacts(events, "workflow-complete", (result_path,))
+            if result_path.exists():
+                stored_result = OfflineRtoResult.from_mapping(_read_json(result_path))
+                if stored_result != result:
+                    raise ValueError("stored offline result differs from deterministic replay")
+                result = stored_result
+                recovered.append("workflow-complete")
+            else:
+                _write_or_verify(result_path, result.as_dict())
+            _ensure_event(events, run_dir, request.ref, "workflow-complete", result.ref)
+
+            _validate_event_stages(
+                tuple(events),
+                request=request,
+                problem=problem,
+                routing=routing,
+                solver_execution=solver_execution,
+                selection=static_selection,
+                dynamic=dynamic,
+                finalization=finalization,
+                anchors=anchor_validation,
+                strategy=strategy,
+                result=result,
+            )
+            manifest = _commit_manifest(run_dir, request, result)
+            verified = read_offline_run(
+                run_dir,
+                strategy_repository=strategy_repository,
+                request_factory=self._request_factory,
+                simulator=simulator,
+                expected_intent=intent,
+                expected_context=context,
+                expected_bundle=bundle,
+                expected_problem=problem,
+            )
+            if verified.result != result or verified.manifest != manifest:
+                raise ValueError("new workflow failed strict post-commit verification")
+            return OfflineRtoRunRecord(
+                run_dir=run_dir,
+                request=request,
+                intent=intent,
+                context=context,
+                capability_snapshot=snapshot,
+                problem=problem,
+                routing=routing,
+                solver_execution=solver_execution,
+                static_selection=static_selection,
+                dynamic_verification=dynamic,
+                finalization=finalization,
+                anchor_validation=anchor_validation,
+                strategy=strategy,
+                result=result,
+                manifest=manifest,
+                events=tuple(events),
+                recovered_stages=tuple(recovered),
+                physical_m2_executions=physical_m2,
+                physical_m4_executions=physical_m4,
+            )
+
+    def _anchors(
         self,
-        bundle: RtoCatalogBundle,
-        problem: OptimizationProblemV1,
-        static: StaticSearchResultV1,
-        optimization: OptimizationResultV1,
+        run_dir: Path,
+        request: OfflineRtoRequest,
+        intent: OptimizationIntent,
+        context: OperatingContext,
+        bundle: CapabilityBundle,
+        problem: OptimizationProblem,
+        solver_execution: SolverExecutionArtifact,
+        dynamic: DynamicVerificationArtifact,
+        finalization: FinalizationArtifacts,
         simulator: SimulatorPort,
-        *,
-        coverage_policy: str,
-    ) -> tuple[AnchorValidationResultV1, int, int]:
-        selected_ref = optimization.selected_proposal_ref
-        selected_static_ref = optimization.selected_static_evaluation_ref
-        selected_dynamic_ref = optimization.selected_dynamic_evaluation_ref
+        events: list[WorkflowEvent],
+        recovered: list[str],
+    ) -> tuple[AnchorValidationResult | None, int, int]:
+        path = run_dir / "anchor_validation.json"
+        _reject_event_without_artifacts(events, "anchor-validation-ready", (path,))
+        if finalization.result.status != "success":
+            if path.exists():
+                raise ValueError("non-publishable workflow cannot contain anchor validation")
+            return None, 0, 0
+        selected_ref = finalization.result.selected_proposal_ref
+        selected_static_ref = finalization.result.selected_static_evaluation_ref
+        selected_dynamic_ref = finalization.result.selected_dynamic_evaluation_ref
         if selected_ref is None or selected_static_ref is None or selected_dynamic_ref is None:
-            raise ValueError("publishable result lacks selected refs")
-        selected = next(item for item in static.proposals if item.ref == selected_ref)
-        selected_static = next(
-            item for item in static.evaluations if item.ref == selected_static_ref
+            raise ValueError("successful finalization lacks selected evidence")
+        proposal = next(
+            item for item in solver_execution.result.proposals if item.ref == selected_ref
         )
-        selected_dynamic = next(
-            item for item in optimization.dynamic_evaluations if item.ref == selected_dynamic_ref
+        static = next(
+            item for item in solver_execution.result.evaluations if item.ref == selected_static_ref
         )
+        central_dynamic = next(
+            item for item in dynamic.evaluations if item.ref == selected_dynamic_ref
+        )
+        if path.exists():
+            validation = AnchorValidationResult.from_mapping(_read_json(path))
+            _validate_anchor_result(
+                validation,
+                request=request,
+                intent=intent,
+                context=context,
+                bundle=bundle,
+                problem=problem,
+                selected_action=proposal.decision_values,
+            )
+            for attempt in validation.attempts:
+                _replay_anchor_attempt(
+                    attempt,
+                    catalog=bundle.catalog,
+                    request_factory=self._request_factory,
+                    run_dir=run_dir,
+                    simulator=simulator,
+                )
+            recovered.append("anchor-validation-ready")
+            _ensure_event(
+                events,
+                run_dir,
+                request.ref,
+                "anchor-validation-ready",
+                validation.ref,
+            )
+            return validation, 0, 0
+
         ratios = (
-            (1.0,) if coverage_policy == "point" else problem.evaluation_plan.feed_anchor_ratios
+            (1.0,)
+            if request.coverage_policy == "point"
+            else problem.evaluation_plan.context_anchor_ratios
         )
-        attempts: list[AnchorAttemptV1] = []
-        m2_count = 0
-        m4_count = 0
-        for index, ratio in enumerate(ratios):
+        attempts: list[AnchorAttempt] = []
+        physical_m2 = 0
+        physical_m4 = 0
+        for ratio in ratios:
             if abs(ratio - 1.0) <= 1e-12:
                 attempts.append(
-                    AnchorAttemptV1(
+                    AnchorAttempt(
                         ratio=ratio,
-                        context=bundle.context,
+                        context=context,
                         problem=problem,
-                        proposal=selected,
-                        static_evaluation=selected_static,
-                        dynamic_evaluation=selected_dynamic,
+                        proposal=proposal,
+                        static_evaluation=static,
+                        dynamic_evaluation=central_dynamic,
                     )
                 )
                 continue
-            anchor_bundle = _anchor_bundle(bundle, ratio)
-            anchor_problem = ProblemBuilder().build(anchor_bundle)
-            proposal = CandidateProposalV1(
-                schema_version=RTO_SCHEMA_VERSION,
-                proposal_version="candidate-proposal-v1",
-                candidate_id=f"anchor-{index:02d}",
-                sequence=index,
+            anchor_context = _anchor_context(context, ratio)
+            anchor_problem = ProblemBuilder().build(bundle, intent, anchor_context)
+            anchor_proposal = CandidateProposal(
+                schema_version=CANDIDATE_SCHEMA_VERSION,
+                proposal_version="candidate-proposal",
+                candidate_id=f"anchor-{_ratio_id(ratio)}",
+                sequence=0,
                 origin="anchor-validation",
                 problem_ref=anchor_problem.ref,
-                context_ref=anchor_bundle.context.ref,
-                decision_values=selected.decision_values,
-                output_kind="steady-setpoint-vector",
-                claim_scope=CLAIM_SCOPE,
+                context_ref=anchor_context.ref,
+                decision_values=proposal.decision_values,
+                output_kind=proposal.output_kind,
+                claim_scope=ENGINEERING_CLAIM_SCOPE,
             )
-            steady = SteadyEvaluationService(
+            m2_service = M2EvaluationService(
                 anchor_problem,
-                anchor_bundle.context,
-                bundle.kpi_catalog,
-                CandidatePlanCompiler(),
+                anchor_context,
+                bundle.catalog,
+                CandidatePlanCompiler(bundle.catalog),
                 self._request_factory,
                 simulator,
             )
-            static_evaluation = steady.evaluate(proposal)
-            m2_count += steady.physical_execution_count
-            dynamic_evaluation: CandidateEvaluationV1 | None = None
-            if static_evaluation.status == "feasible":
-                dynamic = DynamicEvaluationService(
+            anchor_static = _relativize_evaluation(m2_service.evaluate(anchor_proposal), run_dir)
+            physical_m2 += m2_service.physical_execution_count
+            anchor_dynamic: CandidateEvaluation | None = None
+            if anchor_static.status == "feasible":
+                m4_service = M4EvaluationService(
                     anchor_problem,
-                    anchor_bundle.context,
-                    bundle.kpi_catalog,
-                    CandidatePlanCompiler(),
+                    anchor_context,
+                    bundle.catalog,
+                    CandidatePlanCompiler(bundle.catalog),
                     self._request_factory,
                     simulator,
                 )
-                dynamic_evaluation = dynamic.evaluate(proposal)
-                m4_count += dynamic.physical_execution_count
+                anchor_dynamic = _relativize_evaluation(
+                    m4_service.evaluate(anchor_proposal), run_dir
+                )
+                physical_m4 += m4_service.physical_execution_count
             attempts.append(
-                AnchorAttemptV1(
+                AnchorAttempt(
                     ratio=ratio,
-                    context=anchor_bundle.context,
+                    context=anchor_context,
                     problem=anchor_problem,
-                    proposal=proposal,
-                    static_evaluation=static_evaluation,
-                    dynamic_evaluation=dynamic_evaluation,
+                    proposal=anchor_proposal,
+                    static_evaluation=anchor_static,
+                    dynamic_evaluation=anchor_dynamic,
                 )
             )
-        return (
-            AnchorValidationResultV1(
-                schema_version=RTO_SCHEMA_VERSION,
-                validation_version="sampled-anchor-validation-v1",
-                selected_action=selected.decision_values,
-                attempts=tuple(attempts),
-                claim_scope=CLAIM_SCOPE,
-            ),
-            m2_count,
-            m4_count,
+        validation = AnchorValidationResult(
+            schema_id=OFFLINE_WORKFLOW_SCHEMA_ID,
+            schema_version=OFFLINE_WORKFLOW_SCHEMA_VERSION,
+            validation_version="sampled-anchor-validation",
+            central_problem_ref=problem.ref,
+            selected_action=proposal.decision_values,
+            attempts=tuple(attempts),
+            claim_scope=ENGINEERING_CLAIM_SCOPE,
         )
-
-
-def _request_from_bundle(
-    bundle: RtoCatalogBundle,
-    *,
-    coverage_policy: str,
-    external_request_ref: ContractRef | None = None,
-) -> OfflineRtoRequestV1:
-    return OfflineRtoRequestV1(
-        schema_version=RTO_SCHEMA_VERSION,
-        request_version="offline-rto-request-v1",
-        intent_ref=bundle.intent.ref,
-        context_ref=bundle.context.ref,
-        decision_catalog_ref=bundle.decision_catalog.ref,
-        kpi_catalog_ref=bundle.kpi_catalog.ref,
-        constraint_profile_ref=bundle.constraint_profile.ref,
-        policy_ref=bundle.policy.ref,
-        provider_id=bundle.context.provider_id,
-        coverage_policy=coverage_policy,
-        claim_scope=CLAIM_SCOPE,
-        external_request_ref=external_request_ref,
-    )
-
-
-def _anchor_bundle(bundle: RtoCatalogBundle, ratio: float) -> RtoCatalogBundle:
-    if abs(ratio - 1.0) <= 1e-12:
-        return bundle
-    suffix = f"{round(ratio * 1000):04d}"
-    context = replace(
-        bundle.context,
-        context_id=f"{bundle.context.context_id}-feed-{suffix}",
-        feed_mass_flow_kg_s=bundle.context.feed_mass_flow_kg_s * ratio,
-    )
-    intent = replace(
-        bundle.intent,
-        intent_id=f"{bundle.intent.intent_id}-feed-{suffix}",
-        operating_context_ref=context.ref,
-    )
-    return replace(bundle, context=context, intent=intent)
-
-
-def _validate_static(problem: OptimizationProblemV1, static: StaticSearchResultV1) -> None:
-    if static.problem_ref != problem.ref or static.context_ref != problem.context_ref:
-        raise ValueError("static search references another problem or context")
-    feasible = [item for item in static.evaluations if item.status == "feasible"]
-    expected = tuple(
-        sorted(
-            feasible,
-            key=lambda item: (
-                cast(float, item.candidate_objective),
-                -cast(float, item.minimum_normalized_margin),
-                item.normalized_action_l1,
-                item.proposal_ref.fingerprint,
-            ),
+        for attempt in validation.attempts:
+            _replay_anchor_attempt(
+                attempt,
+                catalog=bundle.catalog,
+                request_factory=self._request_factory,
+                run_dir=run_dir,
+                simulator=simulator,
+            )
+        _write_or_verify(path, validation.as_dict())
+        _ensure_event(
+            events,
+            run_dir,
+            request.ref,
+            "anchor-validation-ready",
+            validation.ref,
         )
+        return validation, physical_m2, physical_m4
+
+    def _strategy(
+        self,
+        run_dir: Path,
+        repository: StrategyRepository,
+        actor: str,
+        problem: OptimizationProblem,
+        context: OperatingContext,
+        solver_execution: SolverExecutionArtifact,
+        dynamic: DynamicVerificationArtifact,
+        finalization: FinalizationArtifacts,
+        anchors: AnchorValidationResult | None,
+        events: list[WorkflowEvent],
+        request: OfflineRtoRequest,
+        recovered: list[str],
+    ) -> StrategyEntry | None:
+        path = run_dir / "strategy_draft.json"
+        _reject_event_without_artifacts(events, "strategy-draft-ready", (path,))
+        if finalization.result.status != "success" or anchors is None or not anchors.passed:
+            if path.exists():
+                raise ValueError("workflow without passing anchors cannot contain a strategy")
+            return None
+        expected = _build_expected_strategy(
+            problem,
+            context,
+            solver_execution,
+            dynamic,
+            finalization,
+            anchors,
+        )
+        if path.exists():
+            strategy = StrategyEntry.from_mapping(_read_json(path))
+            if strategy != expected:
+                raise ValueError("stored strategy draft differs from deterministic reconstruction")
+            stored_record = repository.read(strategy.strategy_id, strategy.revision)
+            if stored_record.entry != strategy:
+                raise ValueError("strategy repository payload differs from workflow draft")
+            recovered.append("strategy-draft-ready")
+        else:
+            strategy = expected
+            repository.create_draft(strategy, actor=actor)
+            _write_or_verify(path, strategy.as_dict())
+        _ensure_event(
+            events,
+            run_dir,
+            request.ref,
+            "strategy-draft-ready",
+            strategy.ref,
+        )
+        return strategy
+
+
+def _build_expected_strategy(
+    problem: OptimizationProblem,
+    context: OperatingContext,
+    solver_execution: SolverExecutionArtifact,
+    dynamic: DynamicVerificationArtifact,
+    finalization: FinalizationArtifacts,
+    anchors: AnchorValidationResult,
+) -> StrategyEntry:
+    # Imported lazily to keep orchestration model loading independent of repository I/O.
+    from ..strategies import StrategyBuilder, anchor_from_verified_candidate
+
+    selected_ref = finalization.result.selected_proposal_ref
+    static_ref = finalization.result.selected_static_evaluation_ref
+    dynamic_ref = finalization.result.selected_dynamic_evaluation_ref
+    if selected_ref is None or static_ref is None or dynamic_ref is None:
+        raise ValueError("successful finalization lacks selected strategy evidence")
+    proposal = next(item for item in solver_execution.result.proposals if item.ref == selected_ref)
+    static = next(item for item in solver_execution.result.evaluations if item.ref == static_ref)
+    selected_dynamic = next(item for item in dynamic.evaluations if item.ref == dynamic_ref)
+    additional = tuple(
+        anchor_from_verified_candidate(
+            attempt.problem,
+            attempt.context,
+            attempt.proposal,
+            attempt.static_evaluation,
+            cast(CandidateEvaluation, attempt.dynamic_evaluation),
+            finalization_result_ref=finalization.result.ref,
+        )
+        for attempt in anchors.attempts
+        if attempt.context.ref != context.ref
     )
-    if static.ranked_feasible != expected:
-        raise ValueError("static ranking differs from the deterministic sort policy")
-
-
-def _validate_optimization(
-    problem: OptimizationProblemV1,
-    static: StaticSearchResultV1,
-    optimization: OptimizationResultV1,
-) -> None:
-    replayed = DynamicFinalSelector().select(
+    return StrategyBuilder().build(
         problem,
+        context,
+        proposal,
         static,
-        _ReplayDynamicEvaluator(optimization.dynamic_evaluations),
+        selected_dynamic,
+        finalization,
+        additional_anchors=additional,
     )
-    if replayed != optimization:
-        raise ValueError("optimization result differs from deterministic final selection")
+
+
+def _solver_registry() -> SolverRegistry:
+    return SolverRegistry((CoarseRefineGridSolver(), FullGridParetoSolver()))
+
+
+def _unsupported_solver_result(
+    problem: OptimizationProblem,
+    routing: SolverRoutingDecision,
+) -> SolverResult:
+    return SolverResult(
+        schema_version=SOLVER_RESULT_SCHEMA_VERSION,
+        result_version="unsupported-solver-result",
+        status="unsupported_problem",
+        problem_ref=problem.ref,
+        solver_ref=ContractRef("unsupported-solver-route", routing.fingerprint),
+        proposals=(),
+        evaluations=(),
+        solution_representation="ordered",
+        solution_groups=(),
+        termination_reason="no-compatible-solver",
+        claim_scope=ENGINEERING_CLAIM_SCOPE,
+    )
+
+
+def _validate_solver_execution(
+    problem: OptimizationProblem,
+    routing: SolverRoutingDecision,
+    artifact: SolverExecutionArtifact,
+    solver: object,
+) -> None:
+    if artifact.routing_fingerprint != routing.fingerprint:
+        raise ValueError("solver execution references another routing decision")
+    if artifact.result.problem_ref != problem.ref:
+        raise ValueError("solver execution references another problem")
+    if solver is None:
+        expected = _unsupported_solver_result(problem, routing)
+    else:
+        if not hasattr(solver, "solve"):
+            raise TypeError("selected solver does not implement solve")
+        expected = solver.solve(problem, _ReplayEvaluator(artifact.result.evaluations))
+    if artifact.result != expected:
+        raise ValueError("stored solver execution differs from deterministic replay")
+
+
+def _validate_dynamic_artifact(
+    problem: OptimizationProblem,
+    selection: StaticPreferenceSelection,
+    artifact: DynamicVerificationArtifact,
+) -> None:
+    if artifact.problem_ref != problem.ref or artifact.static_selection_ref != selection.ref:
+        raise ValueError("dynamic verification references another problem or selection")
+    refs = tuple(item.proposal_ref for item in artifact.evaluations)
+    if selection.status == "ready":
+        if refs != selection.shortlist_proposal_refs:
+            raise ValueError("dynamic verification must cover the full shortlist in order")
+        expected_reason = "dynamic-shortlist-evaluated"
+    elif artifact.evaluations:
+        raise ValueError("non-ready selection cannot contain dynamic evaluations")
+    else:
+        expected_reason = "static-selection-not-ready"
+    if (
+        artifact.verification_version != "dynamic-verification"
+        or artifact.termination_reason != expected_reason
+    ):
+        raise ValueError("dynamic verification metadata differs from deterministic execution")
+
+
+def _anchor_context(context: OperatingContext, ratio: float) -> OperatingContext:
+    facts = cast(dict[str, JsonValue], thaw_json(cast(JsonValue, context.facts)))
+    feed = facts.get("fresh_feed_load_kg_s")
+    if isinstance(feed, bool) or not isinstance(feed, (int, float)):
+        raise TypeError("anchor context requires numeric fresh_feed_load_kg_s")
+    facts["fresh_feed_load_kg_s"] = float(feed) * ratio
+    return replace(
+        context,
+        context_id=f"{context.context_id}-feed-{_ratio_id(ratio)}",
+        facts=facts,
+    )
+
+
+def _ratio_id(ratio: float) -> str:
+    return f"{ratio:.6f}".rstrip("0").rstrip(".").replace(".", "p")
 
 
 def _validate_anchor_result(
-    bundle: RtoCatalogBundle,
-    problem: OptimizationProblemV1,
-    static: StaticSearchResultV1,
-    optimization: OptimizationResultV1,
-    validation: AnchorValidationResultV1,
+    validation: AnchorValidationResult,
+    *,
+    request: OfflineRtoRequest,
+    intent: OptimizationIntent,
+    context: OperatingContext,
+    bundle: CapabilityBundle,
+    problem: OptimizationProblem,
+    selected_action: Mapping[str, float],
 ) -> None:
-    selected_ref = optimization.selected_proposal_ref
-    if selected_ref is None:
-        raise ValueError("anchor validation requires a selected proposal")
-    selected = next(item for item in static.proposals if item.ref == selected_ref)
-    if dict(validation.selected_action) != dict(selected.decision_values):
-        raise ValueError("anchor validation action differs from selected proposal")
+    if validation.central_problem_ref != problem.ref or dict(validation.selected_action) != dict(
+        selected_action
+    ):
+        raise ValueError("anchor validation differs from the selected central action")
+    ratios = (
+        (1.0,)
+        if request.coverage_policy == "point"
+        else problem.evaluation_plan.context_anchor_ratios
+    )
+    if tuple(item.ratio for item in validation.attempts) != ratios:
+        raise ValueError("anchor ratios differ from the trusted coverage policy")
     for attempt in validation.attempts:
-        expected_bundle = _anchor_bundle(bundle, attempt.ratio)
-        expected_problem = ProblemBuilder().build(expected_bundle)
-        if attempt.context != expected_bundle.context or attempt.problem != expected_problem:
-            raise ValueError("anchor attempt differs from deterministic sampled context")
-        if attempt.ratio == 1.0 and attempt.problem != problem:
-            raise ValueError("central anchor differs from central optimization problem")
+        expected_context = (
+            context
+            if abs(attempt.ratio - 1.0) <= 1e-12
+            else _anchor_context(context, attempt.ratio)
+        )
+        expected_problem = ProblemBuilder().build(bundle, intent, expected_context)
+        if attempt.context != expected_context or attempt.problem != expected_problem:
+            raise ValueError("stored anchor inputs differ from deterministic reconstruction")
 
 
-def _verify_anchor_evidence(
-    simulator: SimulatorPort,
-    validation: AnchorValidationResultV1,
-) -> None:
-    evaluations = tuple(
-        evaluation
-        for item in validation.attempts
-        for evaluation in (item.static_evaluation, item.dynamic_evaluation)
-        if evaluation is not None
+def _offline_result(
+    request: OfflineRtoRequest,
+    problem: OptimizationProblem,
+    routing: SolverRoutingDecision,
+    solver_execution: SolverExecutionArtifact,
+    selection: StaticPreferenceSelection,
+    dynamic: DynamicVerificationArtifact,
+    finalization: FinalizationArtifact,
+    anchors: AnchorValidationResult | None,
+    strategy: StrategyEntry | None,
+) -> OfflineRtoResult:
+    if (
+        finalization.result.status == "success"
+        and anchors is not None
+        and anchors.passed
+        and strategy is None
+    ):
+        raise ValueError("successful verified finalization requires a strategy draft")
+    if strategy is not None and (
+        finalization.result.status != "success" or anchors is None or not anchors.passed
+    ):
+        raise ValueError("strategy draft requires successful finalization and anchor coverage")
+    if strategy is not None:
+        status: OfflineRunStatus = "completed_draft"
+        reason = "strategy-draft-created"
+    elif finalization.result.status in {
+        "invalid_request",
+        "evaluation_error",
+        "unsupported_problem",
+    }:
+        status = "failed"
+        reason = finalization.result.termination_reason
+    elif anchors is not None and not anchors.passed:
+        status = "completed_without_strategy"
+        reason = "anchor-validation-failed"
+    else:
+        status = "completed_without_strategy"
+        reason = finalization.result.termination_reason
+    return OfflineRtoResult(
+        schema_id=OFFLINE_WORKFLOW_SCHEMA_ID,
+        schema_version=OFFLINE_WORKFLOW_SCHEMA_VERSION,
+        result_version="offline-rto-result",
+        status=status,
+        request_ref=request.ref,
+        problem_ref=problem.ref,
+        routing_ref=routing_ref(routing),
+        solver_execution_ref=solver_execution.ref,
+        static_selection_ref=selection.ref,
+        dynamic_verification_ref=dynamic.ref,
+        finalization_ref=finalization.ref,
+        anchor_validation_ref=None if anchors is None else anchors.ref,
+        strategy_ref=None if strategy is None else strategy.ref,
+        requested_anchor_count=0 if anchors is None else len(anchors.attempts),
+        passed_anchor_count=(
+            0 if anchors is None else sum(item.passed for item in anchors.attempts)
+        ),
+        termination_reason=reason,
+        claim_scope=ENGINEERING_CLAIM_SCOPE,
     )
-    _verify_evaluations(simulator, evaluations)
-
-
-def _verify_evaluations(
-    simulator: SimulatorPort,
-    evaluations: tuple[CandidateEvaluationV1, ...],
-) -> None:
-    verified: dict[str, RunEvidenceRefV1] = {}
-    for evaluation in evaluations:
-        for evidence in (evaluation.baseline_evidence, evaluation.candidate_evidence):
-            if evidence is None:
-                continue
-            actual = verified.get(evidence.run_ref)
-            if actual is None:
-                actual = RunEvidenceRefV1.from_bundle(
-                    simulator.read_evidence(Path(evidence.run_ref))
-                )
-                verified[evidence.run_ref] = actual
-            if actual != evidence:
-                raise ValueError("strict simulator evidence differs from stored RTO evaluation")
-
-
-def _commit_manifest(
-    run_dir: Path,
-    request: OfflineRtoRequestV1,
-    result: OfflineRtoResultV1,
-) -> OfflineRtoManifestV1:
-    names = [
-        "anchor_validation.json",
-        "events.jsonl",
-        "optimization_result.json",
-        "problem.json",
-        "request.json",
-        "result.json",
-        "static_search.json",
-        "strategy.json",
-    ]
-    files = {
-        name: hashlib.sha256((run_dir / name).read_bytes()).hexdigest()
-        for name in names
-        if (run_dir / name).is_file()
-    }
-    manifest = OfflineRtoManifestV1(
-        schema_version=RTO_SCHEMA_VERSION,
-        manifest_version="offline-rto-manifest-v1",
-        workflow_ref=request.ref,
-        result_ref=result.ref,
-        files=dict(sorted(files.items())),
-        software_versions={
-            "petroleum-rto": "0.1.0",
-            "rto-contract": RTO_SCHEMA_VERSION,
-        },
-        created_at=utc_now(),
-        claim_scope=CLAIM_SCOPE,
-    )
-    _write_or_verify(run_dir / "manifest.json", manifest.as_dict())
-    return manifest
 
 
 def read_offline_run(
     run_dir: Path,
     *,
-    bundle: RtoCatalogBundle,
     strategy_repository: StrategyRepository,
+    request_factory: ProviderRequestFactory,
     simulator: SimulatorPort,
-    recovered_stages: tuple[str, ...] = (),
-    external_request_ref: ContractRef | None = None,
+    expected_intent: OptimizationIntent | None = None,
+    expected_context: OperatingContext | None = None,
+    expected_bundle: CapabilityBundle | None = None,
+    expected_problem: OptimizationProblem | None = None,
 ) -> OfflineRtoRunRecord:
-    manifest = OfflineRtoManifestV1.from_mapping(_read_json(run_dir / "manifest.json"))
-    allowed = set(manifest.files) | {"manifest.json", "simulator"}
-    actual_top = {item.name for item in run_dir.iterdir() if not item.name.startswith(".")}
-    if actual_top - allowed:
-        raise ValueError("offline run contains unexpected top-level artifacts")
-    for relative, expected in manifest.files.items():
-        path = run_dir / relative
-        if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
-            raise ValueError(f"offline artifact hash differs: {relative}")
-    request = OfflineRtoRequestV1.from_mapping(_read_json(run_dir / "request.json"))
-    expected_request = _request_from_bundle(
-        bundle,
+    """Strictly reload and deterministically replay one completed run."""
+
+    run_dir = run_dir.resolve()
+    manifest = OfflineRtoManifest.from_mapping(_read_json(run_dir / "manifest.json"))
+    _verify_manifest(run_dir, manifest)
+    request = OfflineRtoRequest.from_mapping(_read_json(run_dir / "request.json"))
+    intent = OptimizationIntent.from_mapping(_read_json(run_dir / "intent.json"))
+    context = OperatingContext.from_mapping(_read_json(run_dir / "context.json"))
+    snapshot = CapabilityBundleSnapshot.from_mapping(_read_json(run_dir / "capability_bundle.json"))
+    bundle = snapshot.bundle
+    expected_snapshot = CapabilityBundleSnapshot(
+        schema_id=OFFLINE_WORKFLOW_SCHEMA_ID,
+        schema_version=OFFLINE_WORKFLOW_SCHEMA_VERSION,
+        snapshot_version="capability-bundle-snapshot",
+        bundle=bundle,
+        claim_scope=ENGINEERING_CLAIM_SCOPE,
+    )
+    if snapshot != expected_snapshot:
+        raise ValueError("capability bundle snapshot metadata is unsupported")
+    if expected_intent is not None and intent != expected_intent:
+        raise ValueError("stored intent differs from the caller-supplied intent")
+    if expected_context is not None and context != expected_context:
+        raise ValueError("stored context differs from the caller-supplied context")
+    if expected_bundle is not None and bundle != expected_bundle:
+        raise ValueError("stored capability bundle differs from the caller-supplied bundle")
+    expected_execution_route = BundleCapabilityView(bundle).route_for_objective_count(
+        len(intent.objectives)
+    )
+    if expected_execution_route is None:
+        raise ValueError("system policy has no execution route for objective count")
+    expected_request = OfflineRtoRequest(
+        schema_id=OFFLINE_WORKFLOW_SCHEMA_ID,
+        schema_version=OFFLINE_WORKFLOW_SCHEMA_VERSION,
+        request_version="offline-rto-request",
+        intent_ref=ContractRef(intent.intent_id, intent.fingerprint),
+        context_ref=context.ref,
+        capability_catalog_ref=bundle.catalog.ref,
+        system_policy_ref=bundle.system_policy.ref,
+        execution_route_ref=expected_execution_route.ref,
+        provider_id=request.provider_id,
         coverage_policy=request.coverage_policy,
-        external_request_ref=external_request_ref,
+        claim_scope=ENGINEERING_CLAIM_SCOPE,
     )
-    if request != expected_request or manifest.workflow_ref != request.ref:
-        raise ValueError("offline request differs from current strict policy inputs")
-    problem = OptimizationProblemV1.from_mapping(_read_json(run_dir / "problem.json"))
-    if problem != ProblemBuilder().build(bundle):
-        raise ValueError("offline problem differs from deterministic builder output")
-    static = StaticSearchResultV1.from_mapping(_read_json(run_dir / "static_search.json"))
-    _validate_static(problem, static)
-    optimization = OptimizationResultV1.from_mapping(
-        _read_json(run_dir / "optimization_result.json")
+    if request != expected_request:
+        raise ValueError("stored request differs from its nested immutable inputs")
+    if request_factory.provider_id != request.provider_id:
+        raise ValueError("provider request factory differs from the workflow request")
+    if manifest.workflow_ref != request.ref:
+        raise ValueError("manifest references another workflow request")
+
+    problem = OptimizationProblem.from_mapping(_read_json(run_dir / "problem.json"))
+    reconstructed_problem = (
+        ProblemBuilder().build(bundle, intent, context)
+        if expected_problem is None
+        else expected_problem
     )
-    _validate_optimization(problem, static, optimization)
-    _verify_evaluations(simulator, static.evaluations)
-    _verify_evaluations(simulator, optimization.dynamic_evaluations)
+    if problem != reconstructed_problem:
+        raise ValueError("stored problem differs from deterministic reconstruction")
+    registry = _solver_registry()
+    features = ProblemFeatureAnalyzer().analyze(problem)
+    execution_route = BundleCapabilityView(bundle).route_by_ref(problem.execution_route_ref)
+    route = SolverRouter().route(problem, features, registry, execution_route)
+    routing = SolverRoutingDecision.from_mapping(_read_json(run_dir / "solver_route.json"))
+    if routing != route.decision:
+        raise ValueError("stored solver route differs from deterministic routing")
+    solver_execution = SolverExecutionArtifact.from_mapping(
+        _read_json(run_dir / "static_solve.json")
+    )
+    _validate_solver_execution(problem, routing, solver_execution, route.solver)
+    _replay_evaluations(
+        solver_execution.result.evaluations,
+        proposals=solver_execution.result.proposals,
+        problem=problem,
+        context=context,
+        catalog=bundle.catalog,
+        request_factory=request_factory,
+        run_dir=run_dir,
+        simulator=simulator,
+    )
+
+    m2 = {item.proposal_ref: item for item in solver_execution.result.evaluations}
+    selector = FinalSelector()
+    static_selection = StaticPreferenceSelection.from_mapping(
+        _read_json(run_dir / "static_selection.json")
+    )
+    expected_selection = selector.rank_static(problem, solver_execution.result, m2)
+    if static_selection != expected_selection:
+        raise ValueError("stored static selection differs from deterministic replay")
+    dynamic = DynamicVerificationArtifact.from_mapping(
+        _read_json(run_dir / "dynamic_evaluations.json")
+    )
+    _validate_dynamic_artifact(problem, static_selection, dynamic)
+    _replay_evaluations(
+        dynamic.evaluations,
+        proposals=solver_execution.result.proposals,
+        problem=problem,
+        context=context,
+        catalog=bundle.catalog,
+        request_factory=request_factory,
+        run_dir=run_dir,
+        simulator=simulator,
+    )
+    m4 = {item.proposal_ref: item for item in dynamic.evaluations}
+    expected_final = selector.select(problem, solver_execution.result, m2, m4, bundle)
+    finalization = FinalizationArtifact.from_mapping(_read_json(run_dir / "finalization.json"))
+    expected_final_artifact = FinalizationArtifact(
+        schema_id=OFFLINE_WORKFLOW_SCHEMA_ID,
+        schema_version=OFFLINE_WORKFLOW_SCHEMA_VERSION,
+        artifact_version="finalization-artifact",
+        static_selection_ref=expected_final.static_selection.ref,
+        publishability=expected_final.publishability,
+        result=expected_final.result,
+        claim_scope=ENGINEERING_CLAIM_SCOPE,
+    )
+    if finalization != expected_final_artifact:
+        raise ValueError("stored finalization differs from deterministic replay")
+
     anchor_path = run_dir / "anchor_validation.json"
     anchor_validation = (
         None
         if not anchor_path.exists()
-        else AnchorValidationResultV1.from_mapping(_read_json(anchor_path))
+        else AnchorValidationResult.from_mapping(_read_json(anchor_path))
     )
     if anchor_validation is not None:
-        _validate_anchor_result(bundle, problem, static, optimization, anchor_validation)
-        _verify_anchor_evidence(simulator, anchor_validation)
-    strategy_path = run_dir / "strategy.json"
+        selected_ref = finalization.result.selected_proposal_ref
+        if selected_ref is None:
+            raise ValueError("anchor validation exists without a selected proposal")
+        selected = next(
+            item for item in solver_execution.result.proposals if item.ref == selected_ref
+        )
+        _validate_anchor_result(
+            anchor_validation,
+            request=request,
+            intent=intent,
+            context=context,
+            bundle=bundle,
+            problem=problem,
+            selected_action=selected.decision_values,
+        )
+        for attempt in anchor_validation.attempts:
+            _replay_anchor_attempt(
+                attempt,
+                catalog=bundle.catalog,
+                request_factory=request_factory,
+                run_dir=run_dir,
+                simulator=simulator,
+            )
+    elif finalization.result.status == "success":
+        raise ValueError("successful finalization requires explicit coverage validation")
+
+    strategy_path = run_dir / "strategy_draft.json"
     strategy = (
         None
         if not strategy_path.exists()
-        else StrategyEntryV1.from_mapping(_read_json(strategy_path))
+        else StrategyEntry.from_mapping(_read_json(strategy_path))
     )
     if strategy is not None:
-        if anchor_validation is None:
-            raise ValueError("offline strategy exists without anchor validation")
-        anchors = tuple(
-            anchor_from_evaluations(
-                item.context,
-                item.proposal,
-                item.static_evaluation,
-                cast(CandidateEvaluationV1, item.dynamic_evaluation),
-            )
-            for item in anchor_validation.passed_attempts
-        )
-        rebuilt = StrategyBuilder().build(
+        if anchor_validation is None or not anchor_validation.passed:
+            raise ValueError("strategy draft exists without passing anchor coverage")
+        expected_strategy = _build_expected_strategy(
             problem,
-            bundle.context,
-            static,
-            optimization,
-            anchors,
+            context,
+            solver_execution,
+            dynamic,
+            expected_final,
+            anchor_validation,
         )
-        if rebuilt != strategy:
-            raise ValueError("offline strategy differs from deterministic strategy builder")
-        stored = strategy_repository.read_ref(strategy.ref)
-        if stored.entry != strategy:
-            raise ValueError("strategy repository differs from offline workflow strategy")
-    result = OfflineRtoResultV1.from_mapping(_read_json(run_dir / "result.json"))
-    expected_result = OfflineRtoResultV1(
-        schema_version=RTO_SCHEMA_VERSION,
-        result_version="offline-rto-result-v1",
-        status=(
-            "completed_draft"
-            if strategy is not None
-            else "failed"
-            if optimization.status == "evaluation_error"
-            or (
-                anchor_validation is not None
-                and any(
-                    item.static_evaluation.status in {"invalid_request", "evaluation_error"}
-                    or (
-                        item.dynamic_evaluation is not None
-                        and item.dynamic_evaluation.status
-                        in {"invalid_request", "evaluation_error"}
-                    )
-                    for item in anchor_validation.attempts
-                )
-            )
-            else "completed_without_strategy"
-        ),
-        request_ref=request.ref,
-        problem_ref=problem.ref,
-        static_search_ref=static.ref,
-        optimization_result_ref=optimization_result_ref(optimization),
-        strategy_ref=None if strategy is None else strategy.ref,
-        requested_anchor_count=0 if anchor_validation is None else len(anchor_validation.attempts),
-        passed_anchor_count=(
-            0 if anchor_validation is None else len(anchor_validation.passed_attempts)
-        ),
-        termination_reason=result.termination_reason,
-        claim_scope=CLAIM_SCOPE,
+        if strategy != expected_strategy:
+            raise ValueError("strategy draft differs from deterministic reconstruction")
+        stored_record = strategy_repository.read(strategy.strategy_id, strategy.revision)
+        if stored_record.entry != strategy:
+            raise ValueError("strategy repository payload differs from workflow draft")
+
+    result = OfflineRtoResult.from_mapping(_read_json(run_dir / "result.json"))
+    expected_result = _offline_result(
+        request,
+        problem,
+        routing,
+        solver_execution,
+        static_selection,
+        dynamic,
+        finalization,
+        anchor_validation,
+        strategy,
     )
     if result != expected_result or manifest.result_ref != result.ref:
-        raise ValueError("offline result differs from strict embedded evidence")
+        raise ValueError("stored offline result or manifest differs from deterministic replay")
+    _verify_manifest(run_dir, manifest, result=result)
     events = _read_events(run_dir / "events.jsonl", request.ref, allow_missing=False)
-    if not events or events[-1].stage != "workflow-complete" or events[-1].object_ref != result.ref:
-        raise ValueError("offline workflow event log does not end at the result")
+    _validate_event_stages(
+        events,
+        request=request,
+        problem=problem,
+        routing=routing,
+        solver_execution=solver_execution,
+        selection=static_selection,
+        dynamic=dynamic,
+        finalization=finalization,
+        anchors=anchor_validation,
+        strategy=strategy,
+        result=result,
+    )
     return OfflineRtoRunRecord(
         run_dir=run_dir,
         request=request,
+        intent=intent,
+        context=context,
+        capability_snapshot=snapshot,
         problem=problem,
-        static_search=static,
-        optimization_result=optimization,
+        routing=routing,
+        solver_execution=solver_execution,
+        static_selection=static_selection,
+        dynamic_verification=dynamic,
+        finalization=finalization,
         anchor_validation=anchor_validation,
         strategy=strategy,
         result=result,
         manifest=manifest,
         events=events,
-        recovered_stages=recovered_stages,
+        recovered_stages=tuple(item.stage for item in events) + ("manifest-committed",),
         physical_m2_executions=0,
         physical_m4_executions=0,
     )
 
 
-def _read_json(path: Path) -> dict[str, object]:
+def _relativize_solver_result(result: SolverResult, run_dir: Path) -> SolverResult:
+    return replace(
+        result,
+        evaluations=tuple(_relativize_evaluation(item, run_dir) for item in result.evaluations),
+    )
+
+
+def _relativize_evaluation(
+    evaluation: CandidateEvaluation,
+    run_dir: Path,
+) -> CandidateEvaluation:
+    evidence = tuple(
+        replace(item, run_ref=_relative_run_ref(item.run_ref, run_dir))
+        for item in evaluation.evidence_refs
+    )
+    return replace(evaluation, evidence_refs=evidence)
+
+
+def _relative_run_ref(value: str, run_dir: Path) -> str:
+    source = Path(value)
+    if not source.is_absolute():
+        raise ValueError("simulator evidence must initially provide an absolute run_ref")
+    resolved = source.resolve()
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"cannot read strict offline JSON: {path}") from exc
-    if not isinstance(value, dict) or any(not isinstance(key, str) for key in value):
-        raise TypeError(f"offline JSON must be an object: {path}")
-    return cast(dict[str, object], value)
+        relative = resolved.relative_to(run_dir.resolve())
+    except ValueError as exc:
+        raise ValueError("simulator evidence must live inside its workflow directory") from exc
+    if not relative.parts or relative.parts[0] != "simulator" or ".." in relative.parts:
+        raise ValueError("simulator evidence must use a safe simulator-relative path")
+    return relative.as_posix()
+
+
+def _replay_evaluations(
+    evaluations: tuple[CandidateEvaluation, ...],
+    *,
+    proposals: tuple[CandidateProposal, ...],
+    problem: OptimizationProblem,
+    context: OperatingContext,
+    catalog: CapabilityCatalog,
+    request_factory: ProviderRequestFactory,
+    run_dir: Path,
+    simulator: SimulatorPort,
+) -> None:
+    proposal_by_ref = {item.ref: item for item in proposals}
+    if len(proposal_by_ref) != len(proposals):
+        raise ValueError("candidate proposals contain duplicate semantic identities")
+    compiler = CandidatePlanCompiler(catalog)
+    for evaluation in evaluations:
+        try:
+            proposal = proposal_by_ref[evaluation.proposal_ref]
+        except KeyError as exc:
+            raise ValueError("candidate evaluation lacks its proposal") from exc
+        if len(evaluation.evidence_refs) != 2:
+            raise ValueError("candidate evaluation lacks replayable paired evidence")
+        evidence_by_role = {item.pair_role: item for item in evaluation.evidence_refs}
+        if set(evidence_by_role) != {"baseline", "candidate"}:
+            raise ValueError("candidate evaluation evidence roles are incomplete")
+        pair = compiler.compile_pair(
+            problem,
+            context,
+            proposal,
+            stage=evaluation.stage,
+            request_factory=request_factory,
+        )
+        baseline = _reload_evidence(
+            evidence_by_role["baseline"], run_dir=run_dir, simulator=simulator
+        )
+        candidate = _reload_evidence(
+            evidence_by_role["candidate"], run_dir=run_dir, simulator=simulator
+        )
+        if evaluation.stage == "M2":
+            replayed = M2PairedEvaluator(problem, catalog).evaluate(
+                proposal, pair, baseline, candidate
+            )
+        else:
+            replayed = M4PairedEvaluator(problem, catalog).evaluate(
+                proposal, pair, baseline, candidate
+            )
+        if replayed.ref != evaluation.ref:
+            raise ValueError("candidate evaluation differs from strict evidence replay")
+
+
+def _replay_anchor_attempt(
+    attempt: AnchorAttempt,
+    *,
+    catalog: CapabilityCatalog,
+    request_factory: ProviderRequestFactory,
+    run_dir: Path,
+    simulator: SimulatorPort,
+) -> None:
+    _replay_evaluations(
+        (attempt.static_evaluation,),
+        proposals=(attempt.proposal,),
+        problem=attempt.problem,
+        context=attempt.context,
+        catalog=catalog,
+        request_factory=request_factory,
+        run_dir=run_dir,
+        simulator=simulator,
+    )
+    if attempt.dynamic_evaluation is not None:
+        _replay_evaluations(
+            (attempt.dynamic_evaluation,),
+            proposals=(attempt.proposal,),
+            problem=attempt.problem,
+            context=attempt.context,
+            catalog=catalog,
+            request_factory=request_factory,
+            run_dir=run_dir,
+            simulator=simulator,
+        )
+
+
+def _reload_evidence(
+    evidence: RunEvidenceRef,
+    *,
+    run_dir: Path,
+    simulator: SimulatorPort,
+) -> SimulationRunBundle:
+    relative = Path(evidence.run_ref)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError("run evidence locator must be relative and traversal-free")
+    resolved = (run_dir / relative).resolve()
+    simulator_root = (run_dir / "simulator").resolve()
+    if not resolved.is_relative_to(simulator_root):
+        raise ValueError("run evidence locator escapes the simulator directory")
+    reloaded = simulator.read_evidence(resolved)
+    actual = RunEvidenceRef.from_bundle(reloaded, pair_role=evidence.pair_role)
+    if actual.manifest_fingerprint != evidence.manifest_fingerprint:
+        raise ValueError("strictly reloaded simulator manifest differs from workflow refs")
+    if actual.semantic_payload() != evidence.semantic_payload():
+        raise ValueError("strictly reloaded simulator evidence differs from workflow refs")
+    return reloaded
+
+
+def _validate_event_stages(
+    events: tuple[WorkflowEvent, ...],
+    *,
+    request: OfflineRtoRequest,
+    problem: OptimizationProblem,
+    routing: SolverRoutingDecision,
+    solver_execution: SolverExecutionArtifact,
+    selection: StaticPreferenceSelection,
+    dynamic: DynamicVerificationArtifact,
+    finalization: FinalizationArtifact,
+    anchors: AnchorValidationResult | None,
+    strategy: StrategyEntry | None,
+    result: OfflineRtoResult,
+) -> None:
+    expected: list[tuple[str, ContractRef]] = [
+        ("inputs-ready", request.ref),
+        ("problem-ready", problem.ref),
+        ("route-ready", routing_ref(routing)),
+        ("static-solve-ready", solver_execution.ref),
+        ("static-selection-ready", selection.ref),
+        ("dynamic-evaluations-ready", dynamic.ref),
+        ("finalization-ready", finalization.ref),
+    ]
+    if anchors is not None:
+        expected.append(("anchor-validation-ready", anchors.ref))
+    if strategy is not None:
+        expected.append(("strategy-draft-ready", strategy.ref))
+    expected.append(("workflow-complete", result.ref))
+    actual = tuple((item.stage, item.object_ref) for item in events)
+    if actual != tuple(expected):
+        raise ValueError("workflow event stages or object refs differ from committed artifacts")
+
+
+def _expected_manifest_files(result: OfflineRtoResult) -> frozenset[str]:
+    expected = set(_REQUIRED_MANIFEST_FILES)
+    if result.anchor_validation_ref is not None:
+        expected.add("anchor_validation.json")
+    if result.strategy_ref is not None:
+        expected.add("strategy_draft.json")
+    return frozenset(expected)
+
+
+def _verify_manifest(
+    run_dir: Path,
+    manifest: OfflineRtoManifest,
+    *,
+    result: OfflineRtoResult | None = None,
+) -> None:
+    if dict(manifest.software_versions) != _SOFTWARE_VERSIONS:
+        raise ValueError("workflow manifest software versions are unsupported")
+    declared = set(manifest.files)
+    allowed = _REQUIRED_MANIFEST_FILES | _OPTIONAL_MANIFEST_FILES
+    if not _REQUIRED_MANIFEST_FILES.issubset(declared) or not declared.issubset(allowed):
+        raise ValueError("workflow manifest contains a missing or unsupported artifact name")
+    if result is not None and declared != set(_expected_manifest_files(result)):
+        raise ValueError("workflow manifest files differ from the committed result shape")
+    _validate_top_level_entries(
+        run_dir,
+        expected_files=frozenset(manifest.files),
+        manifest_required=True,
+    )
+    for name, expected in manifest.files.items():
+        if _file_sha256(run_dir / name) != expected:
+            raise ValueError(f"workflow artifact hash differs from manifest: {name}")
+
+
+def _commit_manifest(
+    run_dir: Path,
+    request: OfflineRtoRequest,
+    result: OfflineRtoResult,
+) -> OfflineRtoManifest:
+    path = run_dir / "manifest.json"
+    if path.exists():
+        manifest = OfflineRtoManifest.from_mapping(_read_json(path))
+        _verify_manifest(run_dir, manifest, result=result)
+        return manifest
+    expected_names = _expected_manifest_files(result)
+    _validate_top_level_entries(
+        run_dir,
+        expected_files=expected_names,
+        manifest_required=False,
+    )
+    files = {name: _file_sha256(run_dir / name) for name in sorted(expected_names)}
+    manifest = OfflineRtoManifest(
+        schema_id=OFFLINE_WORKFLOW_SCHEMA_ID,
+        schema_version=OFFLINE_WORKFLOW_SCHEMA_VERSION,
+        manifest_version=OFFLINE_MANIFEST_VERSION,
+        workflow_ref=request.ref,
+        result_ref=result.ref,
+        files=files,
+        software_versions=_SOFTWARE_VERSIONS,
+        created_at=_utc_now(),
+        claim_scope=ENGINEERING_CLAIM_SCOPE,
+    )
+    _write_or_verify(path, manifest.as_dict())
+    _verify_manifest(run_dir, manifest, result=result)
+    return manifest
+
+
+def _validate_top_level_entries(
+    run_dir: Path,
+    *,
+    expected_files: frozenset[str],
+    manifest_required: bool,
+) -> None:
+    entries = {item.name: item for item in run_dir.iterdir()}
+    allowed = set(expected_files) | {"manifest.json", ".workflow.lock", "simulator"}
+    unexpected = set(entries) - allowed
+    if unexpected:
+        raise ValueError(f"workflow contains an unexpected top-level entry: {sorted(unexpected)!r}")
+    if any(item.is_symlink() for item in entries.values()):
+        raise ValueError("workflow contains a symbolic link")
+    for name in expected_files:
+        item = entries.get(name)
+        if item is None or not item.is_file():
+            raise ValueError(f"workflow artifact must be a regular top-level file: {name}")
+    manifest = entries.get("manifest.json")
+    if manifest_required and (manifest is None or not manifest.is_file()):
+        raise ValueError("workflow manifest must be a regular top-level file")
+    if not manifest_required and manifest is not None:
+        raise ValueError("workflow manifest already exists before commit")
+    lock = entries.get(".workflow.lock")
+    if lock is not None and not lock.is_file():
+        raise ValueError("workflow lock must be a regular top-level file")
+    simulator = entries.get("simulator")
+    if simulator is not None and not simulator.is_dir():
+        raise ValueError("workflow simulator entry must be a top-level directory")
+
+
+def _file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _read_json(path: Path) -> dict[str, object]:
+    if path.is_symlink():
+        raise ValueError(f"workflow artifact must not be a symbolic link: {path.name}")
+    try:
+        value = json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=_reject_duplicate_keys,
+            parse_constant=_reject_constant,
+        )
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"workflow artifact is not valid UTF-8 JSON: {path.name}") from exc
+    return dict(as_mapping(value, context=path.name))
+
+
+def _reject_constant(value: str) -> object:
+    raise ValueError(f"workflow JSON contains non-finite constant {value!r}")
+
+
+def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"workflow JSON contains duplicate key {key!r}")
+        result[key] = value
+    return result
 
 
 def _write_or_verify(path: Path, value: Mapping[str, object]) -> None:
-    payload = canonical_json_bytes(value)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_symlink():
+        raise ValueError(f"workflow artifact must not be a symbolic link: {path.name}")
+    payload = canonical_json_bytes(value) + b"\n"
     if path.exists():
         if path.read_bytes() != payload:
-            raise ValueError(f"existing offline artifact differs: {path.name}")
+            raise ValueError(f"existing workflow artifact differs: {path.name}")
         return
     temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}")
     try:
-        with temporary.open("xb") as stream:
-            stream.write(payload)
-            stream.flush()
-            os.fsync(stream.fileno())
+        with temporary.open("xb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
         os.replace(temporary, path)
+        _fsync_directory(path.parent)
     finally:
-        temporary.unlink(missing_ok=True)
+        if temporary.exists():
+            temporary.unlink()
 
 
 def _read_events(
@@ -749,75 +1516,147 @@ def _read_events(
     workflow_ref: ContractRef,
     *,
     allow_missing: bool,
-) -> tuple[WorkflowEventV1, ...]:
+) -> tuple[WorkflowEvent, ...]:
     if not path.exists():
         if allow_missing:
             return ()
-        raise ValueError("offline workflow event log is missing")
-    lines = path.read_text(encoding="utf-8").splitlines()
-    if not lines or any(not item.strip() for item in lines):
-        raise ValueError("offline workflow event log is empty or malformed")
-    events: list[WorkflowEventV1] = []
-    previous: str | None = None
-    for index, line in enumerate(lines):
-        try:
-            raw = json.loads(line)
-        except json.JSONDecodeError as exc:
-            raise ValueError("offline workflow event contains invalid JSON") from exc
-        if not isinstance(raw, dict):
-            raise TypeError("offline workflow event must be an object")
-        event = WorkflowEventV1.from_mapping(cast(dict[str, object], raw))
+        raise ValueError("workflow event chain is missing")
+    if path.is_symlink():
+        raise ValueError("workflow event chain must not be a symbolic link")
+    try:
+        payload = path.read_bytes()
+        if payload and not payload.endswith(b"\n"):
+            raise ValueError("workflow event chain has an incomplete final line")
+        text_payload = payload.decode("utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ValueError("workflow event chain is not valid UTF-8") from exc
+    events: list[WorkflowEvent] = []
+    for line_number, raw in enumerate(text_payload.splitlines(), start=1):
+        if not raw.strip():
+            raise ValueError(f"workflow event line {line_number} is empty")
+        value = json.loads(
+            raw,
+            object_pairs_hook=_reject_duplicate_keys,
+            parse_constant=_reject_constant,
+        )
+        event = WorkflowEvent.from_mapping(as_mapping(value, context="workflow event"))
+        expected_previous = None if not events else events[-1].fingerprint
         if (
             event.workflow_ref != workflow_ref
-            or event.sequence != index
-            or event.previous_event_fingerprint != previous
+            or event.sequence != len(events)
+            or event.previous_event_fingerprint != expected_previous
         ):
-            raise ValueError("offline workflow event chain is discontinuous")
+            raise ValueError("workflow event chain identity or continuity is invalid")
+        if event.stage not in _STAGE_ORDER:
+            raise ValueError("workflow event contains an unsupported stage")
+        if events and _STAGE_ORDER[event.stage] <= _STAGE_ORDER[events[-1].stage]:
+            raise ValueError("workflow event stages are not strictly ordered")
         events.append(event)
-        previous = event.fingerprint
-    return tuple(events)
+    result = tuple(events)
+    _validate_event_prefix(result)
+    return result
+
+
+_STAGE_ORDER = {
+    stage: index
+    for index, stage in enumerate(
+        (
+            *_STATIC_STAGES,
+            "anchor-validation-ready",
+            "strategy-draft-ready",
+            "workflow-complete",
+        )
+    )
+}
+
+_LEGAL_EVENT_BRANCHES = (
+    (*_STATIC_STAGES, "workflow-complete"),
+    (*_STATIC_STAGES, "anchor-validation-ready", "workflow-complete"),
+    (
+        *_STATIC_STAGES,
+        "anchor-validation-ready",
+        "strategy-draft-ready",
+        "workflow-complete",
+    ),
+)
+
+
+def _validate_event_prefix(events: tuple[WorkflowEvent, ...]) -> None:
+    stages = tuple(item.stage for item in events)
+    if not any(stages == branch[: len(stages)] for branch in _LEGAL_EVENT_BRANCHES):
+        raise ValueError("workflow event stages are not a legal contiguous branch prefix")
 
 
 def _ensure_event(
-    events: list[WorkflowEventV1],
+    events: list[WorkflowEvent],
     run_dir: Path,
     workflow_ref: ContractRef,
     stage: str,
     object_ref: ContractRef,
 ) -> None:
-    existing = [item for item in events if item.stage == stage]
-    if existing:
-        if len(existing) != 1 or existing[0].object_ref != object_ref:
-            raise ValueError("workflow stage event differs from recovered artifact")
+    matches = [item for item in events if item.stage == stage]
+    if matches:
+        if len(matches) != 1 or matches[0].object_ref != object_ref:
+            raise ValueError(f"stored workflow event differs for stage {stage}")
         return
-    event = WorkflowEventV1(
-        schema_version=RTO_SCHEMA_VERSION,
-        event_version="offline-workflow-event-v1",
+    current_rank = _STAGE_ORDER[stage]
+    if any(_STAGE_ORDER[item.stage] > current_rank for item in events):
+        raise ValueError(f"workflow event exists after missing stage {stage}")
+    event = WorkflowEvent(
+        schema_id=OFFLINE_WORKFLOW_SCHEMA_ID,
+        schema_version=OFFLINE_WORKFLOW_SCHEMA_VERSION,
+        event_version="workflow-event",
         workflow_ref=workflow_ref,
         sequence=len(events),
         stage=stage,
         object_ref=object_ref,
-        occurred_at=utc_now(),
+        occurred_at=_utc_now(),
         previous_event_fingerprint=None if not events else events[-1].fingerprint,
+        claim_scope=ENGINEERING_CLAIM_SCOPE,
     )
-    with (run_dir / "events.jsonl").open("ab") as stream:
-        stream.write(canonical_json_bytes(event.as_dict()) + b"\n")
-        stream.flush()
-        os.fsync(stream.fileno())
+    path = run_dir / "events.jsonl"
+    was_missing = not path.exists()
+    payload = canonical_json_bytes(event.as_dict()) + b"\n"
+    with path.open("ab") as handle:
+        handle.write(payload)
+        handle.flush()
+        os.fsync(handle.fileno())
+    if was_missing:
+        _fsync_directory(run_dir)
     events.append(event)
+
+
+def _reject_event_without_artifacts(
+    events: list[WorkflowEvent],
+    stage: str,
+    paths: tuple[Path, ...],
+) -> None:
+    if any(item.stage == stage for item in events) and any(not path.exists() for path in paths):
+        missing = ", ".join(path.name for path in paths if not path.exists())
+        raise ValueError(
+            f"workflow event exists but committed artifact is missing for {stage}: {missing}"
+        )
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _fsync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 @contextmanager
 def _workflow_lock(run_dir: Path) -> Iterator[None]:
-    lock = run_dir / ".workflow.lock"
-    try:
-        descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    except FileExistsError as exc:
-        raise RuntimeError("offline RTO workflow is locked by another writer") from exc
-    try:
-        os.write(descriptor, str(os.getpid()).encode("ascii"))
-        os.fsync(descriptor)
+    with exclusive_file_lock(
+        run_dir / ".workflow.lock",
+        label=f"workflow {run_dir.name}",
+    ):
         yield
-    finally:
-        os.close(descriptor)
-        lock.unlink(missing_ok=True)
+
+
+__all__ = ["OfflineRtoOrchestrator", "OfflineRtoRunRecord", "read_offline_run"]

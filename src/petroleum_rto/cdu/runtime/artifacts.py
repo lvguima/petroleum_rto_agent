@@ -42,9 +42,10 @@ from .resources import (
     list_runtime_resource_ids,
     load_runtime_resource_bundle,
     read_runtime_resource_bytes,
+    runtime_resource_ids_for_preset,
 )
 
-RUN_MANIFEST_VERSION: Final[str] = "cdu-mini-run-manifest-v0.1.0"
+RUN_MANIFEST_VERSION: Final[str] = "cdu-mini-run-manifest-v0.3.0"
 _SHA256: Final[re.Pattern[str]] = re.compile(r"^[0-9a-f]{64}$")
 _IDENTIFIER: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _RUNTIME_STATUSES: Final[frozenset[str]] = frozenset(
@@ -55,11 +56,9 @@ _DOMAIN_STATUSES: Final[frozenset[str]] = frozenset(
 )
 _REQUIRED_NON_FAILURE_VERSION_KEYS: Final[frozenset[str]] = frozenset(
     {
-        "analysis_basis_version",
         "base_case_version",
         "base_parameter_set_version",
         "case_version",
-        "control_version",
         "derived_case_version",
         "derived_parameter_set_version",
         "m5_overlay_version",
@@ -68,7 +67,6 @@ _REQUIRED_NON_FAILURE_VERSION_KEYS: Final[frozenset[str]] = frozenset(
         "parameter_set_version",
         "scenario_version",
         "software_version",
-        "validation_version",
     }
 )
 _REQUIRED_EFFECTIVE_FINGERPRINT_KEYS: Final[frozenset[str]] = frozenset(
@@ -77,7 +75,6 @@ _REQUIRED_EFFECTIVE_FINGERPRINT_KEYS: Final[frozenset[str]] = frozenset(
         "effective_object.component_catalog_object",
         "effective_object.effective_case_object",
         "m5_pipeline_result",
-        "m6_formal_result",
     }
 )
 _REQUIRED_ENVIRONMENT_KEYS: Final[frozenset[str]] = frozenset(
@@ -277,47 +274,72 @@ def _resolve_executable_preset(request: RunRequest) -> RuntimePreset:
     return preset
 
 
+def _resource_ids_for_request(request: RunRequest) -> tuple[str, ...]:
+    try:
+        preset = get_preset(request.preset_id)
+    except (KeyError, TypeError):
+        return list_runtime_resource_ids()
+    if request.run_type != preset.run_type:
+        return list_runtime_resource_ids()
+    return runtime_resource_ids_for_preset(preset)
+
+
 def _common_versions(bundle: RuntimeResourceBundle) -> dict[str, str]:
-    basis = bundle.m6_basis
-    return {
-        "analysis_basis_version": basis.analysis_version,
-        "base_case_version": basis.base_case_version,
-        "base_parameter_set_version": basis.base_parameter_set_version,
+    overlay = bundle.m5_overlay
+    versions = {
+        "base_case_version": overlay.base_case_version,
+        "base_parameter_set_version": overlay.base_parameter_set_version,
         "case_version": bundle.effective_case.case_version,
-        "control_version": bundle.control.control_version,
-        "derived_case_version": basis.derived_case_version,
-        "derived_parameter_set_version": basis.derived_parameter_set_version,
-        "m5_overlay_version": bundle.m5_overlay.overlay_version,
+        "derived_case_version": overlay.derived_case_version,
+        "derived_parameter_set_version": overlay.derived_parameter_set_version,
+        "m5_overlay_version": overlay.overlay_version,
         "model_config_version": bundle.effective_model.config_version,
         "model_version": bundle.effective_model.model_version,
         "parameter_set_version": bundle.effective_model.parameter_set_version,
         "scenario_version": "not_applicable",
         "software_version": SOFTWARE_VERSION,
-        "validation_version": bundle.validation_config.validation_version,
     }
+    if bundle.control is not None:
+        versions["control_version"] = bundle.control.control_version
+    if bundle.validation_config is not None:
+        versions.update(
+            {
+                "analysis_basis_version": bundle.validation_config.analysis_basis_version,
+                "validation_version": bundle.validation_config.validation_version,
+            }
+        )
+    return versions
 
 
 def _base_source_fingerprints(bundle: RuntimeResourceBundle) -> dict[str, str]:
     fingerprints = dict(bundle.resource_fingerprints)
     fingerprints.update(
         {
-            "m5_manifest": bundle.m6_basis.m5_manifest_sha256,
-            "m5_pipeline_result": bundle.m6_basis.m5_pipeline_fingerprint,
-            "m6_formal_result": bundle.m6_result_fingerprint,
+            "m5_manifest": bundle.m5_overlay.m5_manifest_sha256,
+            "m5_pipeline_result": bundle.m5_overlay.pipeline_result_fingerprint,
         }
     )
     fingerprints.update(
         {
             f"m5_artifact.{name}": digest
-            for name, digest in bundle.m6_basis.m5_artifact_sha256.items()
+            for name, digest in bundle.m5_overlay.m5_artifact_sha256.items()
         }
     )
     fingerprints.update(
         {
-            f"effective_object.{name}": digest
-            for name, digest in bundle.m6_basis.effective_object_fingerprints.items()
+            "effective_object.calibrated_model_object": (
+                bundle.m5_overlay.calibrated_model_object_fingerprint
+            ),
+            "effective_object.effective_case_object": (
+                bundle.m5_overlay.effective_case_object_fingerprint
+            ),
+            "effective_object.component_catalog_object": (
+                bundle.m5_overlay.component_catalog_object_fingerprint
+            ),
         }
     )
+    if bundle.m6_result_fingerprint is not None:
+        fingerprints["m6_formal_result"] = bundle.m6_result_fingerprint
     return {name: fingerprints[name] for name in sorted(fingerprints)}
 
 
@@ -332,7 +354,7 @@ def _effective_fingerprint(
         "effective_model": bundle.effective_model.as_dict(),
         "effective_case": bundle.effective_case.as_dict(),
         "component_catalog": bundle.catalog.as_dict(),
-        "m5_analysis_basis": bundle.m6_basis.analysis_basis_fingerprint,
+        "m5_analysis_basis": bundle.m5_overlay.analysis_basis_fingerprint,
         "resource_fingerprints": dict(bundle.resource_fingerprints),
     }
     if extra is not None:
@@ -372,11 +394,10 @@ def _validation_scenario(
     bundle: RuntimeResourceBundle,
     preset: RuntimePreset,
 ) -> ValidationScenarioSpec:
+    config = bundle.require_validation_config()
     try:
         return next(
-            scenario
-            for scenario in bundle.validation_config.scenarios
-            if scenario.scenario_id == preset.scenario_id
+            scenario for scenario in config.scenarios if scenario.scenario_id == preset.scenario_id
         )
     except StopIteration as exc:
         raise ValueError("fixed preset has no matching packaged M6 scenario") from exc
@@ -412,15 +433,16 @@ def _resolved_run_provenance(
     elif resolved.preset.engine_layer == "M4":
         if resolved.closed_loop_scenario is None:
             raise ValueError("custom M4 provenance lacks its resolved scenario")
+        control = bundle.require_control()
         versions.update(
             {
                 "config_version": resolved.model.config_version,
-                "control_version": bundle.control.control_version,
+                "control_version": control.control_version,
                 "scenario_version": resolved.closed_loop_scenario.scenario_version,
                 "simulation_stage": "M4",
             }
         )
-        sources["control_input"] = bundle.control.input_fingerprint
+        sources["control_input"] = control.input_fingerprint
     else:  # pragma: no cover - custom M6 is rejected during shape validation
         raise ValueError("portable M6 provenance does not accept custom inputs")
     return DerivedRunProvenance(
@@ -434,10 +456,16 @@ def _normal_run_provenance(
     request: RunRequest,
     preset: RuntimePreset,
     bundle: RuntimeResourceBundle,
+    *,
+    resolved: ResolvedRuntimeInputs | None = None,
 ) -> DerivedRunProvenance:
-    resolved = resolve_runtime_inputs(request, bundle=bundle)
-    if resolved.is_custom:
-        return _resolved_run_provenance(resolved, bundle)
+    actual_resolved = (
+        resolve_runtime_inputs(request, bundle=bundle) if resolved is None else resolved
+    )
+    if actual_resolved.request != request or actual_resolved.preset != preset:
+        raise ValueError("resolved provenance inputs differ from the request or preset")
+    if actual_resolved.is_custom:
+        return _resolved_run_provenance(actual_resolved, bundle)
     versions = _common_versions(bundle)
     source_fingerprints = _base_source_fingerprints(bundle)
     extra: dict[str, object] | None = None
@@ -450,28 +478,32 @@ def _normal_run_provenance(
         versions["simulation_stage"] = "M3"
         extra = {"scenario": open_scenario.as_dict()}
     elif preset.engine_layer == "M4":
+        control = bundle.require_control()
         closed_scenario = _closed_loop_scenario(bundle, preset)
         versions["config_version"] = bundle.effective_model.config_version
-        versions["control_version"] = bundle.control.control_version
+        versions["control_version"] = control.control_version
         versions["scenario_version"] = closed_scenario.scenario_version
         versions["simulation_stage"] = "M4"
-        source_fingerprints["control_input"] = bundle.control.input_fingerprint
+        source_fingerprints["control_input"] = control.input_fingerprint
         extra = {
-            "control": bundle.control.as_dict(),
+            "control": control.as_dict(),
             "scenario": closed_scenario.as_dict(),
         }
     else:
+        control = bundle.require_control()
+        config = bundle.require_validation_config()
+        formal_m6_result = bundle.require_m6_result_fingerprint()
         validation_scenario = _validation_scenario(bundle, preset)
         versions.update(
             {
-                "control_version": bundle.control.control_version,
+                "control_version": control.control_version,
                 "execution_profile": "portable_selected_scenario_replay",
                 "scenario_version": validation_scenario.scenario_version,
                 "simulation_stage": "M6",
-                "validation_version": bundle.validation_config.validation_version,
+                "validation_version": config.validation_version,
             }
         )
-        source_fingerprints["formal_m6_result"] = bundle.m6_result_fingerprint
+        source_fingerprints["formal_m6_result"] = formal_m6_result
         if preset.preset_id == _M6_PUMP_PRESET_ID:
             if (
                 preset.duration_s != _M6_DURATION_S
@@ -482,29 +514,27 @@ def _normal_run_provenance(
                 raise ValueError("portable M6 pump-trip preset differs from its frozen grid")
             try:
                 rule = next(
-                    item
-                    for item in bundle.validation_config.protection_rules
-                    if item.rule_id == _M6_PUMP_RULE_ID
+                    item for item in config.protection_rules if item.rule_id == _M6_PUMP_RULE_ID
                 )
             except StopIteration as exc:
                 raise ValueError("portable M6 pump-trip protection rule is unavailable") from exc
             extra = {
-                "control": bundle.control.as_dict(),
-                "m6_config": bundle.validation_config.as_dict(),
+                "control": control.as_dict(),
+                "m6_config": config.as_dict(),
                 "scenario": validation_scenario.as_dict(),
                 "protection_rule": rule.as_dict(),
                 "execution_profile": "portable_selected_scenario_replay",
             }
         elif preset.preset_id == _M6_REJECTION_PRESET_ID:
             domain = assess_applicability(
-                bundle.validation_config.domain_dimensions,
+                config.domain_dimensions,
                 validation_scenario.inputs,
                 abnormal_verification=validation_scenario.abnormal_verification,
             )
             if domain.status != "rejected":
                 raise ValueError("portable M6 structural preset is not rejected")
             extra = {
-                "m6_config": bundle.validation_config.as_dict(),
+                "m6_config": config.as_dict(),
                 "scenario": validation_scenario.as_dict(),
                 "domain": domain.as_dict(),
                 "execution_profile": "portable_selected_scenario_replay",
@@ -555,7 +585,11 @@ def derive_run_provenance(request: RunRequest) -> DerivedRunProvenance:
     if not isinstance(request, RunRequest):
         raise TypeError("derive_run_provenance requires a RunRequest")
     preset = _resolve_executable_preset(request)
-    return _normal_run_provenance(request, preset, load_runtime_resource_bundle())
+    return _normal_run_provenance(
+        request,
+        preset,
+        load_runtime_resource_bundle(preset),
+    )
 
 
 def _assert_mapping_equal(
@@ -714,8 +748,15 @@ def _validate_source_fingerprints(
 def _validate_payload_provenance(
     request: RunRequest,
     payload: ExecutionPayload,
+    *,
+    prepared_bundle: RuntimeResourceBundle | None = None,
+    prepared_resolved: ResolvedRuntimeInputs | None = None,
 ) -> None:
-    def validate_preflight_rejection(exception: ValueError) -> None:
+    def validate_preflight_rejection(
+        exception: ValueError,
+        *,
+        known_resource_fingerprints: Mapping[str, str] | None = None,
+    ) -> None:
         if payload.runtime_status != "rejected" or payload.failure_stage != "request_preflight":
             raise ValueError(
                 "a non-executable request may only publish an honest preflight rejection"
@@ -724,10 +765,14 @@ def _validate_payload_provenance(
             raise ValueError("preflight rejection must not claim model version lineage")
         if payload.effective_input_fingerprint != request.request_fingerprint:
             raise ValueError("preflight rejection effective input must equal the request")
-        resource_fingerprints = {
-            resource_id: _sha256(read_runtime_resource_bytes(resource_id))
-            for resource_id in list_runtime_resource_ids()
-        }
+        resource_fingerprints = (
+            {
+                resource_id: _sha256(read_runtime_resource_bytes(resource_id))
+                for resource_id in _resource_ids_for_request(request)
+            }
+            if known_resource_fingerprints is None
+            else dict(known_resource_fingerprints)
+        )
         _assert_mapping_equal(
             payload.source_fingerprints,
             resource_fingerprints,
@@ -740,16 +785,27 @@ def _validate_payload_provenance(
         validate_preflight_rejection(exc)
         return
 
-    bundle = load_runtime_resource_bundle()
-    try:
-        resolved = resolve_runtime_inputs(request, bundle=bundle)
-    except ValueError as exc:
-        validate_preflight_rejection(exc)
-        return
+    if (prepared_bundle is None) != (prepared_resolved is None):
+        raise ValueError("prepared provenance requires both bundle and resolved inputs")
+    if prepared_bundle is None or prepared_resolved is None:
+        bundle = load_runtime_resource_bundle(preset)
+        try:
+            resolved = resolve_runtime_inputs(request, bundle=bundle)
+        except ValueError as exc:
+            validate_preflight_rejection(
+                exc,
+                known_resource_fingerprints=bundle.resource_fingerprints,
+            )
+            return
+    else:
+        bundle = prepared_bundle
+        resolved = prepared_resolved
+        if resolved.request != request or resolved.preset != preset:
+            raise ValueError("prepared provenance inputs differ from the request or preset")
     if payload.failure_stage == "request_preflight":
         raise ValueError("an executable request contradicts request_preflight rejection")
     _validate_fixed_preset_shape(preset, payload, resolved=resolved)
-    normal = _normal_run_provenance(request, preset, bundle)
+    normal = _normal_run_provenance(request, preset, bundle, resolved=resolved)
     if payload.runtime_status == _EXPECTED_PRESET_STATUS[preset.preset_id]:
         expected = normal
     elif payload.failure_stage == "model_execution":
@@ -932,11 +988,7 @@ class RunManifest:
         if self.runtime_status in {"success", "limited"}:
             if not _REQUIRED_NON_FAILURE_VERSION_KEYS.issubset(self.versions):
                 raise ValueError("non-failure manifest is missing required version lineage")
-            required_sources = {
-                *list_runtime_resource_ids(),
-                *_REQUIRED_EFFECTIVE_FINGERPRINT_KEYS,
-            }
-            if not required_sources.issubset(self.source_fingerprints):
+            if not _REQUIRED_EFFECTIVE_FINGERPRINT_KEYS.issubset(self.source_fingerprints):
                 raise ValueError("non-failure manifest is missing required source lineage")
         object.__setattr__(
             self,
@@ -979,6 +1031,15 @@ class RunManifest:
                 raise TypeError("manifest artifacts must contain ArtifactDescriptor values")
             artifacts[safe_id] = descriptor
         object.__setattr__(self, "artifacts", MappingProxyType(artifacts))
+        input_resource_ids = {
+            artifact_id.removeprefix("input.")
+            for artifact_id in artifacts
+            if artifact_id.startswith("input.")
+        }
+        if self.runtime_status in {"success", "limited"} and not input_resource_ids.issubset(
+            self.source_fingerprints
+        ):
+            raise ValueError("non-failure manifest is missing input resource lineage")
         if self.manifest_fingerprint != _fingerprint(self.fingerprint_payload()):
             raise ValueError("manifest fingerprint differs from content")
 
@@ -1199,24 +1260,92 @@ def write_run(
 ) -> RunRecord:
     """Publish one complete run; manifest.json is always the last file."""
 
+    return _write_run(
+        request,
+        payload,
+        output_root,
+        input_resources=input_resources,
+        started_at_utc=started_at_utc,
+        finished_at_utc=finished_at_utc,
+        wall_time_s=wall_time_s,
+        wall_clock_start_s=wall_clock_start_s,
+        prepared_bundle=None,
+        prepared_resolved=None,
+    )
+
+
+def _write_prepared_run(
+    request: RunRequest,
+    payload: ExecutionPayload,
+    output_root: Path,
+    *,
+    input_resources: Mapping[str, bytes],
+    prepared_bundle: RuntimeResourceBundle,
+    prepared_resolved: ResolvedRuntimeInputs,
+    started_at_utc: str | None = None,
+    finished_at_utc: str | None = None,
+    wall_time_s: float = 0.0,
+    wall_clock_start_s: float | None = None,
+) -> RunRecord:
+    """Publish from one package-private context while retaining full validation."""
+
+    return _write_run(
+        request,
+        payload,
+        output_root,
+        input_resources=input_resources,
+        started_at_utc=started_at_utc,
+        finished_at_utc=finished_at_utc,
+        wall_time_s=wall_time_s,
+        wall_clock_start_s=wall_clock_start_s,
+        prepared_bundle=prepared_bundle,
+        prepared_resolved=prepared_resolved,
+    )
+
+
+def _write_run(
+    request: RunRequest,
+    payload: ExecutionPayload,
+    output_root: Path,
+    *,
+    input_resources: Mapping[str, bytes],
+    started_at_utc: str | None,
+    finished_at_utc: str | None,
+    wall_time_s: float,
+    wall_clock_start_s: float | None,
+    prepared_bundle: RuntimeResourceBundle | None,
+    prepared_resolved: ResolvedRuntimeInputs | None,
+) -> RunRecord:
     if payload.request_fingerprint != request.request_fingerprint:
         raise ValueError("execution payload belongs to another request")
     if payload.preset_id != request.preset_id or payload.run_type != request.run_type:
         raise ValueError("execution payload identity differs from request")
-    resource_ids = list_runtime_resource_ids()
+    resource_ids = _resource_ids_for_request(request)
     if tuple(input_resources) != resource_ids:
-        raise ValueError("run publication requires the fixed ordered runtime resource set")
+        raise ValueError("run publication resources differ from the request closure")
+    if prepared_bundle is not None and tuple(prepared_bundle.resource_bytes) != resource_ids:
+        raise ValueError("prepared resources differ from the request closure")
     for resource_id in resource_ids:
         data = input_resources[resource_id]
         if not isinstance(data, bytes):
             raise TypeError("input resource content must be bytes")
-        if data != read_runtime_resource_bytes(resource_id):
+        expected_data = (
+            read_runtime_resource_bytes(resource_id)
+            if prepared_bundle is None
+            else prepared_bundle.resource_bytes[resource_id]
+        )
+        if data != expected_data:
             raise ValueError(f"input resource {resource_id!r} differs from the package")
         if payload.source_fingerprints.get(resource_id) != _sha256(data):
             raise ValueError(
                 f"execution source fingerprint differs for input resource {resource_id!r}"
             )
-    _validate_payload_provenance(request, payload)
+    _validate_payload_provenance(
+        request,
+        payload,
+        prepared_bundle=prepared_bundle,
+        prepared_resolved=prepared_resolved,
+    )
     if started_at_utc is not None and finished_at_utc is not None:
         started_check = _timestamp(started_at_utc, context="started_at_utc")
         finished_check = _timestamp(finished_at_utc, context="finished_at_utc")
@@ -1451,7 +1580,9 @@ class _OnePassJsonlSequence(Sequence[object]):
             self._handle = None
 
 
-def _artifact_layout() -> Mapping[str, tuple[str, str, str]]:
+def _artifact_layout(
+    resource_ids: Iterable[str],
+) -> Mapping[str, tuple[str, str, str]]:
     layout: dict[str, tuple[str, str, str]] = {
         "request": ("request.json", "application/json", RUN_REQUEST_VERSION),
         "result": ("result.json", "application/json", RUNTIME_VERSION),
@@ -1467,7 +1598,7 @@ def _artifact_layout() -> Mapping[str, tuple[str, str, str]]:
         ),
         "errors": ("error.json", "application/json", "cdu-mini-errors-v0.1.0"),
     }
-    for resource_id in list_runtime_resource_ids():
+    for resource_id in resource_ids:
         layout[f"input.{resource_id}"] = (
             f"inputs/{resource_id.replace('.', '__')}.json",
             "application/json",
@@ -1500,7 +1631,19 @@ def read_run(run_dir: Path) -> RunRecord:
     manifest = RunManifest.from_mapping(_load_json(manifest_path))
     if root.name != manifest.run_id:
         raise ValueError("run directory name differs from manifest run_id")
-    layout = _artifact_layout()
+    manifest_resource_ids = {
+        artifact_id.removeprefix("input.")
+        for artifact_id in manifest.artifacts
+        if artifact_id.startswith("input.")
+    }
+    resource_ids = tuple(
+        resource_id
+        for resource_id in list_runtime_resource_ids()
+        if resource_id in manifest_resource_ids
+    )
+    if set(resource_ids) != manifest_resource_ids:
+        raise ValueError("manifest references an unknown input resource")
+    layout = _artifact_layout(resource_ids)
     if set(manifest.artifacts) != set(layout):
         raise ValueError("manifest artifact set differs from the runtime contract")
     expected_files = {
@@ -1536,6 +1679,8 @@ def read_run(run_dir: Path) -> RunRecord:
     if "request_fingerprint" not in request_document:
         raise ValueError("published request fingerprint is missing")
     request = RunRequest.from_mapping(request_document)
+    if resource_ids != _resource_ids_for_request(request):
+        raise ValueError("manifest input resources differ from the request closure")
     result = dict(_load_json(root / manifest.artifacts["result"].path))
     if "result_fingerprint" not in result:
         raise ValueError("published result fingerprint is missing")
@@ -1607,7 +1752,7 @@ def read_run(run_dir: Path) -> RunRecord:
         or payload.claim_scope != manifest.claim_scope
     ):
         raise ValueError("execution source contract differs from manifest")
-    for resource_id in list_runtime_resource_ids():
+    for resource_id in resource_ids:
         descriptor = manifest.artifacts[f"input.{resource_id}"]
         if payload.source_fingerprints.get(resource_id) != descriptor.sha256:
             raise ValueError(

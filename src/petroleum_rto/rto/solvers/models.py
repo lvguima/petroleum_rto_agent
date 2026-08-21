@@ -16,8 +16,9 @@ from ..contracts.common import (
     strict_keys,
     text,
 )
+from ..contracts.reference import ContractRef
 
-SOLVER_ROUTING_SCHEMA_VERSION: Final[str] = "1.0.0"
+SOLVER_ROUTING_SCHEMA_VERSION: Final[str] = "2.0.0"
 
 RoutingStatus = Literal["selected", "unsupported"]
 
@@ -60,9 +61,6 @@ class ProblemFeatures:
     result_mode: str
     deterministic: bool
     maximum_evaluations: int
-    gradient_availability: str
-    evaluator_kind: str
-    dynamic_verification_required: bool
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -97,24 +95,6 @@ class ProblemFeatures:
             "maximum_evaluations",
             integer(self.maximum_evaluations, context="maximum_evaluations", minimum=1),
         )
-        object.__setattr__(
-            self,
-            "gradient_availability",
-            identifier(self.gradient_availability, context="gradient_availability"),
-        )
-        object.__setattr__(
-            self,
-            "evaluator_kind",
-            identifier(self.evaluator_kind, context="evaluator_kind"),
-        )
-        object.__setattr__(
-            self,
-            "dynamic_verification_required",
-            _boolean(
-                self.dynamic_verification_required,
-                context="dynamic_verification_required",
-            ),
-        )
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -125,9 +105,6 @@ class ProblemFeatures:
             "result_mode": self.result_mode,
             "deterministic": self.deterministic,
             "maximum_evaluations": self.maximum_evaluations,
-            "gradient_availability": self.gradient_availability,
-            "evaluator_kind": self.evaluator_kind,
-            "dynamic_verification_required": self.dynamic_verification_required,
         }
 
     @property
@@ -214,132 +191,21 @@ class SolverSupport:
 
 
 @dataclass(frozen=True)
-class SolverRoutingPolicy:
-    """Versioned and explicitly ordered solver preference policy."""
-
-    schema_version: str
-    policy_version: str
-    policy_id: str
-    solver_order: tuple[str, ...]
-
-    def __post_init__(self) -> None:
-        _schema(self.schema_version)
-        object.__setattr__(
-            self,
-            "policy_version",
-            identifier(self.policy_version, context="policy_version"),
-        )
-        object.__setattr__(self, "policy_id", identifier(self.policy_id, context="policy_id"))
-        object.__setattr__(
-            self,
-            "solver_order",
-            _identifiers(self.solver_order, context="solver_order", ordered=True),
-        )
-
-    def as_dict(self) -> dict[str, object]:
-        return {
-            "schema_version": self.schema_version,
-            "policy_version": self.policy_version,
-            "policy_id": self.policy_id,
-            "solver_order": list(self.solver_order),
-        }
-
-    @property
-    def fingerprint(self) -> str:
-        return canonical_fingerprint(self.as_dict())
-
-
-@dataclass(frozen=True)
-class SolverConsideration:
-    """One solver's compatibility decision recorded during routing."""
-
-    solver_id: str
-    solver_version: str | None
-    solver_fingerprint: str | None
-    supported: bool
-    reason_codes: tuple[str, ...]
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "solver_id", identifier(self.solver_id, context="solver_id"))
-        if self.solver_version is not None:
-            object.__setattr__(
-                self,
-                "solver_version",
-                identifier(self.solver_version, context="solver_version"),
-            )
-        if self.solver_fingerprint is not None:
-            object.__setattr__(
-                self,
-                "solver_fingerprint",
-                digest(self.solver_fingerprint, context="solver_fingerprint"),
-            )
-        support = SolverSupport(self.supported, self.reason_codes)
-        object.__setattr__(self, "supported", support.supported)
-        object.__setattr__(self, "reason_codes", support.reason_codes)
-        if (self.solver_version is None) != (self.solver_fingerprint is None):
-            raise ValueError(
-                "solver version and fingerprint must either both exist or both be absent"
-            )
-        if self.solver_version is None and self.supported:
-            raise ValueError("an unregistered solver cannot be supported")
-
-    def as_dict(self) -> dict[str, object]:
-        return {
-            "solver_id": self.solver_id,
-            "solver_version": self.solver_version,
-            "solver_fingerprint": self.solver_fingerprint,
-            "supported": self.supported,
-            "reason_codes": list(self.reason_codes),
-        }
-
-    @classmethod
-    def from_mapping(cls, value: Mapping[str, object]) -> SolverConsideration:
-        strict_keys(
-            value,
-            required={
-                "solver_id",
-                "solver_version",
-                "solver_fingerprint",
-                "supported",
-                "reason_codes",
-            },
-            context="solver consideration",
-        )
-        version = value["solver_version"]
-        fingerprint = value["solver_fingerprint"]
-        return cls(
-            solver_id=identifier(value["solver_id"], context="solver_id"),
-            solver_version=(
-                None if version is None else identifier(version, context="solver_version")
-            ),
-            solver_fingerprint=(
-                None if fingerprint is None else digest(fingerprint, context="solver_fingerprint")
-            ),
-            supported=_boolean(value["supported"], context="supported"),
-            reason_codes=tuple(
-                identifier(item, context="reason_code")
-                for item in as_sequence(value["reason_codes"], context="reason_codes")
-            ),
-        )
-
-
-@dataclass(frozen=True)
 class SolverRoutingDecision:
-    """Serializable selected or unsupported route; it never contains a plugin object."""
+    """Serializable result of checking one problem-bound execution route."""
 
     schema_version: str
     routing_version: str
     status: RoutingStatus
+    problem_ref: ContractRef
     features_fingerprint: str
-    policy_id: str
-    policy_version: str
-    policy_fingerprint: str
-    trusted_override: str | None
+    execution_route_ref: ContractRef
+    algorithm_id: str
+    algorithm_version: str
     selected_solver_id: str | None
     selected_solver_version: str | None
     selected_solver_fingerprint: str | None
-    considerations: tuple[SolverConsideration, ...]
-    reason_code: str
+    reason_codes: tuple[str, ...]
 
     def __post_init__(self) -> None:
         _schema(self.schema_version)
@@ -350,28 +216,22 @@ class SolverRoutingDecision:
         )
         if self.status not in {"selected", "unsupported"}:
             raise ValueError("unsupported solver routing status")
+        for name in ("problem_ref", "execution_route_ref"):
+            if not isinstance(getattr(self, name), ContractRef):
+                raise TypeError(f"{name} must be ContractRef")
         object.__setattr__(
             self,
             "features_fingerprint",
             digest(self.features_fingerprint, context="features_fingerprint"),
         )
-        object.__setattr__(self, "policy_id", identifier(self.policy_id, context="policy_id"))
         object.__setattr__(
-            self,
-            "policy_version",
-            identifier(self.policy_version, context="policy_version"),
+            self, "algorithm_id", identifier(self.algorithm_id, context="algorithm_id")
         )
         object.__setattr__(
             self,
-            "policy_fingerprint",
-            digest(self.policy_fingerprint, context="policy_fingerprint"),
+            "algorithm_version",
+            identifier(self.algorithm_version, context="algorithm_version"),
         )
-        if self.trusted_override is not None:
-            object.__setattr__(
-                self,
-                "trusted_override",
-                identifier(self.trusted_override, context="trusted_override"),
-            )
         selected = (
             self.selected_solver_id,
             self.selected_solver_version,
@@ -398,46 +258,34 @@ class SolverRoutingDecision:
                     context="selected_solver_fingerprint",
                 ),
             )
-        considerations = tuple(self.considerations)
-        if not considerations:
-            raise ValueError("routing decision must record at least one consideration")
-        if any(not isinstance(value, SolverConsideration) for value in considerations):
-            raise TypeError("considerations must contain SolverConsideration values")
-        ids = tuple(value.solver_id for value in considerations)
-        if len(ids) != len(set(ids)):
-            raise ValueError("routing considerations must contain unique solver ids")
-        object.__setattr__(self, "considerations", considerations)
-        object.__setattr__(
-            self,
-            "reason_code",
-            identifier(self.reason_code, context="reason_code"),
-        )
+        reasons = tuple(identifier(item, context="reason_code") for item in self.reason_codes)
+        if len(reasons) != len(set(reasons)) or reasons != tuple(sorted(reasons)):
+            raise ValueError("routing reason_codes must be unique and sorted")
+        object.__setattr__(self, "reason_codes", reasons)
         if self.status == "selected":
-            if self.selected_solver_id is None:
-                raise ValueError("selected route requires a solver")
-            if not any(
-                item.solver_id == self.selected_solver_id and item.supported
-                for item in considerations
+            if (
+                self.selected_solver_id != self.algorithm_id
+                or self.selected_solver_version != self.algorithm_version
+                or reasons
             ):
-                raise ValueError("selected solver must have a supported consideration")
-        elif any(value is not None for value in selected):
-            raise ValueError("unsupported route cannot contain a selected solver")
+                raise ValueError("selected solver must exactly match its execution route")
+        elif any(value is not None for value in selected) or not reasons:
+            raise ValueError("unsupported route requires reasons and no selected solver")
 
     def as_dict(self) -> dict[str, object]:
         return {
             "schema_version": self.schema_version,
             "routing_version": self.routing_version,
             "status": self.status,
+            "problem_ref": self.problem_ref.as_dict(),
             "features_fingerprint": self.features_fingerprint,
-            "policy_id": self.policy_id,
-            "policy_version": self.policy_version,
-            "policy_fingerprint": self.policy_fingerprint,
-            "trusted_override": self.trusted_override,
+            "execution_route_ref": self.execution_route_ref.as_dict(),
+            "algorithm_id": self.algorithm_id,
+            "algorithm_version": self.algorithm_version,
             "selected_solver_id": self.selected_solver_id,
             "selected_solver_version": self.selected_solver_version,
             "selected_solver_fingerprint": self.selected_solver_fingerprint,
-            "considerations": [item.as_dict() for item in self.considerations],
-            "reason_code": self.reason_code,
+            "reason_codes": list(self.reason_codes),
         }
 
     @property
@@ -452,23 +300,21 @@ class SolverRoutingDecision:
                 "schema_version",
                 "routing_version",
                 "status",
+                "problem_ref",
                 "features_fingerprint",
-                "policy_id",
-                "policy_version",
-                "policy_fingerprint",
-                "trusted_override",
+                "execution_route_ref",
+                "algorithm_id",
+                "algorithm_version",
                 "selected_solver_id",
                 "selected_solver_version",
                 "selected_solver_fingerprint",
-                "considerations",
-                "reason_code",
+                "reason_codes",
             },
             context="solver routing decision",
         )
         status = value["status"]
         if status not in {"selected", "unsupported"}:
             raise ValueError("unsupported solver routing status")
-        trusted_override = value["trusted_override"]
         selected_id = value["selected_solver_id"]
         selected_version = value["selected_solver_version"]
         selected_fingerprint = value["selected_solver_fingerprint"]
@@ -476,17 +322,17 @@ class SolverRoutingDecision:
             schema_version=text(value["schema_version"], context="schema_version"),
             routing_version=identifier(value["routing_version"], context="routing_version"),
             status=status,
+            problem_ref=ContractRef.from_mapping(
+                as_mapping(value["problem_ref"], context="problem_ref")
+            ),
             features_fingerprint=digest(
                 value["features_fingerprint"], context="features_fingerprint"
             ),
-            policy_id=identifier(value["policy_id"], context="policy_id"),
-            policy_version=identifier(value["policy_version"], context="policy_version"),
-            policy_fingerprint=digest(value["policy_fingerprint"], context="policy_fingerprint"),
-            trusted_override=(
-                None
-                if trusted_override is None
-                else identifier(trusted_override, context="trusted_override")
+            execution_route_ref=ContractRef.from_mapping(
+                as_mapping(value["execution_route_ref"], context="execution_route_ref")
             ),
+            algorithm_id=identifier(value["algorithm_id"], context="algorithm_id"),
+            algorithm_version=identifier(value["algorithm_version"], context="algorithm_version"),
             selected_solver_id=(
                 None
                 if selected_id is None
@@ -502,9 +348,8 @@ class SolverRoutingDecision:
                 if selected_fingerprint is None
                 else digest(selected_fingerprint, context="selected_solver_fingerprint")
             ),
-            considerations=tuple(
-                SolverConsideration.from_mapping(as_mapping(item, context="solver consideration"))
-                for item in as_sequence(value["considerations"], context="considerations")
+            reason_codes=tuple(
+                identifier(item, context="reason_code")
+                for item in as_sequence(value["reason_codes"], context="reason_codes")
             ),
-            reason_code=identifier(value["reason_code"], context="reason_code"),
         )

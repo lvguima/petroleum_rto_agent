@@ -1,66 +1,99 @@
-"""Tamper-evident local file repository for immutable R5 strategies."""
+"""Tamper-evident append-only strategy repository."""
 
 from __future__ import annotations
 
 import json
 import os
 import re
+import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, cast
 
-from ..contracts import CLAIM_SCOPE, RTO_SCHEMA_VERSION, ContractRef
-from ..contracts.common import canonical_json_bytes
+from .._file_lock import exclusive_file_lock
+from ..contracts.common import canonical_json_bytes, identifier, integer
+from ..contracts.problem import ENGINEERING_CLAIM_SCOPE
+from ..contracts.reference import ContractRef
 from .models import (
-    StrategyEntryV1,
+    STRATEGY_SCHEMA_VERSION,
+    StrategyEntry,
     StrategyEventType,
-    StrategyLifecycleEventV1,
-    StrategyQueryV1,
-    StrategyRecordV1,
-    StrategyReleaseManifestV1,
+    StrategyLifecycleEvent,
+    StrategyQuery,
+    StrategyRecord,
+    StrategyReleaseManifest,
     StrategyState,
 )
 
-_REF: Final[re.Pattern[str]] = re.compile(r"^(?P<strategy>.+)-r(?P<revision>[1-9][0-9]*)$")
+_REF: Final[re.Pattern[str]] = re.compile(
+    r"^(?P<strategy>[A-Za-z0-9][A-Za-z0-9._-]*)-r(?P<revision>[1-9][0-9]*)$"
+)
 
 
 def utc_now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _strict_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"strict strategy JSON contains duplicate key {key!r}")
+        result[key] = value
+    return result
+
+
+def _loads(payload: str, *, context: str) -> dict[str, object]:
+    try:
+        value = json.loads(payload, object_pairs_hook=_strict_object)
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise ValueError(f"cannot parse strict {context}") from exc
+    if not isinstance(value, dict) or any(not isinstance(key, str) for key in value):
+        raise ValueError(f"strict {context} must be a JSON object")
+    return cast(dict[str, object], value)
+
+
 class StrategyRepository:
-    """Single-process local repository with immutable payloads and event hash chains."""
+    """Local single-writer repository with immutable payloads and hash-chained events."""
 
     def __init__(self, root: Path) -> None:
         if not isinstance(root, Path):
-            raise TypeError("strategy repository root must be a pathlib.Path")
-        self.root = root
-        self.entries_root = root / "entries"
-        self.releases_root = root / "releases"
+            raise TypeError("strategy repository root must be pathlib.Path")
+        self.root = root.resolve()
+        self.entries_root = self.root / "entries"
+        self.releases_root = self.root / "releases"
 
     def create_draft(
         self,
-        entry: StrategyEntryV1,
+        entry: StrategyEntry,
         *,
         actor: str,
         occurred_at: str | None = None,
         reason: str = "evidence-complete-offline-draft",
-    ) -> StrategyRecordV1:
-        if not isinstance(entry, StrategyEntryV1):
-            raise TypeError("create_draft requires a StrategyEntryV1")
+    ) -> StrategyRecord:
+        if not isinstance(entry, StrategyEntry):
+            raise TypeError("create_draft requires StrategyEntry")
         with self._lock():
             path = self._entry_path(entry.strategy_id, entry.revision)
-            if path.exists():
+            events_path = self._events_path(entry.strategy_id, entry.revision)
+            if path.exists() or events_path.exists():
                 existing = self.read(entry.strategy_id, entry.revision)
                 if existing.entry != entry:
                     raise FileExistsError("strategy revision already exists with different content")
                 return existing
-            self._write_immutable(path, canonical_json_bytes(entry.as_dict()))
-            event = StrategyLifecycleEventV1(
-                schema_version=RTO_SCHEMA_VERSION,
-                event_version="strategy-lifecycle-event-v1",
+            if entry.supersedes is not None:
+                prior = self.read(entry.strategy_id, entry.revision - 1)
+                if entry.supersedes != prior.entry.ref:
+                    raise ValueError("supersedes differs from the stored direct prior revision")
+                if prior.current_state != "pending_revalidation":
+                    raise ValueError(
+                        "prior revision must be pending_revalidation before a new draft"
+                    )
+            event = StrategyLifecycleEvent(
+                schema_version=STRATEGY_SCHEMA_VERSION,
+                event_version="strategy-lifecycle-event",
                 strategy_ref=entry.ref,
                 sequence=0,
                 event_type="created",
@@ -72,8 +105,9 @@ class StrategyRepository:
                 release_ref=None,
                 related_strategy_ref=None,
                 previous_event_fingerprint=None,
+                claim_scope=ENGINEERING_CLAIM_SCOPE,
             )
-            self._append_event(self._events_path(entry.strategy_id, entry.revision), event)
+            self._write_draft_atomically(path.parent, entry, event)
         return self.read(entry.strategy_id, entry.revision)
 
     def approve(
@@ -83,8 +117,8 @@ class StrategyRepository:
         *,
         actor: str,
         occurred_at: str | None = None,
-        reason: str = "offline-review-approved",
-    ) -> StrategyRecordV1:
+        reason: str = "offline-human-review-approved",
+    ) -> StrategyRecord:
         return self._transition(
             strategy_id,
             revision,
@@ -104,28 +138,35 @@ class StrategyRepository:
         actor: str,
         occurred_at: str | None = None,
         reason: str = "offline-library-release",
-    ) -> StrategyReleaseManifestV1:
+    ) -> StrategyReleaseManifest:
         with self._lock():
             record = self.read(strategy_id, revision)
             if record.current_state == "published" and record.release_ref is not None:
                 return self.read_release(record.release_ref.object_id)
             if record.current_state != "approved":
                 raise ValueError("only an approved strategy may be published")
-            instant = occurred_at or utc_now()
             release_id = f"release-{record.entry.fingerprint[:16]}"
-            release = StrategyReleaseManifestV1(
-                schema_version=RTO_SCHEMA_VERSION,
-                release_version="strategy-library-release-v1",
-                release_id=release_id,
-                entry_refs=(record.entry.ref,),
-                created_by=actor,
-                created_at=instant,
-                claim_scope=CLAIM_SCOPE,
-            )
-            self._write_immutable(
-                self.releases_root / f"{release.release_id}.json",
-                canonical_json_bytes(release.as_dict()),
-            )
+            release_path = self._release_path(release_id)
+            if release_path.exists():
+                release = self._read_release_payload(release_id)
+                if release.entry_refs != (record.entry.ref,) or release.created_by != actor:
+                    raise ValueError("orphan release differs from the requested publication")
+                if occurred_at is not None and release.created_at != occurred_at:
+                    raise ValueError("orphan release timestamp differs from publication request")
+                instant = release.created_at
+            else:
+                instant = occurred_at or utc_now()
+                release = StrategyReleaseManifest(
+                    schema_version=STRATEGY_SCHEMA_VERSION,
+                    release_version="strategy-library-release",
+                    release_id=release_id,
+                    entry_refs=(record.entry.ref,),
+                    created_by=actor,
+                    created_at=instant,
+                    review_scope="offline-human-review",
+                    execution_scope="offline_simulation_only",
+                    claim_scope=ENGINEERING_CLAIM_SCOPE,
+                )
             event = self._next_event(
                 record,
                 event_type="published",
@@ -135,10 +176,14 @@ class StrategyRepository:
                 reason=reason,
                 release_ref=release.ref,
             )
+            self._write_immutable(
+                release_path,
+                canonical_json_bytes(release.as_dict()),
+            )
             self._append_event(self._events_path(strategy_id, revision), event)
         verified = self.read(strategy_id, revision)
         if verified.release_ref != release.ref:
-            raise RuntimeError("published event does not reference the written release")
+            raise RuntimeError("published lifecycle differs from immutable release")
         return self.read_release(release.release_id)
 
     def request_revalidation(
@@ -149,7 +194,7 @@ class StrategyRepository:
         actor: str,
         occurred_at: str | None = None,
         reason: str = "dependency-version-changed",
-    ) -> StrategyRecordV1:
+    ) -> StrategyRecord:
         return self._transition(
             strategy_id,
             revision,
@@ -171,16 +216,20 @@ class StrategyRepository:
         actor: str,
         occurred_at: str | None = None,
         reason: str = "validated-replacement-published",
-    ) -> StrategyRecordV1:
+    ) -> StrategyRecord:
         with self._lock():
             record = self.read(strategy_id, revision)
             replacement = self.read(replacement_strategy_id, replacement_revision)
             if record.current_state != "pending_revalidation":
-                raise ValueError("only pending_revalidation strategy may be superseded")
+                raise ValueError("only a pending_revalidation strategy may be superseded")
             if replacement.current_state != "published":
                 raise ValueError("replacement strategy must already be published")
-            if replacement.entry.supersedes != record.entry.ref:
-                raise ValueError("replacement payload does not supersede the old revision")
+            if (
+                replacement.entry.strategy_id != record.entry.strategy_id
+                or replacement.entry.revision != record.entry.revision + 1
+                or replacement.entry.supersedes != record.entry.ref
+            ):
+                raise ValueError("replacement is not the published direct next revision")
             event = self._next_event(
                 record,
                 event_type="superseded",
@@ -201,7 +250,7 @@ class StrategyRepository:
         actor: str,
         occurred_at: str | None = None,
         reason: str = "offline-strategy-retired",
-    ) -> StrategyRecordV1:
+    ) -> StrategyRecord:
         with self._lock():
             record = self.read(strategy_id, revision)
             if record.current_state not in {
@@ -222,74 +271,94 @@ class StrategyRepository:
             self._append_event(self._events_path(strategy_id, revision), event)
         return self.read(strategy_id, revision)
 
-    def read(self, strategy_id: str, revision: int) -> StrategyRecordV1:
+    def read(self, strategy_id: str, revision: int) -> StrategyRecord:
         entry_path = self._entry_path(strategy_id, revision)
-        entry = StrategyEntryV1.from_mapping(self._read_json(entry_path))
+        entry = StrategyEntry.from_mapping(self._read_json(entry_path))
         if entry.strategy_id != strategy_id or entry.revision != revision:
             raise ValueError("strategy path identity differs from immutable entry")
         events = self._read_events(self._events_path(strategy_id, revision))
-        return StrategyRecordV1(entry=entry, events=events)
+        record = StrategyRecord(entry=entry, events=events)
+        if revision > 1:
+            prior = self.read(strategy_id, revision - 1)
+            if entry.supersedes != prior.entry.ref:
+                raise ValueError("strategy revision does not reference its stored predecessor")
+        return record
 
-    def read_ref(self, ref: ContractRef) -> StrategyRecordV1:
+    def read_ref(self, ref: ContractRef) -> StrategyRecord:
+        if not isinstance(ref, ContractRef):
+            raise TypeError("strategy ref must be ContractRef")
         match = _REF.fullmatch(ref.object_id)
         if match is None:
             raise ValueError("strategy ref object_id has an invalid revision suffix")
-        record = self.read(match.group("strategy"), int(match.group("revision")))
+        record = self.read(
+            match.group("strategy"),
+            int(match.group("revision")),
+        )
         if record.entry.ref != ref:
             raise ValueError("strategy ref fingerprint differs from repository entry")
         return record
 
-    def read_release(self, release_id: str) -> StrategyReleaseManifestV1:
-        release = StrategyReleaseManifestV1.from_mapping(
-            self._read_json(self.releases_root / f"{release_id}.json")
-        )
+    def read_release(self, release_id: str) -> StrategyReleaseManifest:
+        release = self._read_release_payload(release_id)
         for ref in release.entry_refs:
             record = self.read_ref(ref)
             if not any(
                 event.event_type == "published" and event.release_ref == release.ref
                 for event in record.events
             ):
-                raise ValueError("release is not referenced by the strategy lifecycle")
+                raise ValueError("release is not referenced by strategy lifecycle")
         return release
 
-    def query(self, query: StrategyQueryV1) -> tuple[StrategyRecordV1, ...]:
-        if not isinstance(query, StrategyQueryV1):
-            raise TypeError("query requires a StrategyQueryV1")
-        matched: list[tuple[float, float, str, StrategyRecordV1]] = []
+    def query(self, query: StrategyQuery) -> tuple[StrategyRecord, ...]:
+        """Return published records matching an explicitly evaluated anchor only."""
+
+        if not isinstance(query, StrategyQuery):
+            raise TypeError("query requires StrategyQuery")
         if not self.entries_root.exists():
             return ()
-        for path in sorted(self.entries_root.glob("*/r*/entry.json")):
-            entry = StrategyEntryV1.from_mapping(self._read_json(path))
-            record = self.read(entry.strategy_id, entry.revision)
-            if record.current_state != "published":
+        records: list[StrategyRecord] = []
+        for strategy_dir in sorted(self.entries_root.iterdir(), key=lambda item: item.name):
+            if not strategy_dir.is_dir():
                 continue
-            if entry.case_ref != query.case_ref or entry.operating_mode != query.operating_mode:
+            identifier(strategy_dir.name, context="stored strategy_id")
+            for revision_dir in sorted(strategy_dir.iterdir(), key=lambda item: item.name):
+                match = re.fullmatch(r"r([1-9][0-9]*)", revision_dir.name)
+                if match is None or not revision_dir.is_dir():
+                    continue
+                record = self.read(strategy_dir.name, int(match.group(1)))
+                if record.current_state != "published" or not self._matches(query, record.entry):
+                    continue
+                records.append(record)
+        return tuple(
+            sorted(
+                records,
+                key=lambda item: (item.entry.strategy_id, item.entry.revision),
+            )
+        )
+
+    @staticmethod
+    def _matches(query: StrategyQuery, entry: StrategyEntry) -> bool:
+        if query.case_ref != entry.case_ref or query.operating_mode != entry.operating_mode:
+            return False
+        if not set(query.required_dependency_refs).issubset(entry.dependency_refs):
+            return False
+        for anchor in entry.anchors:
+            if set(anchor.applicability_values) != set(query.applicability_values):
                 continue
-            if query.required_dependency_refs and not set(query.required_dependency_refs).issubset(
-                entry.dependency_refs
+            if all(
+                abs(anchor.applicability_values[key] - value) <= query.measurement_tolerances[key]
+                for key, value in query.applicability_values.items()
             ):
-                continue
-            anchors = tuple(
-                item
-                for item in entry.anchors
-                if abs(item.feed_mass_flow_kg_s - query.feed_mass_flow_kg_s)
-                <= query.measurement_tolerance_kg_s
-            )
-            if not anchors:
-                continue
-            anchor = min(
-                anchors,
-                key=lambda item: abs(item.feed_mass_flow_kg_s - query.feed_mass_flow_kg_s),
-            )
-            matched.append(
-                (
-                    -anchor.relative_improvement,
-                    -anchor.minimum_normalized_margin,
-                    entry.fingerprint,
-                    record,
-                )
-            )
-        return tuple(item[3] for item in sorted(matched, key=lambda item: item[:3]))
+                return True
+        return False
+
+    def _read_release_payload(self, release_id: str) -> StrategyReleaseManifest:
+        release = StrategyReleaseManifest.from_mapping(
+            self._read_json(self._release_path(release_id))
+        )
+        if release.release_id != release_id:
+            raise ValueError("release path identity differs from immutable release")
+        return release
 
     def _transition(
         self,
@@ -302,7 +371,7 @@ class StrategyRepository:
         actor: str,
         occurred_at: str | None,
         reason: str,
-    ) -> StrategyRecordV1:
+    ) -> StrategyRecord:
         with self._lock():
             record = self.read(strategy_id, revision)
             if record.current_state != expected:
@@ -320,7 +389,7 @@ class StrategyRepository:
 
     @staticmethod
     def _next_event(
-        record: StrategyRecordV1,
+        record: StrategyRecord,
         *,
         event_type: StrategyEventType,
         target: StrategyState,
@@ -329,10 +398,10 @@ class StrategyRepository:
         reason: str,
         release_ref: ContractRef | None = None,
         related_strategy_ref: ContractRef | None = None,
-    ) -> StrategyLifecycleEventV1:
-        return StrategyLifecycleEventV1(
-            schema_version=RTO_SCHEMA_VERSION,
-            event_version="strategy-lifecycle-event-v1",
+    ) -> StrategyLifecycleEvent:
+        event = StrategyLifecycleEvent(
+            schema_version=STRATEGY_SCHEMA_VERSION,
+            event_version="strategy-lifecycle-event",
             strategy_ref=record.entry.ref,
             sequence=len(record.events),
             event_type=event_type,
@@ -344,75 +413,140 @@ class StrategyRepository:
             release_ref=release_ref,
             related_strategy_ref=related_strategy_ref,
             previous_event_fingerprint=record.events[-1].fingerprint,
+            claim_scope=ENGINEERING_CLAIM_SCOPE,
         )
+        StrategyRecord(entry=record.entry, events=(*record.events, event))
+        return event
 
     def _entry_path(self, strategy_id: str, revision: int) -> Path:
-        return self.entries_root / strategy_id / f"r{revision}" / "entry.json"
+        strategy = identifier(strategy_id, context="strategy_id")
+        revision_value = integer(revision, context="revision", minimum=1)
+        return self._safe_path(self.entries_root / strategy / f"r{revision_value}" / "entry.json")
 
     def _events_path(self, strategy_id: str, revision: int) -> Path:
-        return self.entries_root / strategy_id / f"r{revision}" / "events.jsonl"
+        return self._entry_path(strategy_id, revision).with_name("events.jsonl")
+
+    def _release_path(self, release_id: str) -> Path:
+        release = identifier(release_id, context="release_id")
+        return self._safe_path(self.releases_root / f"{release}.json")
+
+    def _safe_path(self, path: Path) -> Path:
+        resolved = path.resolve()
+        if not resolved.is_relative_to(self.root):
+            raise ValueError("strategy path escapes the repository root")
+        return resolved
 
     @staticmethod
     def _read_json(path: Path) -> dict[str, object]:
         try:
-            value = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+            payload = path.read_text(encoding="utf-8")
+        except OSError as exc:
             raise ValueError(f"cannot read strict strategy JSON: {path}") from exc
-        if not isinstance(value, dict) or any(not isinstance(key, str) for key in value):
-            raise ValueError(f"strategy JSON must be an object: {path}")
-        return cast(dict[str, object], value)
+        return _loads(payload, context="strategy JSON")
 
     @staticmethod
-    def _read_events(path: Path) -> tuple[StrategyLifecycleEventV1, ...]:
+    def _read_events(path: Path) -> tuple[StrategyLifecycleEvent, ...]:
         try:
             lines = path.read_text(encoding="utf-8").splitlines()
         except OSError as exc:
             raise ValueError(f"cannot read strategy events: {path}") from exc
         if not lines or any(not line.strip() for line in lines):
             raise ValueError("strategy event log must contain non-empty JSON lines")
-        result: list[StrategyLifecycleEventV1] = []
-        for line in lines:
-            try:
-                value = json.loads(line)
-            except json.JSONDecodeError as exc:
-                raise ValueError("strategy event log contains invalid JSON") from exc
-            if not isinstance(value, dict):
-                raise TypeError("strategy event must be a JSON object")
-            result.append(StrategyLifecycleEventV1.from_mapping(cast(dict[str, object], value)))
-        return tuple(result)
+        return tuple(
+            StrategyLifecycleEvent.from_mapping(_loads(line, context="strategy lifecycle event"))
+            for line in lines
+        )
 
     @staticmethod
     def _write_immutable(path: Path, payload: bytes) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+        )
+        temporary = Path(temporary_name)
         try:
-            with path.open("xb") as stream:
+            with os.fdopen(descriptor, "wb") as stream:
                 stream.write(payload)
                 stream.flush()
                 os.fsync(stream.fileno())
-        except FileExistsError:
-            if path.read_bytes() != payload:
-                raise FileExistsError(f"immutable file already exists with different bytes: {path}")
+            try:
+                os.link(temporary, path)
+            except FileExistsError:
+                if path.read_bytes() != payload:
+                    raise FileExistsError(
+                        f"immutable file already exists with different bytes: {path}"
+                    )
+        finally:
+            temporary.unlink(missing_ok=True)
 
     @staticmethod
-    def _append_event(path: Path, event: StrategyLifecycleEventV1) -> None:
+    def _append_event(path: Path, event: StrategyLifecycleEvent) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("ab") as stream:
-            stream.write(canonical_json_bytes(event.as_dict()) + b"\n")
-            stream.flush()
-            os.fsync(stream.fileno())
+        try:
+            prior = path.read_bytes()
+        except OSError as exc:
+            raise ValueError(f"cannot read strategy event log before append: {path}") from exc
+        if not prior or not prior.endswith(b"\n"):
+            raise ValueError("strategy event log has an incomplete final line")
+        payload = prior + canonical_json_bytes(event.as_dict()) + b"\n"
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+        )
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    @staticmethod
+    def _write_draft_atomically(
+        target: Path,
+        entry: StrategyEntry,
+        event: StrategyLifecycleEvent,
+    ) -> None:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = Path(
+            tempfile.mkdtemp(
+                prefix=f".{target.name}.",
+                suffix=".tmp",
+                dir=target.parent,
+            )
+        )
+        entry_path = temporary / "entry.json"
+        events_path = temporary / "events.jsonl"
+        try:
+            for path, payload in (
+                (entry_path, canonical_json_bytes(entry.as_dict())),
+                (events_path, canonical_json_bytes(event.as_dict()) + b"\n"),
+            ):
+                with path.open("xb") as stream:
+                    stream.write(payload)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+            os.rename(temporary, target)
+        finally:
+            entry_path.unlink(missing_ok=True)
+            events_path.unlink(missing_ok=True)
+            try:
+                temporary.rmdir()
+            except FileNotFoundError:
+                pass
 
     @contextmanager
     def _lock(self) -> Iterator[None]:
-        self.root.mkdir(parents=True, exist_ok=True)
-        lock_path = self.root / ".strategy-repository.lock"
-        try:
-            descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        except FileExistsError as exc:
-            raise RuntimeError("strategy repository is locked by another writer") from exc
-        try:
-            os.write(descriptor, str(os.getpid()).encode("ascii"))
-            os.fsync(descriptor)
+        with exclusive_file_lock(
+            self.root / ".strategy-repository.lock",
+            label="strategy repository",
+        ):
             yield
-        finally:
-            os.close(descriptor)
-            lock_path.unlink(missing_ok=True)
+
+
+__all__ = ["StrategyRepository", "utc_now"]

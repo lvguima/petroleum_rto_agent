@@ -792,7 +792,8 @@ def _resolve_scenario(
 
     assert base_closed is not None
     setpoint_events: list[SetpointEvent] = []
-    loop_ids = set(bundle.control.loops)
+    control = bundle.require_control()
+    loop_ids = set(control.loops)
     for event in event_requests:
         suffix_text = ".setpoint_ratio"
         if not event.target.endswith(suffix_text):
@@ -837,7 +838,7 @@ def resolve_runtime_inputs(
     preset = get_preset(request.preset_id)
     if request.run_type != preset.run_type:
         raise ValueError("request run_type differs from its preset template")
-    resources = load_runtime_resource_bundle() if bundle is None else bundle
+    resources = load_runtime_resource_bundle(preset) if bundle is None else bundle
     supplied = _validate_requested_inputs(request)
     case_values = {
         name: value for name, value in supplied.items() if name.startswith(("feed.", "operating."))
@@ -910,13 +911,13 @@ def resolve_runtime_inputs(
         "effective_model": model.as_dict(),
         "effective_case": case.as_dict(),
         "component_catalog": resources.catalog.as_dict(),
-        "m5_analysis_basis": resources.m6_basis.analysis_basis_fingerprint,
+        "m5_analysis_basis": resources.m5_overlay.analysis_basis_fingerprint,
         "resource_fingerprints": dict(resources.resource_fingerprints),
     }
     if open_scenario is not None:
         execution_payload["scenario"] = open_scenario.as_dict()
     if closed_scenario is not None:
-        execution_payload["control"] = resources.control.as_dict()
+        execution_payload["control"] = resources.require_control().as_dict()
         execution_payload["scenario"] = closed_scenario.as_dict()
     if request.scenario is not None:
         execution_payload["runtime_scenario_request"] = scenario_payload

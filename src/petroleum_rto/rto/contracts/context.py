@@ -11,6 +11,7 @@ from .common import (
     JsonValue,
     as_mapping,
     canonical_fingerprint,
+    finite,
     freeze_json_mapping,
     identifier,
     numeric_mapping,
@@ -22,7 +23,7 @@ from .problem import ENGINEERING_CLAIM_SCOPE
 from .reference import ContractRef
 
 OPERATING_CONTEXT_SCHEMA_ID: Final[str] = "operating-context"
-OPERATING_CONTEXT_SCHEMA_VERSION: Final[str] = "1.0.0"
+OPERATING_CONTEXT_SCHEMA_VERSION: Final[str] = "2.0.0"
 
 
 def _timestamp(value: object) -> str:
@@ -44,7 +45,6 @@ class OperatingContext:
     schema_version: str
     context_version: str
     context_id: str
-    context_schema_ref: ContractRef
     provider_id: str
     model_ref: ContractRef
     case_ref: ContractRef
@@ -65,12 +65,18 @@ class OperatingContext:
             raise ValueError("claim_scope must be engineering_simulation_only")
         for name in ("context_version", "context_id", "provider_id", "operating_mode"):
             object.__setattr__(self, name, identifier(getattr(self, name), context=name))
-        for name in ("context_schema_ref", "model_ref", "case_ref"):
+        for name in ("model_ref", "case_ref"):
             if not isinstance(getattr(self, name), ContractRef):
                 raise TypeError(f"{name} must be ContractRef")
         facts = freeze_json_mapping(self.facts, context="context facts")
         if not facts:
             raise ValueError("context facts must be non-empty")
+        feed = finite(facts.get("fresh_feed_load_kg_s"), context="fresh_feed_load_kg_s")
+        if feed <= 0.0:
+            raise ValueError("fresh_feed_load_kg_s must be positive")
+        composition = numeric_mapping(facts.get("feed_composition"), context="feed_composition")
+        if not composition:
+            raise ValueError("feed_composition must be non-empty")
         object.__setattr__(self, "facts", facts)
         setpoints = numeric_mapping(self.current_setpoints, context="current_setpoints")
         if not setpoints:
@@ -93,7 +99,6 @@ class OperatingContext:
                 "schema_version",
                 "context_version",
                 "context_id",
-                "context_schema_ref",
                 "provider_id",
                 "model_ref",
                 "case_ref",
@@ -113,9 +118,6 @@ class OperatingContext:
             schema_version=text(value["schema_version"], context="schema_version"),
             context_version=identifier(value["context_version"], context="context_version"),
             context_id=identifier(value["context_id"], context="context_id"),
-            context_schema_ref=ContractRef.from_mapping(
-                as_mapping(value["context_schema_ref"], context="context_schema_ref")
-            ),
             provider_id=identifier(value["provider_id"], context="provider_id"),
             model_ref=ContractRef.from_mapping(as_mapping(value["model_ref"], context="model_ref")),
             case_ref=ContractRef.from_mapping(as_mapping(value["case_ref"], context="case_ref")),
@@ -139,7 +141,6 @@ class OperatingContext:
             "schema_version": self.schema_version,
             "context_version": self.context_version,
             "context_id": self.context_id,
-            "context_schema_ref": self.context_schema_ref.as_dict(),
             "provider_id": self.provider_id,
             "model_ref": self.model_ref.as_dict(),
             "case_ref": self.case_ref.as_dict(),

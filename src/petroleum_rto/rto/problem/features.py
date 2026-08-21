@@ -1,4 +1,4 @@
-"""Pure extraction of solver-relevant facts from a unified problem."""
+"""Pure extraction of solver-relevant facts from a problem."""
 
 from __future__ import annotations
 
@@ -39,7 +39,4 @@ class ProblemFeatureAnalyzer:
             result_mode=_RESULT_MODE[problem.result_request.mode],
             deterministic=problem.solve_requirements.deterministic_required,
             maximum_evaluations=problem.solve_requirements.maximum_evaluations,
-            gradient_availability=problem.solve_requirements.gradient_availability,
-            evaluator_kind="paired-black-box",
-            dynamic_verification_required=(problem.evaluation_plan.dynamic_verification_required),
         )

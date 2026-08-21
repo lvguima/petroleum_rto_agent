@@ -1,100 +1,217 @@
-"""Build one immutable OptimizationProblemV1 without solving or simulation."""
+"""Deterministic construction of one objective-count-neutral problem."""
 
 from __future__ import annotations
 
-import math
-
-from ..catalogs import RtoCatalogBundle
-from ..contracts import (
-    CLAIM_SCOPE,
-    RTO_SCHEMA_VERSION,
-    DecisionDomainV1,
-    OptimizationProblemV1,
+from ..capabilities import BundleCapabilityView, CapabilityBundle
+from ..capabilities.models import GuardrailCapability
+from ..contracts.context import OperatingContext
+from ..contracts.problem import (
+    ENGINEERING_CLAIM_SCOPE,
+    OPTIMIZATION_PROBLEM_SCHEMA_ID,
+    OPTIMIZATION_PROBLEM_SCHEMA_VERSION,
+    ConstraintRule,
+    DecisionDomain,
+    EvaluationPlan,
+    ObjectiveSpec,
+    OptimizationProblem,
+    ResultMode,
+    ResultRequest,
+    SelectionPreference,
+    SolveRequirements,
 )
+from ..contracts.reference import ContractRef
+from ..intent import IntentResolver, OptimizationIntent
 
 
 class ProblemBuilder:
-    """Pure deterministic assembly of an RTO problem from strict inputs."""
+    """Bind a resolved business intent to trusted context and immutable policy."""
 
-    def build(self, bundle: RtoCatalogBundle) -> OptimizationProblemV1:
-        if not isinstance(bundle, RtoCatalogBundle):
-            raise TypeError("ProblemBuilder requires an RtoCatalogBundle")
-        intent = bundle.intent
-        context = bundle.context
-        decision_catalog = bundle.decision_catalog
-        kpi_catalog = bundle.kpi_catalog
-        constraint_profile = bundle.constraint_profile
-        policy = bundle.policy
-
-        if intent.operating_context_ref != context.ref:
-            raise ValueError("intent operating context reference differs from the loaded context")
-        if intent.decision_profile_id != decision_catalog.catalog_id:
-            raise ValueError("intent decision profile differs from the loaded catalog")
-        if intent.constraint_profile_id != constraint_profile.profile_id:
-            raise ValueError("intent constraint profile differs from the loaded profile")
-        if intent.priority_profile_id != policy.priority_profile_id:
-            raise ValueError("intent priority profile differs from the loaded policy")
-        if intent.requested_output != "steady-setpoint-vector":
-            raise ValueError("RTO V1 only supports a steady setpoint vector")
-        if intent.context_policy != "feed-as-fixed-context":
-            raise ValueError("RTO V1 requires feed to remain fixed context")
-
-        objective = kpi_catalog.by_id(intent.objective_metric_id)
-        if objective.stage != "M2" or objective.direction != intent.objective_sense:
-            raise ValueError("objective KPI cannot support the requested stage or direction")
-        for rule in constraint_profile.rules:
-            kpi_catalog.by_id(rule.metric_id)
-
-        feed = decision_catalog.by_id("fresh_feed_load_kg_s")
-        if feed.role != "context" or feed.enabled:
-            raise ValueError("fresh feed must remain a disabled context variable")
-        if not feed.lower_bound <= context.feed_mass_flow_kg_s <= feed.upper_bound:
-            raise ValueError("context feed is outside the sampled decision catalog domain")
-
-        enabled = tuple(
-            item for item in decision_catalog.variables if item.enabled and item.role == "decision"
-        )
-        if tuple(item.variable_id for item in enabled) != (
-            "furnace_temperature_target_k",
-            "tower_top_pressure_target_pa_a",
-        ):
-            raise ValueError("RTO V1 must enable exactly the two frozen decisions")
-        domains: list[DecisionDomainV1] = []
-        for item in enabled:
-            if item.m2_parameter is None or item.m4_loop is None:
-                raise ValueError(f"decision {item.variable_id!r} lacks an end-to-end mapping")
-            context_nominal = context.current_setpoints.get(item.variable_id)
-            if context_nominal is None or not math.isclose(
-                context_nominal, item.nominal_value, rel_tol=0.0, abs_tol=1e-9
-            ):
-                raise ValueError(f"context nominal differs for {item.variable_id!r}")
-            domains.append(
-                DecisionDomainV1(
-                    variable_id=item.variable_id,
-                    display_unit=item.display_unit,
-                    canonical_unit=item.canonical_unit,
-                    nominal_value=item.nominal_value,
-                    lower_bound=item.lower_bound,
-                    upper_bound=item.upper_bound,
-                    coarse_step=item.coarse_step,
-                    refine_step=item.refine_step,
-                )
+    def build(
+        self,
+        bundle: CapabilityBundle,
+        intent: OptimizationIntent,
+        context: OperatingContext,
+    ) -> OptimizationProblem:
+        if not isinstance(bundle, CapabilityBundle):
+            raise TypeError("bundle must be CapabilityBundle")
+        if not isinstance(intent, OptimizationIntent):
+            raise TypeError("intent must be OptimizationIntent")
+        if not isinstance(context, OperatingContext):
+            raise TypeError("context must be OperatingContext")
+        view = BundleCapabilityView(bundle)
+        resolution = IntentResolver().resolve(intent, view)
+        if resolution.status != "resolved":
+            codes = ",".join(item.code for item in resolution.issues)
+            raise ValueError(f"intent is not resolved: {codes}")
+        if intent.constraints:
+            raise ValueError(
+                "business constraint bindings are not implemented; "
+                "published system hard guardrails remain mandatory"
             )
 
-        return OptimizationProblemV1(
-            schema_version=RTO_SCHEMA_VERSION,
-            problem_version="optimization-problem-v1",
-            intent_ref=intent.ref,
+        route = view.route_for_objective_count(len(intent.objectives))
+        if route is None:
+            raise ValueError("system policy has no execution route for objective count")
+        selector = next(
+            item for item in bundle.catalog.selectors if item.selector_id == route.selector_id
+        )
+        if selector.method != intent.preference.method:
+            raise ValueError("intent preference differs from the execution route selector")
+
+        decisions = self._decision_domains(bundle, intent, context)
+        objectives = self._objective_specs(bundle, intent)
+        constraints = self._hard_constraints(bundle)
+        publishability_constraints = self._publishability_constraints(bundle)
+        result_mode: ResultMode = (
+            "selected"
+            if not intent.result_request.include_alternatives
+            else "pareto-and-selected"
+            if len(objectives) > 1
+            else "ranked-and-selected"
+        )
+        return OptimizationProblem(
+            schema_id=OPTIMIZATION_PROBLEM_SCHEMA_ID,
+            schema_version=OPTIMIZATION_PROBLEM_SCHEMA_VERSION,
+            problem_version="optimization-problem-2.0.0",
+            intent_ref=self._intent_ref(intent),
             context_ref=context.ref,
-            decision_catalog_ref=decision_catalog.ref,
-            kpi_catalog_ref=kpi_catalog.ref,
-            constraint_profile_ref=constraint_profile.ref,
-            policy_ref=policy.ref,
-            decision_domains=tuple(domains),
-            objective_metric_id=intent.objective_metric_id,
-            objective_sense=intent.objective_sense,
-            constraints=constraint_profile.rules,
-            evaluation_plan=policy.evaluation,
-            search_plan=policy.search,
-            claim_scope=CLAIM_SCOPE,
+            capability_catalog_ref=bundle.catalog.ref,
+            system_policy_ref=bundle.system_policy.ref,
+            execution_route_ref=route.ref,
+            decision_domains=decisions,
+            objectives=objectives,
+            hard_constraints=constraints,
+            publishability_constraints=publishability_constraints,
+            preference=SelectionPreference(
+                method=intent.preference.method,
+                objective_order=tuple(item.metric_id for item in objectives),
+                tie_breaks=route.tie_breaks,
+            ),
+            result_request=ResultRequest(
+                mode=result_mode,
+                maximum_returned_candidates=intent.result_request.max_candidates,
+            ),
+            evaluation_plan=EvaluationPlan(
+                static_stage="M2",
+                dynamic_stage="M4",
+                m2_preset_id=route.m2_preset_id,
+                m4_preset_id=route.m4_preset_id,
+                m4_event_time_s=route.m4_event_time_s,
+                m4_duration_s=route.m4_duration_s,
+                m4_time_step_s=route.m4_time_step_s,
+                dynamic_verification_required=True,
+                dynamic_shortlist_size=route.top_k,
+                context_anchor_ratios=route.feed_anchor_ratios,
+            ),
+            solve_requirements=SolveRequirements(
+                maximum_evaluations=route.maximum_m2_candidates,
+                deterministic_required=True,
+            ),
+            claim_scope=ENGINEERING_CLAIM_SCOPE,
+        )
+
+    @staticmethod
+    def _intent_ref(intent: OptimizationIntent) -> ContractRef:
+        return ContractRef(intent.intent_id, intent.fingerprint)
+
+    @staticmethod
+    def _decision_domains(
+        bundle: CapabilityBundle,
+        intent: OptimizationIntent,
+        context: OperatingContext,
+    ) -> tuple[DecisionDomain, ...]:
+        by_id = {item.decision_id: item for item in bundle.catalog.decisions}
+        domains: list[DecisionDomain] = []
+        for variable_id in sorted(intent.decision_variables):
+            capability = by_id[variable_id]
+            if capability.availability != "available":
+                raise ValueError(f"decision {variable_id!r} is not available")
+            nominal = context.current_setpoints.get(variable_id)
+            if nominal is None:
+                raise ValueError(f"context has no current setpoint for {variable_id!r}")
+            domains.append(
+                DecisionDomain(
+                    variable_id=variable_id,
+                    display_unit=capability.display_unit,
+                    canonical_unit=capability.canonical_unit,
+                    nominal_value=nominal,
+                    lower_bound=capability.lower_bound,
+                    upper_bound=capability.upper_bound,
+                    coarse_step=capability.coarse_step,
+                    refine_step=capability.refine_step,
+                )
+            )
+        return tuple(domains)
+
+    @staticmethod
+    def _objective_specs(
+        bundle: CapabilityBundle,
+        intent: OptimizationIntent,
+    ) -> tuple[ObjectiveSpec, ...]:
+        objectives_by_metric = {item.metric_id: item for item in bundle.catalog.objectives}
+        metrics_by_id = {item.metric_id: item for item in bundle.catalog.metrics}
+        result: list[ObjectiveSpec] = []
+        for requested in intent.objectives:
+            capability = objectives_by_metric[requested.metric_id]
+            metric = metrics_by_id[requested.metric_id]
+            if capability.sense != requested.sense:
+                raise ValueError("intent objective direction differs from capability")
+            result.append(
+                ObjectiveSpec(
+                    metric_id=requested.metric_id,
+                    sense=requested.sense,
+                    unit=metric.unit,
+                    evaluation_stage=metric.stage,
+                    formula_id=metric.formula_ref,
+                    normalization_scale=capability.normalization_scale,
+                )
+            )
+        return tuple(result)
+
+    @staticmethod
+    def _hard_constraints(bundle: CapabilityBundle) -> tuple[ConstraintRule, ...]:
+        guardrails: dict[str, GuardrailCapability] = {
+            item.guardrail_id: item for item in bundle.catalog.guardrails
+        }
+        return tuple(
+            ConstraintRule(
+                constraint_id=binding.guardrail_id,
+                priority=binding.priority,
+                metric_id=guardrails[binding.guardrail_id].metric_id,
+                evaluation_stage=guardrails[binding.guardrail_id].stage,
+                operator=binding.operator,
+                limit=binding.limit,
+                unit=guardrails[binding.guardrail_id].unit,
+                normalization_scale=binding.normalization_scale,
+                source="system",
+            )
+            for binding in sorted(
+                bundle.system_policy.hard_guardrails,
+                key=lambda item: item.priority,
+            )
+        )
+
+    @staticmethod
+    def _publishability_constraints(
+        bundle: CapabilityBundle,
+    ) -> tuple[ConstraintRule, ...]:
+        guardrails: dict[str, GuardrailCapability] = {
+            item.guardrail_id: item for item in bundle.catalog.guardrails
+        }
+        return tuple(
+            ConstraintRule(
+                constraint_id=binding.guardrail_id,
+                priority=binding.priority,
+                metric_id=guardrails[binding.guardrail_id].metric_id,
+                evaluation_stage=guardrails[binding.guardrail_id].stage,
+                operator=binding.operator,
+                limit=binding.limit,
+                unit=guardrails[binding.guardrail_id].unit,
+                normalization_scale=binding.normalization_scale,
+                source="system",
+            )
+            for binding in sorted(
+                bundle.system_policy.publishability_guardrails,
+                key=lambda item: item.priority,
+            )
         )

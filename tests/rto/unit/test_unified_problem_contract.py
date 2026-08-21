@@ -29,11 +29,12 @@ def _problem(*objectives: ObjectiveSpec) -> OptimizationProblem:
     return OptimizationProblem(
         schema_id=OPTIMIZATION_PROBLEM_SCHEMA_ID,
         schema_version=OPTIMIZATION_PROBLEM_SCHEMA_VERSION,
-        problem_version="optimization-problem-unified",
+        problem_version="optimization-problem-2.0.0",
         intent_ref=_ref("intent", "1"),
         context_ref=_ref("context", "2"),
         capability_catalog_ref=_ref("catalog", "3"),
         system_policy_ref=_ref("policy", "4"),
+        execution_route_ref=_ref("route", "5"),
         decision_domains=(
             DecisionDomain(
                 variable_id="furnace_temperature_target_k",
@@ -107,7 +108,6 @@ def _problem(*objectives: ObjectiveSpec) -> OptimizationProblem:
         solve_requirements=SolveRequirements(
             maximum_evaluations=81,
             deterministic_required=True,
-            gradient_availability="none",
         ),
         claim_scope=ENGINEERING_CLAIM_SCOPE,
     )

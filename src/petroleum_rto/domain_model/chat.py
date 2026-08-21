@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import base64
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from importlib import import_module
-from typing import Protocol
+from typing import Final, Protocol
+from urllib.parse import quote
 
 from .chat_settings import DmxChatSettings, DmxChatSettingsError, load_dmx_chat_settings
+
+MAX_CHAT_HISTORY_MESSAGES: Final[int] = 64
+MAX_CHAT_HISTORY_BYTES: Final[int] = 128 * 1024
+MAX_CHAT_REQUEST_BYTES: Final[int] = 256 * 1024
+MAX_CHAT_RESPONSE_BYTES: Final[int] = 128 * 1024
 
 
 class DmxChatError(RuntimeError):
@@ -49,22 +57,35 @@ class _HttpxChatClient:
         try:
             httpx = import_module("httpx")
             client_type = httpx.Client
-            with client_type(
-                timeout=timeout_seconds,
-                follow_redirects=False,
-                trust_env=False,
-                verify=True,
-            ) as client:
-                response = client.post(
+            with (
+                client_type(
+                    timeout=timeout_seconds,
+                    follow_redirects=False,
+                    trust_env=False,
+                    verify=True,
+                ) as client,
+                client.stream(
+                    "POST",
                     url,
                     headers=dict(headers),
                     json=dict(payload),
-                )
+                ) as response,
+            ):
                 status_code = getattr(response, "status_code", None)
-                json_method = getattr(response, "json", None)
-                if not isinstance(status_code, int) or not callable(json_method):
+                if not isinstance(status_code, int):
                     raise TypeError("invalid HTTP response")
-                response_payload: object = json_method()
+                if status_code != 200:
+                    return DmxChatHttpResponse(status_code=status_code, payload=None)
+                body = bytearray()
+                for chunk in response.iter_bytes():
+                    if not isinstance(chunk, bytes):
+                        raise TypeError("invalid HTTP response body")
+                    body.extend(chunk)
+                    if len(body) > MAX_CHAT_RESPONSE_BYTES:
+                        raise DmxChatError("DMXAPI chat response exceeds the byte limit")
+                if not body:
+                    raise TypeError("empty HTTP response body")
+                response_payload = json.loads(body)
         except ImportError:
             raise DmxChatError("httpx is required for DMXAPI chat") from None
         except DmxChatError:
@@ -118,6 +139,10 @@ class DmxChatClient:
             "model": self._settings.model,
             "messages": normalized,
         }
+        if _contains_credential(request_payload, self._settings.api_key):
+            raise DmxChatError("DMXAPI chat request contains credential material")
+        if _json_size(request_payload) > MAX_CHAT_REQUEST_BYTES:
+            raise DmxChatError("DMXAPI chat request exceeds the byte limit")
         headers = {
             "Authorization": self._settings.api_key,
             "Content-Type": "application/json",
@@ -135,6 +160,10 @@ class DmxChatClient:
             raise DmxChatError("DMXAPI chat request failed") from None
         if response.status_code != 200:
             raise DmxChatError(f"DMXAPI chat returned HTTP {response.status_code}")
+        if _json_size(response.payload) > MAX_CHAT_RESPONSE_BYTES:
+            raise DmxChatError("DMXAPI chat response exceeds the byte limit")
+        if _contains_credential(response.payload, self._settings.api_key):
+            raise DmxChatError("DMXAPI chat response contained credential material")
         return _response_content(response.payload)
 
 
@@ -161,7 +190,8 @@ class DmxChatSession:
             raise ValueError("chat text must be non-empty")
         pending = [*self._messages, {"role": "user", "content": text}]
         reply = self._client.complete(pending)
-        self._messages = [*pending, {"role": "assistant", "content": reply}]
+        committed = _normalize_messages([*pending, {"role": "assistant", "content": reply}])
+        self._messages = committed
         return reply
 
     def clear(self) -> None:
@@ -185,7 +215,54 @@ def _normalize_messages(messages: Sequence[Mapping[str, str]]) -> list[dict[str,
         if not isinstance(content, str) or not content.strip():
             raise ValueError("message content must be non-empty text")
         normalized.append({"role": role, "content": content})
+    if len(normalized) > MAX_CHAT_HISTORY_MESSAGES:
+        raise ValueError("chat history exceeds the message limit; use /clear")
+    if _json_size(normalized) > MAX_CHAT_HISTORY_BYTES:
+        raise ValueError("chat history exceeds the byte limit; use /clear")
     return normalized
+
+
+def _json_size(value: object) -> int:
+    try:
+        encoded = json.dumps(
+            value,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError, UnicodeEncodeError):
+        raise DmxChatError("DMXAPI chat payload is not finite UTF-8 JSON") from None
+    return len(encoded)
+
+
+def _credential_variants(credential: str) -> frozenset[str]:
+    encoded = base64.b64encode(credential.encode("ascii")).decode("ascii")
+    urlsafe = base64.urlsafe_b64encode(credential.encode("ascii")).decode("ascii")
+    return frozenset(
+        {
+            credential,
+            encoded,
+            encoded.rstrip("="),
+            urlsafe,
+            urlsafe.rstrip("="),
+            quote(credential, safe=""),
+        }
+    )
+
+
+def _contains_credential(value: object, credential: str) -> bool:
+    variants = _credential_variants(credential)
+
+    def contains(item: object) -> bool:
+        if isinstance(item, str):
+            return any(variant and variant in item for variant in variants)
+        if isinstance(item, Mapping):
+            return any(contains(key) or contains(nested) for key, nested in item.items())
+        if isinstance(item, Sequence) and not isinstance(item, (str, bytes, bytearray)):
+            return any(contains(nested) for nested in item)
+        return False
+
+    return contains(value)
 
 
 def _response_content(payload: object) -> str:
@@ -210,6 +287,10 @@ def _response_content(payload: object) -> str:
 
 
 __all__ = [
+    "MAX_CHAT_HISTORY_BYTES",
+    "MAX_CHAT_HISTORY_MESSAGES",
+    "MAX_CHAT_REQUEST_BYTES",
+    "MAX_CHAT_RESPONSE_BYTES",
     "DmxChatClient",
     "DmxChatError",
     "DmxChatHttpClient",

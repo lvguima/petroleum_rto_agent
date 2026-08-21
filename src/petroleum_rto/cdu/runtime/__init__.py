@@ -48,6 +48,7 @@ from .resources import (
     read_runtime_resource_bytes,
     read_runtime_resource_json,
     read_runtime_resource_text,
+    runtime_resource_ids_for_preset,
     runtime_resource_sha256,
 )
 
@@ -98,5 +99,6 @@ __all__ = [
     "run",
     "runtime_request_from_mapping",
     "runtime_request_template",
+    "runtime_resource_ids_for_preset",
     "runtime_resource_sha256",
 ]

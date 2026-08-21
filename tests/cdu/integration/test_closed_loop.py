@@ -24,6 +24,7 @@ from petroleum_rto.cdu.core.config import (
     load_component_catalog,
     load_model_config,
 )
+from petroleum_rto.cdu.core.math_utils import ConvergenceError
 from petroleum_rto.cdu.dynamics import (
     DynamicConservationTolerances,
     OpenLoopDynamicModel,
@@ -35,7 +36,7 @@ from petroleum_rto.cdu.dynamics.state import (
     SENSOR_STATE_NAMES,
     THERMAL_STATE_NAMES,
 )
-from petroleum_rto.cdu.flowsheet.recycle import solve_recycle
+from petroleum_rto.cdu.flowsheet.recycle import RecycleSettings, solve_recycle
 from petroleum_rto.cdu.properties.components import ComponentCatalog
 
 M4Inputs = tuple[
@@ -79,6 +80,23 @@ def feed_step_result(m4_inputs: M4Inputs) -> ClosedLoopSimulationResult:
     return run_closed_loop(model, case, catalog, control, step)
 
 
+def test_public_entry_point_raises_structured_m2_prerequisite_failure(
+    m4_inputs: M4Inputs,
+) -> None:
+    model, case, catalog, control, baseline, _ = m4_inputs
+    settings = replace(RecycleSettings.from_model(model), maximum_iterations=1)
+
+    with pytest.raises(ConvergenceError, match="M4 prerequisite failed at convergence"):
+        run_closed_loop(
+            model,
+            case,
+            catalog,
+            control,
+            baseline,
+            recycle_settings=settings,
+        )
+
+
 def _sample_at(
     result: ClosedLoopSimulationResult,
     time_s: float,
@@ -100,10 +118,7 @@ def _normalized_sample_difference(
         pv_scale = reference.controls[loop_id].target_setpoint
         differences.extend(
             (
-                abs(
-                    left.controls[loop_id].process_value
-                    - right.controls[loop_id].process_value
-                )
+                abs(left.controls[loop_id].process_value - right.controls[loop_id].process_value)
                 / pv_scale,
                 abs(
                     left.controls[loop_id].output_normalized
@@ -141,8 +156,7 @@ def _normalized_sample_difference(
         ),
     ):
         differences.extend(
-            abs(left_values[name] - right_values[name])
-            / max(abs(reference_values[name]), 1.0)
+            abs(left_values[name] - right_values[name]) / max(abs(reference_values[name]), 1.0)
             for name in names
         )
     differences.extend(
@@ -222,9 +236,7 @@ def test_closed_loop_time_step_halving_is_consistent(
     assert fine.status == "success"
     coarse_by_time = {sample.time_s: sample for sample in feed_step_result.samples}
     fine_by_time = {
-        sample.time_s: sample
-        for sample in fine.samples
-        if sample.time_s in coarse_by_time
+        sample.time_s: sample for sample in fine.samples if sample.time_s in coarse_by_time
     }
     maximum_difference = 0.0
     reference = feed_step_result.samples[0]
@@ -243,9 +255,7 @@ def test_closed_loop_time_step_halving_is_consistent(
     assert final_difference <= 0.002
     non_control_sample = _sample_at(fine, 602.5)
     feed_record = non_control_sample.controls["feed_flow"]
-    actual_feed = non_control_sample.plant.state.actuator_states[
-        "fresh_feed_flow_kg_s"
-    ]
+    actual_feed = non_control_sample.plant.state.actuator_states["fresh_feed_flow_kg_s"]
     assert feed_record.process_value == actual_feed
     assert feed_record.process_value != feed_record.decision_process_value
 
@@ -293,12 +303,10 @@ def test_non_grid_setpoint_event_has_no_future_effect(
     assert before.plant.state.to_vector() == event.plant.state.to_vector()
     assert before.plant.commands == event.plant.commands
     after = _sample_at(with_event, 11.0)
-    assert after.controls["feed_flow"].ramped_setpoint > event.controls[
-        "feed_flow"
-    ].ramped_setpoint
-    assert after.plant.commands["fresh_feed_flow_kg_s"] > event.plant.commands[
-        "fresh_feed_flow_kg_s"
-    ]
+    assert after.controls["feed_flow"].ramped_setpoint > event.controls["feed_flow"].ramped_setpoint
+    assert (
+        after.plant.commands["fresh_feed_flow_kg_s"] > event.plant.commands["fresh_feed_flow_kg_s"]
+    )
 
 
 def test_weak_controller_cannot_turn_plant_success_into_m4_success(
@@ -354,15 +362,10 @@ def test_true_inventory_gate_is_not_replaced_by_lagged_sensor(
     assert result.status == "failed"
     assert result.acceptance_checks["plant_execution"]
     assert not result.acceptance_checks["true_inventory_safety"]
-    nominal_true = result.samples[0].plant.state.liquid_inventories[
-        "flash_drum"
-    ].total_mass_kg
-    nominal_sensor = result.samples[0].controls[
-        "flash_inventory"
-    ].process_value
+    nominal_true = result.samples[0].plant.state.liquid_inventories["flash_drum"].total_mass_kg
+    nominal_sensor = result.samples[0].controls["flash_inventory"].process_value
     assert any(
-        sample.plant.state.liquid_inventories["flash_drum"].total_mass_kg
-        / nominal_true
+        sample.plant.state.liquid_inventories["flash_drum"].total_mass_kg / nominal_true
         > tight_acceptance.inventory_true_max_ratio
         and sample.controls["flash_inventory"].process_value / nominal_sensor
         <= tight_acceptance.inventory_true_max_ratio
@@ -495,11 +498,7 @@ def test_floating_equivalent_event_and_output_times_are_merged(
         versions=dynamic_model.versions,
     )
 
-    near_event = [
-        sample
-        for sample in result.samples
-        if abs(sample.time_s - 0.3) <= 1e-12
-    ]
+    near_event = [sample for sample in result.samples if abs(sample.time_s - 0.3) <= 1e-12]
     assert len(near_event) == 1
     assert len(result.samples) == 11
     assert result.diagnostics["requested_integration_substeps"] == 10.0
@@ -593,9 +592,7 @@ def test_manual_loop_cannot_be_accepted_as_automatic_closed_loop(
     assert result.status == "failed"
     assert result.failure_stage == "performance"
     assert not result.acceptance_checks["automatic_initialization_no_bump"]
-    assert {
-        sample.controls["top_temperature"].mode for sample in result.samples
-    } == {"manual"}
+    assert {sample.controls["top_temperature"].mode for sample in result.samples} == {"manual"}
 
 
 def test_result_contract_rejects_forged_success_and_invalid_traceability(
@@ -609,11 +606,7 @@ def test_result_contract_rejects_forged_success_and_invalid_traceability(
     with pytest.raises(ValueError, match="required metadata"):
         replace(
             result,
-            metadata={
-                key: value
-                for key, value in result.metadata.items()
-                if key != "purpose"
-            },
+            metadata={key: value for key, value in result.metadata.items() if key != "purpose"},
         )
     with pytest.raises(ValueError, match="failed gate"):
         replace(

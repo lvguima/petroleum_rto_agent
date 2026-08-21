@@ -1,40 +1,40 @@
-"""R5 immutable strategy contracts, builder and repository."""
+"""Immutable strategy contracts, builder, and repository."""
 
-from .builder import StrategyBuilder, anchor_from_evaluations, optimization_result_ref
+from .builder import (
+    StrategyBuilder,
+    anchor_from_finalization,
+    anchor_from_verified_candidate,
+)
 from .models import (
-    StrategyAnchorV1,
-    StrategyEntryV1,
-    StrategyLifecycleEventV1,
-    StrategyQueryV1,
-    StrategyRecordV1,
-    StrategyReleaseManifestV1,
+    STRATEGY_SCHEMA_VERSION,
+    StrategyAnchor,
+    StrategyCoverage,
+    StrategyEntry,
+    StrategyEventType,
+    StrategyLifecycleEvent,
+    StrategyObjectiveSummary,
+    StrategyQuery,
+    StrategyRecord,
+    StrategyReleaseManifest,
     StrategyState,
 )
 from .repository import StrategyRepository, utc_now
-from .v2_models import (
-    StrategyAnchorV2,
-    StrategyDraftEventV2,
-    StrategyDraftRecordV2,
-    StrategyDraftRepositoryV2,
-    StrategyEntryV2,
-)
 
 __all__ = [
-    "StrategyAnchorV1",
-    "StrategyAnchorV2",
+    "STRATEGY_SCHEMA_VERSION",
+    "StrategyAnchor",
     "StrategyBuilder",
-    "StrategyDraftEventV2",
-    "StrategyDraftRecordV2",
-    "StrategyDraftRepositoryV2",
-    "StrategyEntryV1",
-    "StrategyEntryV2",
-    "StrategyLifecycleEventV1",
-    "StrategyQueryV1",
-    "StrategyRecordV1",
-    "StrategyReleaseManifestV1",
+    "StrategyCoverage",
+    "StrategyEntry",
+    "StrategyEventType",
+    "StrategyLifecycleEvent",
+    "StrategyObjectiveSummary",
+    "StrategyQuery",
+    "StrategyRecord",
+    "StrategyReleaseManifest",
     "StrategyRepository",
     "StrategyState",
-    "anchor_from_evaluations",
-    "optimization_result_ref",
+    "anchor_from_finalization",
+    "anchor_from_verified_candidate",
     "utc_now",
 ]

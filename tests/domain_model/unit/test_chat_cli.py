@@ -63,9 +63,7 @@ def test_result_displays_safe_summary_then_sends_only_normalized_projection(
                 "unit": "K",
             }
         ],
-        "claim_scope": "engineering_simulation_only",
-        "field_validated": False,
-        "control_authority": "none",
+        "publishable": True,
     }
     loaded: list[str] = []
     monkeypatch.setattr(cli, "_new_session", lambda: session)
@@ -83,12 +81,17 @@ def test_result_displays_safe_summary_then_sends_only_normalized_projection(
 
     captured = capsys.readouterr()
     assert loaded == [str(source)]
+    assert "不可直接下装" not in captured.out
+    assert "未经现场验证" not in captured.out
+    assert "边界说明" not in captured.out
     assert "RTO设定值概要：" in captured.out
     assert "626.35" in captured.out
     assert "模型> 回复1" in captured.out
     assert session.messages[1] == "这个温度代表什么？"
     result_prompt = session.messages[0]
-    assert "合成工程仿真" in result_prompt
+    for repeated_notice in ("快照", "合成工程仿真", "未经现场验证", "现场控制权"):
+        assert repeated_notice not in result_prompt
+    assert "不要输出JSON" in result_prompt
     assert "626.35" in result_prompt
     assert str(source) not in result_prompt
     assert "run_dir" not in result_prompt
@@ -96,7 +99,7 @@ def test_result_displays_safe_summary_then_sends_only_normalized_projection(
     assert captured.err == ""
 
 
-def test_natural_status_question_displays_and_sends_only_the_safe_projection(
+def test_natural_status_question_displays_only_the_model_explanation(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -106,8 +109,7 @@ def test_natural_status_question_displays_and_sends_only_the_safe_projection(
         "simulator_mode": "on_demand_offline",
         "simulator_state": "idle",
         "fresh_feed_load": {"kg_per_s": 113.1388888888889, "t_per_h": 407.3},
-        "claim_scope": "engineering_simulation_only",
-        "live_plant_data": False,
+        "operating_mode": "normal-steady",
     }
     monkeypatch.setattr(cli, "_new_session", lambda: session)
     monkeypatch.setattr(cli, "_load_simulation_status", lambda: summary)
@@ -119,13 +121,24 @@ def test_natural_status_question_displays_and_sends_only_the_safe_projection(
     assert cli.main([]) == 0
 
     captured = capsys.readouterr()
-    assert "当前仿真基准工况：" in captured.out
-    assert "407.3" in captured.out
+    assert "本次查询未启动新仿真" not in captured.out
+    assert "不是DCS" not in captured.out
+    assert "当前仿真基准工况：" not in captured.out
+    assert "407.3" not in captured.out
+    assert "state_kind" not in captured.out
+    assert "claim_scope" not in captured.out
     assert "模型> 回复1" in captured.out
     assert session.messages[1] == "这属于实时数据吗？"
     status_prompt = session.messages[0]
-    assert "本次查询没有启动新仿真" in status_prompt
-    assert "不是DCS" in status_prompt
+    for repeated_notice in (
+        "快照",
+        "本次查询没有启动新仿真",
+        "不是DCS",
+        "未经现场验证",
+        "控制权",
+    ):
+        assert repeated_notice not in status_prompt
+    assert "不要输出JSON" in status_prompt
     assert "407.3" in status_prompt
     assert "context_id" not in status_prompt
     assert "fingerprint" not in status_prompt
@@ -134,10 +147,40 @@ def test_natural_status_question_displays_and_sends_only_the_safe_projection(
     assert captured.err == ""
 
 
+def test_compound_status_and_optimization_request_cannot_imply_execution(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    session = _FakeSession()
+    summary = {
+        "simulator_state": "idle",
+        "operating_mode": "normal-steady",
+        "fresh_feed_load": {"kg_per_s": 113.1388888888889, "t_per_h": 407.3},
+    }
+    question = "现在常压装置什是什么状态，以降低能耗，提高利  产率为目标开始调整"
+    monkeypatch.setattr(cli, "_new_session", lambda: session)
+    monkeypatch.setattr(cli, "_load_simulation_status", lambda: summary)
+    monkeypatch.setattr("sys.stdin", io.StringIO(f"{question}\n/exit\n"))
+
+    assert cli.main([]) == 0
+
+    captured = capsys.readouterr()
+    assert "模型> 回复1" in captured.out
+    assert "407.3" not in captured.out
+    assert len(session.messages) == 1
+    prompt = session.messages[0]
+    assert "407.3" in prompt
+    assert question in prompt
+    assert "下一步需要形成优化预览" in prompt
+    assert "不得声称已经运行优化" in prompt
+    assert captured.err == ""
+
+
 @pytest.mark.parametrize(
     "question",
     [
         "当前常压装置工况怎么样？",
+        "现在常压装置是什么状态？",
         "仿真软件现在是什么运行状态？",
         "现在进料量是多少？",
         "炉温当前值是多少？",
@@ -149,8 +192,8 @@ def test_natural_status_question_displays_and_sends_only_the_safe_projection(
         "仿真软件现在运行吗？",
     ],
 )
-def test_operating_questions_are_recognized_automatically(question: str) -> None:
-    assert cli._is_simulation_status_query(question) is True
+def test_operating_questions_receive_operating_context(question: str) -> None:
+    assert cli._needs_operating_context(question) is True
 
 
 @pytest.mark.parametrize(
@@ -167,7 +210,27 @@ def test_operating_questions_are_recognized_automatically(question: str) -> None
     ],
 )
 def test_non_status_questions_remain_normal_chat(question: str) -> None:
-    assert cli._is_simulation_status_query(question) is False
+    assert cli._needs_operating_context(question) is False
+
+
+def test_status_slash_command_is_not_exposed(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    session = _FakeSession()
+    monkeypatch.setattr(cli, "_new_session", lambda: session)
+    monkeypatch.setattr(
+        cli,
+        "_load_simulation_status",
+        lambda: (_ for _ in ()).throw(AssertionError("must not load status")),
+    )
+    monkeypatch.setattr("sys.stdin", io.StringIO("/status\n/exit\n"))
+
+    assert cli.main([]) == 0
+
+    captured = capsys.readouterr()
+    assert session.messages == []
+    assert "未知命令" in captured.err
 
 
 def test_each_operating_question_refreshes_status_and_normal_chat_is_unchanged(

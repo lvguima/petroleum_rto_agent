@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from importlib import resources as importlib_resources
 from pathlib import Path
 from types import MappingProxyType
@@ -12,6 +14,7 @@ from petroleum_rto.cdu.repository import (
     canonicalize_cdu_resource_bytes,
     resolve_cdu_repository_path,
 )
+from petroleum_rto.cdu.runtime.presets import get_preset
 from petroleum_rto.cdu.runtime.resources import (
     M5RuntimeOverlay,
     RuntimeResourceError,
@@ -23,6 +26,7 @@ from petroleum_rto.cdu.runtime.resources import (
     read_runtime_resource_bytes,
     read_runtime_resource_json,
     read_runtime_resource_text,
+    runtime_resource_ids_for_preset,
     runtime_resource_sha256,
 )
 
@@ -189,7 +193,7 @@ def test_bundle_reconstructs_the_exact_m5_effective_basis_and_m6_lineage(
     )
     assert bundle.base_case.operating_conditions["flash_temperature_k"] == 493.15
     assert bundle.effective_case.operating_conditions["flash_temperature_k"] == 473.75
-    assert bundle.m6_basis.analysis_basis_fingerprint == (
+    assert bundle.m5_overlay.analysis_basis_fingerprint == (
         "4c12146b6fb14cb033b0e05f64e68093f28087482f55128aed5aa56c37dfffed"
     )
     assert bundle.validation_config.input_fingerprint == (
@@ -207,7 +211,86 @@ def test_bundle_collections_and_m5_evidence_are_immutable() -> None:
 
     assert isinstance(bundle.open_loop_scenarios, MappingProxyType)
     assert isinstance(bundle.closed_loop_scenarios, MappingProxyType)
+    assert isinstance(bundle.resource_bytes, MappingProxyType)
     assert isinstance(bundle.resource_fingerprints, MappingProxyType)
     assert isinstance(bundle.m5_overlay.m5_artifact_sha256, MappingProxyType)
     with pytest.raises(TypeError):
         bundle.open_loop_scenarios["extra"] = bundle.open_loop_scenarios["baseline"]  # type: ignore[index]
+
+
+@pytest.mark.parametrize(
+    ("preset_id", "expected_ids"),
+    (
+        (
+            "steady-baseline",
+            ("model.base", "catalog.components", "case.base", "overlay.m5"),
+        ),
+        (
+            "open-loop-feed-step",
+            (
+                "model.base",
+                "catalog.components",
+                "case.base",
+                "scenario.open_loop.feed_step",
+                "overlay.m5",
+            ),
+        ),
+        (
+            "closed-loop-feed-step",
+            (
+                "model.base",
+                "catalog.components",
+                "case.base",
+                "control.pi",
+                "scenario.closed_loop.feed_step",
+                "overlay.m5",
+            ),
+        ),
+        ("m6-abnormal-pump-trip", _RESOURCE_IDS),
+        ("m6-structural-rejection", _RESOURCE_IDS),
+    ),
+)
+def test_preset_bundle_loads_each_resource_in_its_minimum_closure_once(
+    preset_id: str,
+    expected_ids: tuple[str, ...],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from petroleum_rto.cdu.runtime import resources as resources_module
+
+    original = resources_module.read_runtime_resource_bytes
+    calls: list[str] = []
+
+    def counted(resource_id: str) -> bytes:
+        calls.append(resource_id)
+        return original(resource_id)
+
+    monkeypatch.setattr(resources_module, "read_runtime_resource_bytes", counted)
+    preset = get_preset(preset_id)
+
+    bundle = load_runtime_resource_bundle(preset)
+
+    assert runtime_resource_ids_for_preset(preset) == expected_ids
+    assert tuple(bundle.resource_fingerprints) == expected_ids
+    assert tuple(bundle.resource_bytes) == expected_ids
+    assert tuple(calls) == expected_ids
+    assert (bundle.validation_config is not None) == preset_id.startswith("m6-")
+
+
+def test_ordinary_runtime_import_does_not_load_m6_basis_or_calibration_pipeline() -> None:
+    repo_root = _repo_root()
+    script = (
+        "import sys; "
+        f"sys.path.insert(0, {str(repo_root / 'src')!r}); "
+        "import petroleum_rto.cdu.runtime; "
+        "assert 'petroleum_rto.cdu.validation.basis' not in sys.modules; "
+        "assert 'petroleum_rto.cdu.calibration.pipeline' not in sys.modules"
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr

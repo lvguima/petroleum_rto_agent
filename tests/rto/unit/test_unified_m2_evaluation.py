@@ -7,12 +7,12 @@ from pathlib import Path
 import pytest
 
 from petroleum_rto.rto.adapters import CduM7RequestFactory
-from petroleum_rto.rto.capabilities import UnifiedCapabilityBundle, load_capability_bundle
+from petroleum_rto.rto.capabilities import CapabilityBundle, load_capability_bundle
 from petroleum_rto.rto.compilation import (
     CandidateCompilationError,
+    CandidatePlanCompiler,
     CompiledPair,
     SystemCompilationError,
-    UnifiedCandidatePlanCompiler,
 )
 from petroleum_rto.rto.context import load_operating_context
 from petroleum_rto.rto.contracts.candidate import (
@@ -23,20 +23,20 @@ from petroleum_rto.rto.contracts.candidate import (
 from petroleum_rto.rto.contracts.common import JsonValue
 from petroleum_rto.rto.contracts.context import OperatingContext
 from petroleum_rto.rto.contracts.evidence import RunEvidenceRef
-from petroleum_rto.rto.contracts.models import CLAIM_SCOPE, RTO_SCHEMA_VERSION
 from petroleum_rto.rto.contracts.problem import ENGINEERING_CLAIM_SCOPE, OptimizationProblem
 from petroleum_rto.rto.contracts.simulation import (
+    SIMULATION_SCHEMA_VERSION,
     SimulationEvaluationRequest,
     SimulationPreview,
     SimulationRunBundle,
 )
 from petroleum_rto.rto.evaluation import (
+    M2EvaluationService,
+    M2PairedEvaluator,
     TrustedM2FormulaRegistry,
-    UnifiedM2EvaluationService,
-    UnifiedM2PairedEvaluator,
 )
-from petroleum_rto.rto.problem import UnifiedProblemBuilder
-from petroleum_rto.rto.unified_inputs import OptimizationIntent, load_optimization_intent
+from petroleum_rto.rto.intent import OptimizationIntent, load_optimization_intent
+from petroleum_rto.rto.problem import ProblemBuilder
 from tests.rto.unit.test_unified_intent import _raw as _intent_raw
 
 
@@ -48,7 +48,7 @@ def _basis(
     objective_metric_id: str | None = None,
     objective_sense: str = "minimize",
 ) -> tuple[
-    UnifiedCapabilityBundle,
+    CapabilityBundle,
     OperatingContext,
     OptimizationProblem,
     CandidateProposal,
@@ -80,7 +80,7 @@ def _basis(
         raw = intent.as_dict()
         raw["decision_variables"] = ["furnace_temperature_target_k"]
         intent = type(intent).from_mapping(raw)
-    problem = UnifiedProblemBuilder().build(bundle, intent, context)
+    problem = ProblemBuilder().build(bundle, intent, context)
     values = {
         domain.variable_id: (
             627.35 if domain.variable_id == "furnace_temperature_target_k" else 151325.0
@@ -99,7 +99,7 @@ def _basis(
         output_kind="steady-setpoint-vector",
         claim_scope=ENGINEERING_CLAIM_SCOPE,
     )
-    pair = UnifiedCandidatePlanCompiler(bundle.catalog).compile_pair(
+    pair = CandidatePlanCompiler(bundle.catalog).compile_pair(
         problem,
         context,
         proposal,
@@ -138,7 +138,7 @@ def test_one_and_many_objectives_share_candidate_evaluation(
             yield_delta=0.001,
         )
 
-        result = UnifiedM2PairedEvaluator(problem, bundle.catalog).evaluate(
+        result = M2PairedEvaluator(problem, bundle.catalog).evaluate(
             proposal,
             pair,
             baseline,
@@ -158,11 +158,16 @@ def test_one_and_many_objectives_share_candidate_evaluation(
         relocated = replace(
             result,
             evidence_refs=tuple(
-                replace(item, run_ref=f"/relocated/{item.pair_role}")
+                replace(
+                    item,
+                    run_ref=f"/relocated/{item.pair_role}",
+                    manifest_fingerprint=("0" if item.pair_role == "baseline" else "1") * 64,
+                )
                 for item in result.evidence_refs
             ),
         )
         assert relocated.fingerprint == result.fingerprint
+        assert relocated.as_dict() != result.as_dict()
 
 
 def test_formula_registry_applies_paired_constraints_and_rejects_untrusted_binding(
@@ -183,7 +188,7 @@ def test_formula_registry_applies_paired_constraints_and_rejects_untrusted_bindi
         yield_delta=0.001,
     )
 
-    result = UnifiedM2PairedEvaluator(problem, bundle.catalog).evaluate(
+    result = M2PairedEvaluator(problem, bundle.catalog).evaluate(
         proposal,
         pair,
         baseline,
@@ -202,7 +207,7 @@ def test_formula_registry_applies_paired_constraints_and_rejects_untrusted_bindi
         ),
     )
     with pytest.raises(ValueError, match="trusted binding"):
-        UnifiedM2PairedEvaluator(tampered, bundle.catalog, TrustedM2FormulaRegistry())
+        M2PairedEvaluator(tampered, bundle.catalog, TrustedM2FormulaRegistry())
 
 
 @pytest.mark.parametrize(
@@ -237,7 +242,7 @@ def test_publishability_metric_is_computed_for_non_energy_single_objectives_with
         yield_delta=0.001,
     )
 
-    result = UnifiedM2PairedEvaluator(problem, bundle.catalog).evaluate(
+    result = M2PairedEvaluator(problem, bundle.catalog).evaluate(
         proposal,
         pair,
         baseline,
@@ -253,7 +258,7 @@ def test_publishability_metric_is_computed_for_non_energy_single_objectives_with
     }
 
 
-def test_evidence_fingerprint_ignores_only_run_location(
+def test_evidence_semantic_fingerprint_ignores_audit_location_and_manifest(
     repo_root: Path,
     make_bundle: Callable[..., SimulationRunBundle],
 ) -> None:
@@ -262,8 +267,18 @@ def test_evidence_fingerprint_ignores_only_run_location(
     evidence = RunEvidenceRef.from_bundle(bundle, pair_role="baseline")
 
     assert replace(evidence, run_ref="/relocated/evidence").fingerprint == evidence.fingerprint
-    assert replace(evidence, request_fingerprint="f" * 64).fingerprint != evidence.fingerprint
-    assert replace(evidence, manifest_fingerprint="e" * 64).fingerprint != evidence.fingerprint
+    changed_manifest = replace(evidence, manifest_fingerprint="e" * 64)
+    assert changed_manifest.fingerprint == evidence.fingerprint
+    assert changed_manifest.as_dict() != evidence.as_dict()
+    semantic_changes = (
+        replace(evidence, provider_request_fingerprint="a" * 64),
+        replace(evidence, request_fingerprint="b" * 64),
+        replace(evidence, effective_input_fingerprint="c" * 64),
+        replace(evidence, result_fingerprint="d" * 64),
+        replace(evidence, versions={**evidence.versions, "runtime": "changed"}),
+        replace(evidence, source_fingerprints={**evidence.source_fingerprints, "model": "f" * 64}),
+    )
+    assert all(item.fingerprint != evidence.fingerprint for item in semantic_changes)
     assert RunEvidenceRef.from_mapping(evidence.as_dict()) == evidence
 
 
@@ -297,7 +312,7 @@ class _Simulator:
 
     def preview(self, request: SimulationEvaluationRequest) -> SimulationPreview:
         return SimulationPreview(
-            schema_version=RTO_SCHEMA_VERSION,
+            schema_version=SIMULATION_SCHEMA_VERSION,
             preview_version="fake-preview",
             simulation_request_ref=request.ref,
             provider_id=request.provider_id,
@@ -308,7 +323,7 @@ class _Simulator:
                 "case": self._context.case_ref.fingerprint,
             },
             effective_object_fingerprints={},
-            claim_scope=CLAIM_SCOPE,
+            claim_scope=ENGINEERING_CLAIM_SCOPE,
         )
 
     def evaluate(
@@ -385,11 +400,11 @@ def test_service_caches_pair_and_rejects_preview_context_drift_before_execution(
 ) -> None:
     bundle, context, problem, proposal, _ = _basis(repo_root, multi=False)
     simulator = _Simulator(context, make_bundle)
-    service = UnifiedM2EvaluationService(
+    service = M2EvaluationService(
         problem,
         context,
         bundle.catalog,
-        UnifiedCandidatePlanCompiler(bundle.catalog),
+        CandidatePlanCompiler(bundle.catalog),
         CduM7RequestFactory(),
         simulator,
     )
@@ -403,11 +418,11 @@ def test_service_caches_pair_and_rejects_preview_context_drift_before_execution(
     assert service.cache_hit_count == 1
 
     drifting = _Simulator(context, make_bundle, wrong_model=True)
-    guarded = UnifiedM2EvaluationService(
+    guarded = M2EvaluationService(
         problem,
         context,
         bundle.catalog,
-        UnifiedCandidatePlanCompiler(bundle.catalog),
+        CandidatePlanCompiler(bundle.catalog),
         CduM7RequestFactory(),
         drifting,
     ).evaluate(proposal)
@@ -421,7 +436,7 @@ def test_m2_service_separates_candidate_errors_from_factory_configuration_errors
     make_bundle: Callable[..., SimulationRunBundle],
 ) -> None:
     bundle, context, problem, proposal, _ = _basis(repo_root, multi=False)
-    compiler = UnifiedCandidatePlanCompiler(bundle.catalog)
+    compiler = CandidatePlanCompiler(bundle.catalog)
     invalid_proposal = replace(
         proposal,
         decision_values={
@@ -447,7 +462,7 @@ def test_m2_service_separates_candidate_errors_from_factory_configuration_errors
         )
 
     candidate_simulator = _Simulator(context, make_bundle)
-    invalid = UnifiedM2EvaluationService(
+    invalid = M2EvaluationService(
         problem,
         context,
         bundle.catalog,
@@ -460,7 +475,7 @@ def test_m2_service_separates_candidate_errors_from_factory_configuration_errors
     assert candidate_simulator.evaluate_calls == 0
 
     system_simulator = _Simulator(context, make_bundle)
-    system_error = UnifiedM2EvaluationService(
+    system_error = M2EvaluationService(
         problem,
         context,
         bundle.catalog,
@@ -483,4 +498,4 @@ def test_builder_rejects_unbound_business_constraint(repo_root: Path) -> None:
     raw["constraints"] = ["quality-proxy-preservation"]
 
     with pytest.raises(ValueError, match="business constraint bindings"):
-        UnifiedProblemBuilder().build(bundle, type(intent).from_mapping(raw), context)
+        ProblemBuilder().build(bundle, type(intent).from_mapping(raw), context)

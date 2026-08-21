@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ... import __version__ as SOFTWARE_VERSION
 from ..core.config import CaseConfig, ModelConfig, validate_config_compatibility
+from ..core.math_utils import ConvergenceError
 from ..core.types import MaterialStream
 from ..dynamics.initialization import initialize_open_loop_dynamic_model
 from ..flowsheet.recycle import RecycleSettings, solve_recycle
@@ -49,7 +50,7 @@ def run_closed_loop_scenario(
     if not recycle.converged:
         stage = recycle.failure_stage or "unknown"
         reason = recycle.failure_reason or "M2 prerequisite did not converge"
-        raise RuntimeError(f"M4 prerequisite failed at {stage}: {reason}")
+        raise ConvergenceError(f"M4 prerequisite failed at {stage}: {reason}")
     dynamic_model = initialize_open_loop_dynamic_model(
         model,
         case,

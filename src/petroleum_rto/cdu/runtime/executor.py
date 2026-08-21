@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import cast
 
@@ -19,6 +19,7 @@ from ..core.config import (
     canonical_fingerprint,
     validate_config_compatibility,
 )
+from ..core.math_utils import ConvergenceError
 from ..dynamics.equations import OpenLoopDynamicModel
 from ..dynamics.initialization import initialize_open_loop_dynamic_model
 from ..dynamics.runner import run_dynamic_scenario
@@ -71,46 +72,61 @@ def _json_mapping(value: Mapping[str, object]) -> Mapping[str, JsonValue]:
 
 
 def _common_versions(bundle: RuntimeResourceBundle) -> dict[str, str]:
-    basis = bundle.m6_basis
-    return {
-        "analysis_basis_version": basis.analysis_version,
-        "base_case_version": basis.base_case_version,
-        "base_parameter_set_version": basis.base_parameter_set_version,
+    overlay = bundle.m5_overlay
+    versions = {
+        "base_case_version": overlay.base_case_version,
+        "base_parameter_set_version": overlay.base_parameter_set_version,
         "case_version": bundle.effective_case.case_version,
-        "control_version": bundle.control.control_version,
-        "derived_case_version": basis.derived_case_version,
-        "derived_parameter_set_version": basis.derived_parameter_set_version,
-        "m5_overlay_version": bundle.m5_overlay.overlay_version,
+        "derived_case_version": overlay.derived_case_version,
+        "derived_parameter_set_version": overlay.derived_parameter_set_version,
+        "m5_overlay_version": overlay.overlay_version,
         "model_config_version": bundle.effective_model.config_version,
         "model_version": bundle.effective_model.model_version,
         "parameter_set_version": bundle.effective_model.parameter_set_version,
         "scenario_version": "not_applicable",
         "software_version": SOFTWARE_VERSION,
-        "validation_version": bundle.validation_config.validation_version,
     }
+    if bundle.control is not None:
+        versions["control_version"] = bundle.control.control_version
+    if bundle.validation_config is not None:
+        versions.update(
+            {
+                "analysis_basis_version": bundle.validation_config.analysis_basis_version,
+                "validation_version": bundle.validation_config.validation_version,
+            }
+        )
+    return versions
 
 
 def _source_fingerprints(bundle: RuntimeResourceBundle) -> dict[str, str]:
     fingerprints = dict(bundle.resource_fingerprints)
     fingerprints.update(
         {
-            "m5_manifest": bundle.m6_basis.m5_manifest_sha256,
-            "m5_pipeline_result": bundle.m6_basis.m5_pipeline_fingerprint,
-            "m6_formal_result": bundle.m6_result_fingerprint,
+            "m5_manifest": bundle.m5_overlay.m5_manifest_sha256,
+            "m5_pipeline_result": bundle.m5_overlay.pipeline_result_fingerprint,
         }
     )
     fingerprints.update(
         {
             f"m5_artifact.{name}": digest
-            for name, digest in bundle.m6_basis.m5_artifact_sha256.items()
+            for name, digest in bundle.m5_overlay.m5_artifact_sha256.items()
         }
     )
     fingerprints.update(
         {
-            f"effective_object.{name}": digest
-            for name, digest in bundle.m6_basis.effective_object_fingerprints.items()
+            "effective_object.calibrated_model_object": (
+                bundle.m5_overlay.calibrated_model_object_fingerprint
+            ),
+            "effective_object.effective_case_object": (
+                bundle.m5_overlay.effective_case_object_fingerprint
+            ),
+            "effective_object.component_catalog_object": (
+                bundle.m5_overlay.component_catalog_object_fingerprint
+            ),
         }
     )
+    if bundle.m6_result_fingerprint is not None:
+        fingerprints["m6_formal_result"] = bundle.m6_result_fingerprint
     return {name: fingerprints[name] for name in sorted(fingerprints)}
 
 
@@ -143,7 +159,7 @@ def _effective_fingerprint(
         "effective_model": bundle.effective_model.as_dict(),
         "effective_case": bundle.effective_case.as_dict(),
         "component_catalog": bundle.catalog.as_dict(),
-        "m5_analysis_basis": bundle.m6_basis.analysis_basis_fingerprint,
+        "m5_analysis_basis": bundle.m5_overlay.analysis_basis_fingerprint,
         "resource_fingerprints": dict(bundle.resource_fingerprints),
     }
     if extra is not None:
@@ -246,12 +262,13 @@ def _execute_closed_loop(
     preset: RuntimePreset,
     bundle: RuntimeResourceBundle,
 ) -> ExecutionPayload:
+    control = bundle.require_control()
     scenario = _closed_loop_scenario(bundle, preset)
     effective = _effective_fingerprint(
         bundle,
         request,
         extra={
-            "control": bundle.control.as_dict(),
+            "control": control.as_dict(),
             "scenario": scenario.as_dict(),
         },
     )
@@ -259,7 +276,7 @@ def _execute_closed_loop(
         bundle.effective_model,
         bundle.effective_case,
         bundle.catalog,
-        bundle.control,
+        control,
         scenario,
     )
     return adapt_closed_loop_result(
@@ -268,7 +285,7 @@ def _execute_closed_loop(
         result,
         versions={
             **_common_versions(bundle),
-            "control_version": bundle.control.control_version,
+            "control_version": control.control_version,
             "scenario_version": scenario.scenario_version,
             "simulation_stage": "M4",
         },
@@ -341,7 +358,7 @@ def _execute_custom_open_loop(
     if not recycle.converged:
         stage = recycle.failure_stage or "unknown"
         reason = recycle.failure_reason or "M2 prerequisite did not converge"
-        raise RuntimeError(f"M3 prerequisite failed at {stage}: {reason}")
+        raise ConvergenceError(f"M3 prerequisite failed at {stage}: {reason}")
     nominal_model = initialize_open_loop_dynamic_model(
         resolved.model,
         resolved.case,
@@ -411,6 +428,7 @@ def _execute_custom_closed_loop(
     bundle: RuntimeResourceBundle,
     resolved: ResolvedRuntimeInputs,
 ) -> ExecutionPayload:
+    control = bundle.require_control()
     scenario = resolved.closed_loop_scenario
     if scenario is None:
         raise ValueError("custom closed-loop execution lacks a resolved scenario")
@@ -418,7 +436,7 @@ def _execute_custom_closed_loop(
     if not recycle.converged:
         stage = recycle.failure_stage or "unknown"
         reason = recycle.failure_reason or "M2 prerequisite did not converge"
-        raise RuntimeError(f"M4 prerequisite failed at {stage}: {reason}")
+        raise ConvergenceError(f"M4 prerequisite failed at {stage}: {reason}")
     dynamic_model = initialize_open_loop_dynamic_model(
         resolved.model,
         resolved.case,
@@ -431,7 +449,7 @@ def _execute_custom_closed_loop(
     )
     result = simulate_closed_loop(
         dynamic_model,
-        bundle.control,
+        control,
         scenario,
         versions=_resolved_version_mapping(resolved, bundle),
         plant_initial_state=actual_state,
@@ -442,7 +460,7 @@ def _execute_custom_closed_loop(
         result,
         versions={
             **_common_versions(bundle),
-            "control_version": bundle.control.control_version,
+            "control_version": control.control_version,
             "scenario_version": scenario.scenario_version,
             "simulation_stage": "M4",
         },
@@ -591,13 +609,15 @@ def _m6_versions(
     bundle: RuntimeResourceBundle,
     spec: ValidationScenarioSpec,
 ) -> dict[str, str]:
+    control = bundle.require_control()
+    config = bundle.require_validation_config()
     return {
         **_common_versions(bundle),
-        "control_version": bundle.control.control_version,
+        "control_version": control.control_version,
         "execution_profile": "portable_selected_scenario_replay",
         "scenario_version": spec.scenario_version,
         "simulation_stage": "M6",
-        "validation_version": bundle.validation_config.validation_version,
+        "validation_version": config.validation_version,
     }
 
 
@@ -605,7 +625,7 @@ def _execute_m6_structural_rejection(
     request: RunRequest,
     bundle: RuntimeResourceBundle,
 ) -> ExecutionPayload:
-    config = bundle.validation_config
+    config = bundle.require_validation_config()
     spec = _validation_scenario(config, _M6_REJECTION_SCENARIO_ID)
     domain = assess_applicability(
         config.domain_dimensions,
@@ -649,7 +669,7 @@ def _execute_m6_structural_rejection(
         versions=_m6_versions(bundle, spec),
         source_fingerprints=_source_fingerprints(bundle),
         effective_input_fingerprint=effective,
-        formal_m6_result_fingerprint=bundle.m6_result_fingerprint,
+        formal_m6_result_fingerprint=bundle.require_m6_result_fingerprint(),
         duration_s=None,
         time_step_s=None,
     )
@@ -694,7 +714,9 @@ def _execute_m6_pump_trip(
     preset: RuntimePreset,
     bundle: RuntimeResourceBundle,
 ) -> ExecutionPayload:
-    config = bundle.validation_config
+    config = bundle.require_validation_config()
+    control = bundle.require_control()
+    formal_m6_result = bundle.require_m6_result_fingerprint()
     spec = _validation_scenario(config, _M6_PUMP_SCENARIO_ID)
     rule = _protection_rule(config, _M6_PUMP_RULE_ID)
     domain = assess_applicability(
@@ -708,7 +730,7 @@ def _execute_m6_pump_trip(
         bundle,
         request,
         extra={
-            "control": bundle.control.as_dict(),
+            "control": control.as_dict(),
             "m6_config": config.as_dict(),
             "scenario": spec.as_dict(),
             "protection_rule": rule.as_dict(),
@@ -787,7 +809,7 @@ def _execute_m6_pump_trip(
                 "m6_portable_baseline": baseline.source_fingerprint,
             },
             effective_input_fingerprint=effective,
-            formal_m6_result_fingerprint=bundle.m6_result_fingerprint,
+            formal_m6_result_fingerprint=formal_m6_result,
             duration_s=_M6_DURATION_S,
             time_step_s=_M6_TIME_STEP_S,
             failure_time_s=baseline.failure_time_s,
@@ -829,7 +851,7 @@ def _execute_m6_pump_trip(
                 "m6_portable_candidate": candidate.source_fingerprint,
             },
             effective_input_fingerprint=effective,
-            formal_m6_result_fingerprint=bundle.m6_result_fingerprint,
+            formal_m6_result_fingerprint=formal_m6_result,
             duration_s=_M6_DURATION_S,
             time_step_s=_M6_TIME_STEP_S,
             failure_time_s=candidate.failure_time_s,
@@ -847,7 +869,7 @@ def _execute_m6_pump_trip(
     timeline_passed = bool(trigger_events) and first_trigger_time >= _M6_EVENT_TIME_S
     tracking, tracking_passed = _tracking_evidence(
         rule,
-        bundle.control,
+        control,
         dynamic_model,
         relative_tolerance=config.report_acceptance.controller_tracking_relative_tolerance,
     )
@@ -918,7 +940,7 @@ def _execute_m6_pump_trip(
             "m6_portable_candidate": candidate.source_fingerprint,
         },
         effective_input_fingerprint=effective,
-        formal_m6_result_fingerprint=bundle.m6_result_fingerprint,
+        formal_m6_result_fingerprint=formal_m6_result,
         duration_s=_M6_DURATION_S,
         time_step_s=_M6_TIME_STEP_S,
         extra_diagnostics={
@@ -969,26 +991,45 @@ def _rejected_request(
 
 
 def _exception_status(exception: Exception) -> RuntimeStatus:
-    message = str(exception).lower()
-    if isinstance(exception, RuntimeError) and (
-        "prerequisite failed" in message
-        or "did not converge" in message
-        or "not converged" in message
-    ):
+    if isinstance(exception, ConvergenceError):
         return "not_converged"
     return "failed"
 
 
-def execute(request: RunRequest) -> ExecutionPayload:
-    """Execute one strict request without creating directories or wall-clock data."""
+@dataclass(frozen=True)
+class _PreparedExecution:
+    """One validated, package-private execution context for a single request."""
+
+    request: RunRequest
+    preset: RuntimePreset
+    bundle: RuntimeResourceBundle
+    resolved: ResolvedRuntimeInputs
+
+    def __post_init__(self) -> None:
+        if self.resolved.request != self.request:
+            raise ValueError("prepared execution resolved inputs belong to another request")
+        if self.resolved.preset != self.preset:
+            raise ValueError("prepared execution resolved inputs use another preset")
+
+
+def _prepare_execution(
+    request: RunRequest,
+    *,
+    normalize_errors: bool,
+) -> _PreparedExecution | ExecutionPayload:
+    """Validate and resolve one request, optionally normalizing preflight failures."""
 
     if not isinstance(request, RunRequest):
         raise TypeError("execute requires a RunRequest")
     try:
         preset = get_preset(request.preset_id)
     except (KeyError, TypeError) as exc:
+        if not normalize_errors:
+            raise
         return _rejected_request(request, exc, preset=None)
     if request.run_type != preset.run_type:
+        if not normalize_errors:
+            raise ValueError("request run_type differs from its preset template")
         return _rejected_request(
             request,
             ValueError(
@@ -999,10 +1040,14 @@ def execute(request: RunRequest) -> ExecutionPayload:
     try:
         validate_runtime_request_shape(request)
     except (KeyError, TypeError, ValueError) as exc:
+        if not normalize_errors:
+            raise
         return _rejected_request(request, exc, preset=preset)
     try:
-        bundle = load_runtime_resource_bundle()
-    except Exception as exc:  # noqa: BLE001 - resource failure is outcome evidence
+        bundle = load_runtime_resource_bundle(preset)
+    except Exception as exc:
+        if not normalize_errors:
+            raise
         return adapt_exception(
             request,
             exc,
@@ -1014,6 +1059,8 @@ def execute(request: RunRequest) -> ExecutionPayload:
     try:
         resolved = resolve_runtime_inputs(request, bundle=bundle)
     except (KeyError, TypeError, ValueError) as exc:
+        if not normalize_errors:
+            raise
         duration_s = (
             preset.duration_s
             if request.scenario is None or request.scenario.duration_s is None
@@ -1033,6 +1080,16 @@ def execute(request: RunRequest) -> ExecutionPayload:
             duration_s=duration_s,
             time_step_s=time_step_s,
         )
+    return _PreparedExecution(request, preset, bundle, resolved)
+
+
+def _execute_prepared(prepared: _PreparedExecution) -> ExecutionPayload:
+    """Execute one already validated context without reloading package resources."""
+
+    request = prepared.request
+    preset = prepared.preset
+    bundle = prepared.bundle
+    resolved = prepared.resolved
     try:
         if resolved.is_custom:
             if preset.engine_layer == "M2":
@@ -1071,6 +1128,15 @@ def execute(request: RunRequest) -> ExecutionPayload:
             duration_s=resolved.duration_s,
             time_step_s=resolved.time_step_s,
         )
+
+
+def execute(request: RunRequest) -> ExecutionPayload:
+    """Execute one strict request without creating directories or wall-clock data."""
+
+    prepared = _prepare_execution(request, normalize_errors=True)
+    if isinstance(prepared, ExecutionPayload):
+        return prepared
+    return _execute_prepared(prepared)
 
 
 execute_request = execute

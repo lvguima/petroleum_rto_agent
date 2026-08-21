@@ -32,7 +32,6 @@ class FullGridParetoSolver:
             deterministic=True,
             supported_result_modes=(
                 "pareto-and-selected",
-                "pareto-set",
                 "selected-solution",
             ),
         )

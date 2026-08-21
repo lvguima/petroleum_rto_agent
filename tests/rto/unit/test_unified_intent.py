@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from petroleum_rto.rto.unified_inputs import (
+from petroleum_rto.rto.intent import (
     IntentResolver,
     ObjectiveSense,
     OptimizationIntent,

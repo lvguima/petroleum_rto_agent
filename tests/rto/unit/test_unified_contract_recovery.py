@@ -15,7 +15,7 @@ from petroleum_rto.rto.contracts.finalization import (
 )
 from petroleum_rto.rto.contracts.reference import ContractRef
 from petroleum_rto.rto.contracts.solver_result import SolverResult
-from petroleum_rto.rto.selection import UnifiedFinalSelector
+from petroleum_rto.rto.selection import FinalSelector
 from tests.rto.unit.test_unified_finalization import (
     _basis,
     _dynamic_evaluation,
@@ -165,7 +165,7 @@ def test_finalization_subcontracts_keep_strict_readers_and_cross_artifact_identi
     proposal = _proposal(problem, 0)
     static = (_static_evaluation(problem, proposal, (187.0,)),)
     solver = _solver_result(problem, (proposal,), static)
-    selector = UnifiedFinalSelector()
+    selector = FinalSelector()
     selection = selector.rank_static(problem, solver, _mapping(static))
     dynamic = {proposal.ref: _dynamic_evaluation(problem, proposal.ref, "feasible")}
     artifacts = selector.select(problem, solver, _mapping(static), dynamic, bundle)

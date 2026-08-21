@@ -6,7 +6,7 @@ from typing import Literal
 
 import pytest
 
-from petroleum_rto.rto.capabilities import UnifiedCapabilityBundle, load_capability_bundle
+from petroleum_rto.rto.capabilities import CapabilityBundle, load_capability_bundle
 from petroleum_rto.rto.context import load_operating_context
 from petroleum_rto.rto.contracts.candidate import (
     CANDIDATE_SCHEMA_VERSION,
@@ -36,9 +36,9 @@ from petroleum_rto.rto.contracts.solver_result import (
     SolutionGroup,
     SolverResult,
 )
-from petroleum_rto.rto.problem import UnifiedProblemBuilder
-from petroleum_rto.rto.selection import UnifiedFinalSelector
-from petroleum_rto.rto.unified_inputs import load_optimization_intent
+from petroleum_rto.rto.intent import load_optimization_intent
+from petroleum_rto.rto.problem import ProblemBuilder
+from petroleum_rto.rto.selection import FinalSelector
 
 DynamicStatus = Literal[
     "feasible",
@@ -53,7 +53,7 @@ def _basis(
     repo_root: Path,
     *,
     multi: bool,
-) -> tuple[UnifiedCapabilityBundle, OptimizationProblem]:
+) -> tuple[CapabilityBundle, OptimizationProblem]:
     bundle = load_capability_bundle(repo_root)
     context = load_operating_context(repo_root / "configs/rto/contexts/case_20260604.json")
     intent = load_optimization_intent(
@@ -61,7 +61,7 @@ def _basis(
         / "configs/rto/intents"
         / ("quality_yield_energy.json" if multi else "minimize_specific_furnace_energy.json")
     )
-    return bundle, UnifiedProblemBuilder().build(bundle, intent, context)
+    return bundle, ProblemBuilder().build(bundle, intent, context)
 
 
 def _evidence(role: PairRole) -> RunEvidenceRef:
@@ -288,7 +288,7 @@ def test_single_objective_ranks_verifies_and_returns_only_selected(
         for proposal, value in zip(proposals, (189.0, 187.0, 188.0), strict=True)
     )
     solver = _solver_result(problem, proposals, static)
-    selector = UnifiedFinalSelector()
+    selector = FinalSelector()
     selection = selector.rank_static(problem, solver, _mapping(static))
     dynamic = {
         ref: _dynamic_evaluation(problem, ref, "feasible")
@@ -333,7 +333,7 @@ def test_three_objective_order_honors_sense_and_output_cap(repo_root: Path) -> N
         representation="layered",
         groups=((static[2].ref, static[0].ref, static[1].ref),),
     )
-    selector = UnifiedFinalSelector()
+    selector = FinalSelector()
     selection = selector.rank_static(problem, solver, _mapping(static))
     dynamic = {
         ref: _dynamic_evaluation(problem, ref, "feasible")
@@ -373,7 +373,7 @@ def test_single_objective_can_return_ranked_alternatives_and_selected(
         for proposal, value in zip(proposals, (189.0, 187.0, 188.0), strict=True)
     )
     solver = _solver_result(problem, proposals, static)
-    selector = UnifiedFinalSelector()
+    selector = FinalSelector()
     selection = selector.rank_static(problem, solver, _mapping(static))
     dynamic = {
         ref: _dynamic_evaluation(problem, ref, "feasible")
@@ -412,7 +412,7 @@ def test_multiobjective_selected_mode_returns_only_the_dynamic_selection(
         representation="layered",
         groups=((static[2].ref, static[0].ref, static[1].ref),),
     )
-    selector = UnifiedFinalSelector()
+    selector = FinalSelector()
     selection = selector.rank_static(problem, solver, _mapping(static))
     dynamic = {
         ref: _dynamic_evaluation(problem, ref, "feasible")
@@ -449,7 +449,7 @@ def test_alternative_refs_are_static_and_keep_failed_dynamic_candidates_auditabl
         representation="layered",
         groups=((static[0].ref, static[1].ref, static[2].ref),),
     )
-    selector = UnifiedFinalSelector()
+    selector = FinalSelector()
     selection = selector.rank_static(problem, solver, _mapping(static))
     statuses: tuple[DynamicStatus, ...] = (
         "process_infeasible",
@@ -480,7 +480,7 @@ def test_atomic_tie_breaks_are_applied_in_declared_order(repo_root: Path) -> Non
     solver = _solver_result(problem, proposals, static)
 
     ranking = (
-        UnifiedFinalSelector()
+        FinalSelector()
         .rank_static(
             problem,
             solver,
@@ -514,7 +514,7 @@ def test_layered_solver_only_exposes_first_pareto_front(repo_root: Path) -> None
         groups=((first_a.ref, first_b.ref), (dominated.ref,)),
     )
 
-    selection = UnifiedFinalSelector().rank_static(problem, solver, _mapping(static))
+    selection = FinalSelector().rank_static(problem, solver, _mapping(static))
 
     assert selection.ranked_proposal_refs == (proposals[0].ref, proposals[1].ref)
     assert proposals[2].ref not in selection.shortlist_proposal_refs
@@ -530,7 +530,7 @@ def test_top_three_failure_does_not_claim_fourth_or_global_infeasibility(
         for index, proposal in enumerate(proposals)
     )
     solver = _solver_result(problem, proposals, static)
-    selector = UnifiedFinalSelector()
+    selector = FinalSelector()
     selection = selector.rank_static(problem, solver, _mapping(static))
     dynamic = {
         ref: _dynamic_evaluation(problem, ref, "process_infeasible")
@@ -558,7 +558,7 @@ def test_dynamic_system_status_wins_over_other_feasible_candidates(
         for index, proposal in enumerate(proposals)
     )
     solver = _solver_result(problem, proposals, static)
-    selector = UnifiedFinalSelector()
+    selector = FinalSelector()
     selection = selector.rank_static(problem, solver, _mapping(static))
     statuses: tuple[DynamicStatus, ...] = ("feasible", failure_status, "feasible")
     dynamic = {
@@ -581,7 +581,7 @@ def test_first_dynamic_failure_falls_back_after_full_shortlist(repo_root: Path) 
         for index, proposal in enumerate(proposals)
     )
     solver = _solver_result(problem, proposals, static)
-    selector = UnifiedFinalSelector()
+    selector = FinalSelector()
     selection = selector.rank_static(problem, solver, _mapping(static))
     statuses: tuple[DynamicStatus, ...] = (
         "process_infeasible",
@@ -611,7 +611,7 @@ def test_full_shortlist_is_required_before_any_candidate_can_be_selected(
         for index, proposal in enumerate(proposals)
     )
     solver = _solver_result(problem, proposals, static)
-    selector = UnifiedFinalSelector()
+    selector = FinalSelector()
     selection = selector.rank_static(problem, solver, _mapping(static))
     first = selection.shortlist_proposal_refs[0]
 
@@ -638,7 +638,7 @@ def test_not_evaluated_prevents_success_even_when_first_candidate_is_feasible(
         for index, proposal in enumerate(proposals)
     )
     solver = _solver_result(problem, proposals, static)
-    selector = UnifiedFinalSelector()
+    selector = FinalSelector()
     selection = selector.rank_static(problem, solver, _mapping(static))
     statuses: tuple[DynamicStatus, ...] = (
         "feasible",
@@ -675,7 +675,7 @@ def test_publishability_is_independent_and_requires_explicit_m2_metric(
     solver = _solver_result(problem, (proposal,), static)
     dynamic = {proposal.ref: _dynamic_evaluation(problem, proposal.ref, "feasible")}
 
-    artifacts = UnifiedFinalSelector().select(
+    artifacts = FinalSelector().select(
         problem,
         solver,
         _mapping(static),
@@ -704,7 +704,7 @@ def test_publishability_rule_must_close_against_policy_and_catalog(repo_root: Pa
     dynamic = {proposal.ref: _dynamic_evaluation(problem, proposal.ref, "feasible")}
 
     with pytest.raises(ValueError, match="differ from SystemPolicy and catalog"):
-        UnifiedFinalSelector().select(
+        FinalSelector().select(
             problem,
             solver,
             _mapping(static),
@@ -744,7 +744,7 @@ def test_unknown_preference_method_and_tie_break_alias_are_rejected(
     solver = _solver_result(problem, (proposal,), static)
 
     with pytest.raises(ValueError, match=match):
-        UnifiedFinalSelector().rank_static(problem, solver, _mapping(static))
+        FinalSelector().rank_static(problem, solver, _mapping(static))
 
 
 def test_only_static_infeasibility_returns_no_feasible(repo_root: Path) -> None:
@@ -758,7 +758,7 @@ def test_only_static_infeasibility_returns_no_feasible(repo_root: Path) -> None:
         status="no_static_feasible",
     )
 
-    artifacts = UnifiedFinalSelector().select(
+    artifacts = FinalSelector().select(
         problem,
         solver,
         _mapping(static),

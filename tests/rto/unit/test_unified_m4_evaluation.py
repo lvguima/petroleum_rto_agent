@@ -8,25 +8,25 @@ from typing import cast
 import pytest
 
 from petroleum_rto.rto.adapters import CduM7RequestFactory
-from petroleum_rto.rto.capabilities import UnifiedCapabilityBundle
+from petroleum_rto.rto.capabilities import CapabilityBundle
 from petroleum_rto.rto.compilation import (
+    CandidatePlanCompiler,
     CompiledPair,
-    UnifiedCandidatePlanCompiler,
-    assert_unified_compiled_pair,
+    assert_compiled_pair,
 )
 from petroleum_rto.rto.contracts.candidate import CandidateEvaluation, CandidateProposal
 from petroleum_rto.rto.contracts.common import JsonValue, thaw_json
 from petroleum_rto.rto.contracts.context import OperatingContext
-from petroleum_rto.rto.contracts.models import CLAIM_SCOPE, RTO_SCHEMA_VERSION
-from petroleum_rto.rto.contracts.problem import OptimizationProblem
+from petroleum_rto.rto.contracts.problem import ENGINEERING_CLAIM_SCOPE, OptimizationProblem
 from petroleum_rto.rto.contracts.simulation import (
+    SIMULATION_SCHEMA_VERSION,
     SimulationEvaluationRequest,
     SimulationPreview,
     SimulationRunBundle,
 )
 from petroleum_rto.rto.evaluation import (
-    UnifiedM4EvaluationService,
-    UnifiedM4PairedEvaluator,
+    M4EvaluationService,
+    M4PairedEvaluator,
 )
 from tests.rto.unit.test_unified_m2_evaluation import _basis, _WrongPresetFactory
 
@@ -37,7 +37,7 @@ def _m4_basis(
     multi: bool,
     one_decision: bool = False,
 ) -> tuple[
-    UnifiedCapabilityBundle,
+    CapabilityBundle,
     OperatingContext,
     OptimizationProblem,
     CandidateProposal,
@@ -48,7 +48,7 @@ def _m4_basis(
         multi=multi,
         one_decision=one_decision,
     )
-    pair = UnifiedCandidatePlanCompiler(bundle.catalog).compile_pair(
+    pair = CandidatePlanCompiler(bundle.catalog).compile_pair(
         problem,
         context,
         proposal,
@@ -117,7 +117,7 @@ def test_m4_compiler_supports_atomic_decision_and_rejects_pair_drift(
         candidate=replace(pair.candidate, provider_request=payload),
     )
     with pytest.raises(ValueError, match="outside the stage whitelist"):
-        assert_unified_compiled_pair(corrupted, problem, bundle.catalog)
+        assert_compiled_pair(corrupted, problem, bundle.catalog)
 
 
 @pytest.mark.parametrize("multi", [False, True])
@@ -130,7 +130,7 @@ def test_one_and_many_objectives_share_m4_candidate_evaluation(
     baseline = make_bundle(pair.baseline.provider_request_fingerprint, stage="M4")
     candidate = make_bundle(pair.candidate.provider_request_fingerprint, stage="M4")
 
-    result = UnifiedM4PairedEvaluator(problem, bundle.catalog).evaluate(
+    result = M4PairedEvaluator(problem, bundle.catalog).evaluate(
         proposal,
         pair,
         baseline,
@@ -180,7 +180,7 @@ def test_m4_failure_classification_uses_complete_acceptance_evidence(
         stage="M4",
         accepted=False,
     )
-    evaluator = UnifiedM4PairedEvaluator(problem, bundle.catalog)
+    evaluator = M4PairedEvaluator(problem, bundle.catalog)
 
     process = evaluator.evaluate(proposal, pair, baseline, process_failure)
     process_after_success = evaluator.evaluate(
@@ -220,7 +220,7 @@ class _M4Simulator:
 
     def preview(self, request: SimulationEvaluationRequest) -> SimulationPreview:
         return SimulationPreview(
-            schema_version=RTO_SCHEMA_VERSION,
+            schema_version=SIMULATION_SCHEMA_VERSION,
             preview_version="fake-preview",
             simulation_request_ref=request.ref,
             provider_id=request.provider_id,
@@ -231,7 +231,7 @@ class _M4Simulator:
                 "case": "0" * 64 if self._wrong_case else self._context.case_ref.fingerprint,
             },
             effective_object_fingerprints={},
-            claim_scope=CLAIM_SCOPE,
+            claim_scope=ENGINEERING_CLAIM_SCOPE,
         )
 
     def evaluate(
@@ -258,11 +258,11 @@ def test_m4_service_caches_baseline_and_candidate_and_guards_preview_context(
 ) -> None:
     bundle, context, problem, proposal, _ = _m4_basis(repo_root, multi=True)
     simulator = _M4Simulator(context, make_bundle)
-    service = UnifiedM4EvaluationService(
+    service = M4EvaluationService(
         problem,
         context,
         bundle.catalog,
-        UnifiedCandidatePlanCompiler(bundle.catalog),
+        CandidatePlanCompiler(bundle.catalog),
         CduM7RequestFactory(),
         simulator,
     )
@@ -276,11 +276,11 @@ def test_m4_service_caches_baseline_and_candidate_and_guards_preview_context(
     assert service.cache_hit_count == 1
 
     drifting = _M4Simulator(context, make_bundle, wrong_case=True)
-    guarded = UnifiedM4EvaluationService(
+    guarded = M4EvaluationService(
         problem,
         context,
         bundle.catalog,
-        UnifiedCandidatePlanCompiler(bundle.catalog),
+        CandidatePlanCompiler(bundle.catalog),
         CduM7RequestFactory(),
         drifting,
     ).evaluate(proposal)
@@ -299,11 +299,11 @@ def test_m4_service_stops_after_and_caches_an_ineligible_baseline(
         make_bundle,
         baseline_accepted=False,
     )
-    service = UnifiedM4EvaluationService(
+    service = M4EvaluationService(
         problem,
         context,
         bundle.catalog,
-        UnifiedCandidatePlanCompiler(bundle.catalog),
+        CandidatePlanCompiler(bundle.catalog),
         CduM7RequestFactory(),
         simulator,
     )
@@ -325,11 +325,11 @@ def test_m4_service_classifies_wrong_preset_factory_as_system_error_before_execu
     bundle, context, problem, proposal, _ = _m4_basis(repo_root, multi=False)
     simulator = _M4Simulator(context, make_bundle)
 
-    result = UnifiedM4EvaluationService(
+    result = M4EvaluationService(
         problem,
         context,
         bundle.catalog,
-        UnifiedCandidatePlanCompiler(bundle.catalog),
+        CandidatePlanCompiler(bundle.catalog),
         _WrongPresetFactory(stage="M4"),
         simulator,
     ).evaluate(proposal)

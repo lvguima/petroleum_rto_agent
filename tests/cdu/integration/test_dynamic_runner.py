@@ -18,6 +18,7 @@ from petroleum_rto.cdu.core.config import (
     load_model_config,
     load_scenario_config,
 )
+from petroleum_rto.cdu.core.math_utils import ConvergenceError
 from petroleum_rto.cdu.dynamics.runner import run_dynamic_scenario
 from petroleum_rto.cdu.dynamics.state import DynamicState
 from petroleum_rto.cdu.flowsheet.recycle import RecycleSettings
@@ -136,7 +137,7 @@ def test_public_entry_point_rejects_a_failed_m2_prerequisite(
     )
     scenario = replace(runner_inputs.baseline, duration_s=1.0, time_step_s=1.0)
 
-    with pytest.raises(RuntimeError, match="M3 prerequisite failed at convergence"):
+    with pytest.raises(ConvergenceError, match="M3 prerequisite failed at convergence"):
         run_dynamic_scenario(
             runner_inputs.model,
             runner_inputs.case,

@@ -20,7 +20,7 @@ from .problem import ENGINEERING_CLAIM_SCOPE
 from .reference import ContractRef
 from .simulation import SimulationRunBundle
 
-RUN_EVIDENCE_SCHEMA_VERSION: Final[str] = "1.0.0"
+RUN_EVIDENCE_SCHEMA_VERSION: Final[str] = "2.0.0"
 PairRole = Literal["baseline", "candidate"]
 
 
@@ -28,9 +28,9 @@ PairRole = Literal["baseline", "candidate"]
 class RunEvidenceRef:
     """Compact reference to one immutable simulator artifact.
 
-    ``run_ref`` and manifest/request fingerprints are retained for strict local
-    reload, while semantic fingerprints remain stable if an unchanged artifact
-    tree is relocated.
+    ``run_ref`` and ``manifest_fingerprint`` are audit locators retained for
+    strict local reload. They are intentionally excluded from semantic identity,
+    which describes the provider request, effective inputs, and physical result.
     """
 
     schema_version: str
@@ -120,7 +120,6 @@ class RunEvidenceRef:
             "request_fingerprint": self.request_fingerprint,
             "effective_input_fingerprint": self.effective_input_fingerprint,
             "result_fingerprint": self.result_fingerprint,
-            "manifest_fingerprint": self.manifest_fingerprint,
             "versions": dict(self.versions),
             "source_fingerprints": dict(self.source_fingerprints),
             "claim_scope": self.claim_scope,
@@ -141,6 +140,7 @@ class RunEvidenceRef:
         return {
             **self.semantic_payload(),
             "run_ref": self.run_ref,
+            "manifest_fingerprint": self.manifest_fingerprint,
             "evidence_id": self.ref.object_id,
             "evidence_fingerprint": self.fingerprint,
         }

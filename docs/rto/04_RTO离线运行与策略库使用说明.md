@@ -1,90 +1,66 @@
 # RTO离线运行与策略库使用说明
 
-_适用接口：统一`objectives[1..N]`离线RTO · 更新日期：2026-08-20 · 实时状态以[项目实施状态](../STATUS.md)为准_
+_更新日期：2026-08-21 · 当前CLI只有一套目标数量无关的离线RTO入口。_
 
----
+所有输出均为`engineering_simulation_only`和`offline_simulation_only`，没有DCS写入能力，不代表产品放行、安全边界、现场收益或可直接下装的控制策略。
 
-## 📋 使用结论
+## 输入与运行模式
 
-当前默认API和CLI只使用一套目标数量无关的合同。单目标和多目标由`OptimizationIntent.objectives`的长度及结果请求表达，再由问题特征和系统政策路由到兼容求解器；用户不再选择“V1或V2”。
+一次运行使用两个相互独立的严格JSON：
 
-| 输入或操作 | 默认行为 |
-| --- | --- |
-| 一个目标 | 路由到当前确定性标量搜索插件 |
-| 两个及以上目标 | 路由到当前确定性Pareto网格插件 |
-| `point` | 只复核中心运行上下文 |
-| `sampled-anchors` | 复核明确的离散锚点，不声称连续区间 |
-| 成功且可发布 | 创建统一不可变策略草稿 |
-| 审核或发布 | 必须分别显式调用，运行过程不会自动执行 |
+- `intent-file`表达目标、方向、决策变量、偏好和返回形式，不带运行事实或算法名；
+- `context-file`表达受信模型/案例、进料、组成、当前设定值、初态、时刻和数据质量。
 
-> 当前所有输出都是`engineering_simulation_only`和`offline_simulation_only`，不具备DCS写入权限，不代表产品放行、现场安全边界或已验证经济收益。
-
-```mermaid
-flowchart LR
-    accTitle: 统一RTO离线运行与策略治理
-    accDescr: 无上下文意图和受信上下文经严格校验后构造统一问题，系统自动路由求解器并完成M2与M4评价，只有可发布结果才创建草稿，批准和发布仍需显式离线操作。
-
-    intent["OptimizationIntent<br/>objectives 1..N"] --> resolver["IntentResolver"]
-    context["OperatingContext<br/>受信事实"] --> builder["ProblemBuilder"]
-    resolver --> builder
-    builder --> router["FeatureAnalyzer + SolverRouter"]
-    router --> solve["SolverPort + M2配对评价"]
-    solve --> verify["Top-K M4动态复核"]
-    verify --> final["最终选择与发布门禁"]
-    final --> draft["策略草稿"]
-    draft --> review["离线人工审核"]
-    review --> release["显式发布"]
-```
-
-## 📥 输入文件
-
-统一运行使用两个独立JSON：
-
-- `intent-file`：表达目标、方向、决策变量、业务约束、偏好和返回形式；不带运行上下文或算法名。
-- `context-file`：表达受信的原油、进料、当前设定值、初始库存、模式、时刻和质量标签。
-
-当前仓库示例：
+当前fixture：
 
 - [单目标意图](../../configs/rto/intents/minimize_specific_furnace_energy.json)
-- [质量—收率—能耗多目标意图](../../configs/rto/intents/quality_yield_energy.json)
+- [多目标意图](../../configs/rto/intents/quality_yield_energy.json)
 - [CDU受信上下文](../../configs/rto/contexts/case_20260604.json)
 
-解析器拒绝未知字段、重复JSON键、`NaN/Infinity`、布尔值冒充数值、未发布能力ID和方向冲突。意图中`ambiguities`非空时返回`needs_clarification`，不构造问题。
+一个目标和多个目标使用同一命令。系统从目标数选择唯一版本化执行路线：单目标执行确定性粗网格加局部细化，多目标执行确定性全网格Pareto搜索。
 
-## 🔍 无求解校验
+覆盖策略只有两种：
 
-先查看公开能力投影：
+| 策略 | 含义 |
+| --- | --- |
+| `point` | 只验证当前上下文点 |
+| `sampled-anchors` | 额外验证政策中列出的离散进料锚点，不声称连续区间 |
+
+## 无求解检查
+
+以下命令都不会创建运行目录或调用仿真。
+
+查看内部安全能力投影：
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m petroleum_rto.rto.runtime.cli capabilities \
-  --repo-root .
+PYTHONPATH=src .venv/bin/python -m petroleum_rto.rto.runtime capabilities --repo-root .
 ```
 
-只校验意图，不绑定上下文也不调用求解器：
+只解析意图：
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m petroleum_rto.rto.runtime.cli validate-intent \
+PYTHONPATH=src .venv/bin/python -m petroleum_rto.rto.runtime validate-intent \
   --repo-root . \
   --intent-file configs/rto/intents/quality_yield_energy.json
 ```
 
-绑定受信上下文并构造问题，但仍不搜索、不仿真、不创建运行目录：
+绑定上下文并构造不可变问题：
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m petroleum_rto.rto.runtime.cli validate-problem \
+PYTHONPATH=src .venv/bin/python -m petroleum_rto.rto.runtime validate-problem \
   --repo-root . \
   --intent-file configs/rto/intents/quality_yield_energy.json \
   --context-file configs/rto/contexts/case_20260604.json
 ```
 
-`validate-problem`结果会显示目标向量、决策变量、系统硬门禁、独立发布门禁、结果形式及`solver_called=false`。
+输出包含问题引用、已绑定执行路线引用、目标、决策、系统硬门禁、独立发布门禁和结果形式，并明确`solver_called=false`。未知字段、重复JSON键、`NaN/Infinity`、布尔值冒充数值、未知能力、方向冲突、未解决歧义和当前无法绑定的业务约束都会在这里或更早被拒绝。
 
-## ⚙️ 运行和恢复
+## 运行与恢复
 
-单目标和多目标只更换`intent-file`，命令不变：
+单目标点运行：
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m petroleum_rto.rto.runtime.cli run \
+PYTHONPATH=src .venv/bin/python -m petroleum_rto.rto.runtime run \
   --repo-root . \
   --intent-file configs/rto/intents/minimize_specific_furnace_energy.json \
   --context-file configs/rto/contexts/case_20260604.json \
@@ -94,15 +70,15 @@ PYTHONPATH=src .venv/bin/python -m petroleum_rto.rto.runtime.cli run \
   --actor offline-rto-operator
 ```
 
-多目标只改为：
+多目标运行只替换`--intent-file`；离散锚点验证只替换`--coverage-policy sampled-anchors`。
 
-```text
---intent-file configs/rto/intents/quality_yield_energy.json
-```
+未提供`--run-root`时默认使用`<repo-or-cwd>/runs/rto`，未提供`--library-root`时默认使用`<repo-or-cwd>/runs/rto/strategy-library`。
 
-相同语义输入生成相同workflow ID。再次执行会先严格读取已提交阶段，并从最后一个完整阶段恢复。已完成workflow的`physical_m2_executions_this_call`和`physical_m4_executions_this_call`应均为`0`。
+相同语义输入产生相同workflow ID。再次执行时，编排器先严格读取已经提交的阶段，从最后一个完整阶段恢复；完整workflow再次执行时，本次新增的M2/M4物理执行数应均为零。事件存在但artifact缺失、阶段跳跃、文件被替换或manifest不闭合都会停止恢复，不会覆盖可疑目录。
 
-当前统一artifact顺序为：
+## Artifact结构
+
+当前workflow目录包含：
 
 ```text
 request.json
@@ -116,114 +92,104 @@ static_selection.json
 dynamic_evaluations.json
 finalization.json
 anchor_validation.json       # sampled-anchors时可选
-strategy_draft.json          # 成功、可发布且覆盖通过时可选
+strategy_draft.json          # 可发布且覆盖通过时可选
 result.json
 events.jsonl
 manifest.json                # 最后提交
-simulator/                   # M7物理证据
+simulator/                   # CDU物理运行证据
 ```
 
-每个阶段artifact先原子提交，事件再追加到hash链。事件存在但对应artifact缺失、阶段跳跃、未知顶层文件、符号链接或manifest不闭合都会停止恢复，不会盲目覆盖。
+阶段文件原子提交，事件随后追加到连续hash链，manifest最后写入。workflow内仿真引用使用安全相对路径，因此整个目录可以作为一个单元移动；不能把其中单个物理证据拆走后仍期待严格读取通过。
 
-## ✅ 严格检查
-
-新统一运行和历史V1/V2运行共用一条`inspect`命令。系统只根据manifest中的`schema_id + schema_version + manifest_version`精确分流，不按目录名、目标数或字段猜测：
+## 严格检查
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m petroleum_rto.rto.runtime.cli inspect \
-  --repo-root . \
+PYTHONPATH=src .venv/bin/python -m petroleum_rto.rto.runtime inspect \
   --run-dir runs/rto/<workflow-id> \
   --library-root runs/rto/strategy-library
 ```
 
-严格读取会核对阶段引用、路由决策、求解结果、M2/M4配对评价重算、动态回退、发布判定、锚点、策略、事件链和manifest。仿真证据用workflow内相对定位器解析，因此统一运行目录可整体搬迁。检查不执行新仿真。
+`inspect`只接受当前workflow manifest合同。它核对精确文件集、大小、哈希、事件链、合同引用和相对路径，并从持久化证据重算问题、路线、求解结果、M2/M4评价、动态回退、发布判定、锚点和策略引用。检查期间不执行新仿真。
 
-某些历史V1外部请求只workflow中保存了请求引用，此时自动检查需要附加：
+结构或版本不匹配的artifact会被明确拒绝；系统不按目录名、目标数或字段形状猜测旧合同。
 
-```text
---legacy-request-file <original-v1-request.json>
-```
+## 策略审核与发布
 
-历史artifact字节不改写；旧绝对`run_ref`的跨机器搬迁能力尚未闭合，因此历史reader仍是保留项，旧代码尚不具备物理删除条件。
+workflow只在最终候选通过完整M2/M4门禁、发布改善门槛和所选覆盖策略时创建不可变草稿。运行本身不会批准或发布。
 
-## 🔐 策略草稿、审核和发布
-
-workflow只在最终候选M2/M4可行、发布改善门禁通过且覆盖要求满足时创建`draft`。草稿payload和release不可变，状态变化使用append-only事件。
-
-审核和发布必须分两步执行：
+先审核：
 
 ```bash
 rto-offline approve \
-  --library-root ./runs/rto/strategy-library \
+  --library-root runs/rto/strategy-library \
   --strategy-id <strategy-id> \
   --revision 1 \
   --actor offline-reviewer \
   --reason "offline evidence reviewed"
+```
 
+再发布：
+
+```bash
 rto-offline publish \
-  --library-root ./runs/rto/strategy-library \
+  --library-root runs/rto/strategy-library \
   --strategy-id <strategy-id> \
   --revision 1 \
   --actor offline-release-owner \
   --reason "offline library release"
 ```
 
-统一查询器只返回`published`修订，并且只在请求落入一个明确采样锚点的测量容差时命中；它不用`min/max`对锚点之间插值。当前查询以Python `StrategyRepository.query(StrategyQuery(...))`提供，CLI尚未暴露统一查询子命令。
+策略库直接在给定根目录下使用`entries/`和`releases/`，不再有按历史实现划分的子目录。payload和release不可变，生命周期变化使用追加事件。离线`approved`或`published`只表示仓库治理状态，不等于MOC、SIS、工艺、生产或质量审批。
 
-离线`approved`和`published`只表示策略库治理状态，不等于MOC、SIS、工艺、生产或产品质量审批。
+当前查询只提供Python `StrategyRepository.query(StrategyQuery(...))`。它只返回`published`修订，并要求请求落入一个明确采样锚点的测量容差；不会把`min/max`解释为锚点之间连续可用。
 
-## 🔗 Python默认入口
+## 结果字段
 
-`petroleum_rto.rto.runtime`中的默认`run_offline`、`inspect_offline`和`query_strategies`已是统一入口。顶层`petroleum_rto.rto`的`ProblemBuilder`、`CandidatePlanCompiler`、`OfflineRtoOrchestrator`和`StrategyRepository`也指向目标数量无关实现。
+| 字段 | 解释 |
+| --- | --- |
+| `objective_count` | 当前问题的目标数，不是合同版本 |
+| `selected_solver_id` | 问题已绑定路线对应的求解实现 |
+| `static_evaluation_count` | 保存的M2候选评价数 |
+| `dynamic_shortlist_count` | 完成M4动态复核的短名单数 |
+| `selected_setpoints` | 最终选中设定值、数值和规范单位 |
+| `selected_objectives` | 选中候选相对同上下文基准的目标结果 |
+| `optimization_status` | 动态复核后的最终优化状态 |
+| `strategy_state` | workflow是否形成草稿；不表示当前仓储生命周期状态 |
+| `physical_*_executions_this_call` | 本次调用新发生的物理执行数 |
+| `manifest_fingerprint` | 当前workflow artifact集合的完整性指纹 |
 
-历史能力只以显式名保留，例如`run_legacy_v1_request`、`run_legacy_v2_request`、`read_legacy_offline_run_v1`和`read_legacy_offline_run_v2`。新业务代码不得继续从无版本名入口获取旧对象。
+备选引用可能包含M4不通过的静态候选，不能直接当作可执行动作。`invalid_request`、`evaluation_error`和`process_infeasible`含义不同；系统或证据错误不能解释为“装置无可行解”。
 
-## 📚 历史兼容命令
+## 本地自然语言解释
 
-旧V1/V2 writer只用于重放或审计历史artifact，不是新业务入口：
+运行`rto-chat`后，可输入：
 
 ```text
-rto-offline legacy-validate-v1
-rto-offline legacy-validate-v2
-rto-offline legacy-run-v1
-rto-offline legacy-run-v2
-rto-offline legacy-inspect-v1
-rto-offline legacy-inspect-v2
-rto-offline legacy-query-v1
+/result <run-dir或result.json>
 ```
 
-旧JSON、bundle、strict reader和现存运行证据仍保留原字节。在历史绝对证据路径搬迁、包内兼容bundle和真实strict-auto-read门禁全部闭合前，不删除这些兼容实现。
+组合CLI会先用严格reader重载已有workflow，在本地显示确定性设定值，再只把白名单结果摘要交给模型解释。该命令不会启动RTO、仿真、审批或发布；模型失败也不会改变本地结果。
 
-## 📊 结果阅读和常见误解
+普通自然语言询问当前仿真工况时，CLI把固定受信配置的白名单数据交给模型理解，并只显示模型整理后的中文回答，不会先输出原始JSON或固定边界提示。完整行为见[源码区DMX对话工具](../domain_model/01_聚合式垂域模型综合说明.md)。
 
-| 字段 | 含义 |
-| --- | --- |
-| `objective_count` | 问题的目标数，不是schema版本 |
-| `selected_solver_id` | 系统政策路由的求解插件 |
-| `static_evaluation_count` | 本次求解保存的M2候选评价数 |
-| `dynamic_shortlist_count` | 进入M4动态复核的候选数 |
-| `selected_setpoints` | 最终选中设定值、数值和规范单位；这是用户应先查看的确定性结果 |
-| `selected_objectives` | 选中候选的配对目标摘要 |
-| `optimization_status` | 最终动态选择和发布性结果 |
-| `strategy_state` | 草稿是否存在；不代表已批准或已发布 |
-| `physical_*_executions_this_call` | 本次调用新增的物理执行数 |
-| `manifest_fingerprint` | 整个workflow证据集的完整性标识 |
+## Python入口
 
-- 备选列表是静态排名或第一Pareto前沿证据，可包含M4不通过项；只有单列的选中引用表示完整动态回退后的候选。
-- 运行错误不等于工艺不可行。`invalid_request`、`evaluation_error`和`process_infeasible`不得合并。
-- 质量代理基准为零时，相对改善没有定义；系统保存绝对变化和不可用原因，不制造虚假比例。
-- `sampled-anchors`只是有限点覆盖，不是数学上的连续区间证明。
+`petroleum_rto.rto.runtime`公开：
 
-需要自然语言说明时可运行`rto-intent`或`rto-chat`，进入会话后输入`/result <run-dir或result.json>`。该命令只严格读取已有运行并解释安全摘要，不会启动新的求解或仿真；模型失败也不影响本地`selected_setpoints`显示。
+- `capabilities`
+- `validate_intent_file`
+- `validate_problem_files`
+- `run_offline`
+- `inspect_offline`
+- `approve_strategy`
+- `publish_strategy`
+- `query_strategies`
+- `run_summary`
 
-## 🔗 相关资料
+顶层`petroleum_rto.rto`公开中立合同、`ProblemBuilder`、`SolverRouter`、`CandidatePlanCompiler`、M2/M4评价、`FinalSelector`、`OfflineRtoOrchestrator`和`StrategyRepository`。没有按目标数量或历史版本命名的公共入口。
+
+## 相关资料
 
 - [RTO系统综合说明](01_RTO系统综合说明.md)
+- [垂域模型与RTO通信协议](02_垂域模型与RTO通信协议.md)
 - [项目实施状态](../STATUS.md)
-- [RTO历史文档索引](archive/README.md)
-- [R6历史单目标验证报告](../../reports/rto/R6_OFFLINE_RTO_REPORT.md)
-- [R11历史多目标验证报告](../../reports/rto/R11_MULTI_OBJECTIVE_OFFLINE_REPORT.md)
-
----
-
-_最后更新：2026-08-21 · 验证平台：macOS、Python 3.12 · 维护范围：统一离线RTO、结果解释与历史只读兼容入口_

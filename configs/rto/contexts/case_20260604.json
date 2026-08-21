@@ -1,12 +1,8 @@
 {
   "schema_id": "operating-context",
-  "schema_version": "1.0.0",
-  "context_version": "1.0.0",
+  "schema_version": "2.0.0",
+  "context_version": "2.0.0",
   "context_id": "case-20260604-nominal",
-  "context_schema_ref": {
-    "object_id": "cdu-operating-context-schema",
-    "fingerprint": "ca804f20b4314cbeac97b5a77f491f483685e1f7d5d1f89ed872d1e4ac25d97d"
-  },
   "provider_id": "cdu-m7",
   "model_ref": {
     "object_id": "cdu-effective-model",

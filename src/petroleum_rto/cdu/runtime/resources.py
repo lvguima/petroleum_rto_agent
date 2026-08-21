@@ -10,7 +10,7 @@ from dataclasses import dataclass, replace
 from importlib import resources
 from pathlib import PurePosixPath
 from types import MappingProxyType
-from typing import Final, Literal, cast
+from typing import TYPE_CHECKING, Final, Literal, cast
 
 from ..control.config import (
     ControlConfig,
@@ -27,9 +27,11 @@ from ..core.config import (
 )
 from ..properties.components import ComponentCatalog
 from ..repository import canonicalize_cdu_resource_bytes, cdu_resource_bytes_sha256
-from ..validation.basis import M6Basis
-from ..validation.config import M6ValidationConfig
 from .contracts import JsonValue
+
+if TYPE_CHECKING:
+    from ..validation.config import M6ValidationConfig
+    from .presets import RuntimePreset
 
 RuntimeResourceKind = Literal[
     "model",
@@ -67,6 +69,7 @@ _M5_ARTIFACT_NAMES: Final[tuple[str, ...]] = (
 )
 _M5_OVERLAY_VERSION: Final[str] = "m5-case-20260604-runtime-overlay-v0.1.0"
 _M5_CLAIM_SCOPE: Final[str] = "case_alignment_only"
+_M6_ANALYSIS_BASIS_VERSION: Final[str] = "m6-basis-v0.1.0"
 _M6_CONFIG_FINGERPRINT: Final[str] = (
     "ccf4eeeb4eeb79fa0a0b9ea707c37dc36d3b8cc7886ba94c0b1a729c01b9d0ed"
 )
@@ -303,12 +306,53 @@ _RESOURCE_SPECS: Final[tuple[RuntimeResourceSpec, ...]] = (
 _RESOURCE_BY_ID: Final[Mapping[str, RuntimeResourceSpec]] = MappingProxyType(
     {spec.resource_id: spec for spec in _RESOURCE_SPECS}
 )
+_CORE_RESOURCE_IDS: Final[frozenset[str]] = frozenset(
+    {"model.base", "catalog.components", "case.base", "overlay.m5"}
+)
+_OPEN_SCENARIO_RESOURCE_BY_VERSION: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        "open-loop-baseline-v0.1.0": "scenario.open_loop.baseline",
+        "open-loop-feed-step-v0.1.0": "scenario.open_loop.feed_step",
+    }
+)
+_CLOSED_SCENARIO_RESOURCE_BY_VERSION: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        "closed-loop-baseline-v0.1.0": "scenario.closed_loop.baseline",
+        "closed-loop-feed-step-v0.1.0": "scenario.closed_loop.feed_step",
+    }
+)
 
 
 def list_runtime_resource_ids() -> tuple[str, ...]:
     """Return the stable logical resource IDs in deterministic registry order."""
 
     return tuple(spec.resource_id for spec in _RESOURCE_SPECS)
+
+
+def runtime_resource_ids_for_preset(preset: RuntimePreset) -> tuple[str, ...]:
+    """Return the installed-resource closure that can affect one fixed preset."""
+
+    selected = set(_CORE_RESOURCE_IDS)
+    if preset.engine_layer == "M3":
+        if preset.scenario_id is None:
+            raise RuntimeResourceError("M3 preset lacks a scenario version")
+        try:
+            selected.add(_OPEN_SCENARIO_RESOURCE_BY_VERSION[preset.scenario_id])
+        except KeyError as exc:
+            raise RuntimeResourceError("M3 preset scenario has no packaged resource") from exc
+    elif preset.engine_layer == "M4":
+        if preset.scenario_id is None:
+            raise RuntimeResourceError("M4 preset lacks a scenario version")
+        selected.add("control.pi")
+        try:
+            selected.add(_CLOSED_SCENARIO_RESOURCE_BY_VERSION[preset.scenario_id])
+        except KeyError as exc:
+            raise RuntimeResourceError("M4 preset scenario has no packaged resource") from exc
+    elif preset.engine_layer == "M6_portable":
+        selected.update(list_runtime_resource_ids())
+    return tuple(
+        resource_id for resource_id in list_runtime_resource_ids() if resource_id in selected
+    )
 
 
 def get_runtime_resource_spec(resource_id: str) -> RuntimeResourceSpec:
@@ -347,17 +391,22 @@ def read_runtime_resource_text(resource_id: str) -> str:
         raise RuntimeResourceError(f"runtime resource {resource_id!r} is not valid UTF-8") from exc
 
 
-def read_runtime_resource_json(resource_id: str) -> Mapping[str, JsonValue]:
-    """Decode one verified JSON object and reject NaN/Infinity and non-object roots."""
+def _runtime_resource_json_from_bytes(
+    resource_id: str,
+    payload: bytes,
+) -> Mapping[str, JsonValue]:
+    """Decode already verified bytes without reading the package a second time."""
 
     def reject_constant(value: str) -> None:
         raise RuntimeResourceError(f"runtime resource contains non-finite JSON value {value}")
 
     try:
         value: object = json.loads(
-            read_runtime_resource_text(resource_id),
+            payload.decode("utf-8"),
             parse_constant=reject_constant,
         )
+    except UnicodeDecodeError as exc:
+        raise RuntimeResourceError(f"runtime resource {resource_id!r} is not valid UTF-8") from exc
     except json.JSONDecodeError as exc:
         raise RuntimeResourceError(
             f"runtime resource {resource_id!r} is not valid JSON: {exc}"
@@ -365,8 +414,26 @@ def read_runtime_resource_json(resource_id: str) -> Mapping[str, JsonValue]:
     return _json_object(value, context=f"runtime resource {resource_id}")
 
 
+def read_runtime_resource_json(resource_id: str) -> Mapping[str, JsonValue]:
+    """Decode one verified JSON object and reject NaN/Infinity and non-object roots."""
+
+    return _runtime_resource_json_from_bytes(
+        resource_id,
+        read_runtime_resource_bytes(resource_id),
+    )
+
+
 def _loader_mapping(resource_id: str) -> Mapping[str, object]:
     frozen = read_runtime_resource_json(resource_id)
+    thawed = _deep_thaw_json(cast(JsonValue, frozen))
+    return _mapping(thawed, context=f"runtime loader input {resource_id}")
+
+
+def _loader_mapping_from_bytes(
+    resource_id: str,
+    payload: bytes,
+) -> Mapping[str, object]:
+    frozen = _runtime_resource_json_from_bytes(resource_id, payload)
     thawed = _deep_thaw_json(cast(JsonValue, frozen))
     return _mapping(thawed, context=f"runtime loader input {resource_id}")
 
@@ -830,21 +897,21 @@ def load_m5_runtime_overlay() -> M5RuntimeOverlay:
 
 @dataclass(frozen=True)
 class RuntimeResourceBundle:
-    """Validated base/effective inputs and all built-in runtime scenarios."""
+    """Validated inputs limited to one explicit preset resource closure."""
 
     base_model: ModelConfig
     effective_model: ModelConfig
     base_case: CaseConfig
     effective_case: CaseConfig
     catalog: ComponentCatalog
-    control: ControlConfig
+    control: ControlConfig | None
     open_loop_scenarios: Mapping[str, ScenarioConfig]
     closed_loop_scenarios: Mapping[str, ClosedLoopScenarioConfig]
-    validation_config: M6ValidationConfig
-    m6_manifest: Mapping[str, JsonValue]
-    m6_result_fingerprint: str
-    m6_basis: M6Basis
+    validation_config: M6ValidationConfig | None
+    m6_manifest: Mapping[str, JsonValue] | None
+    m6_result_fingerprint: str | None
     m5_overlay: M5RuntimeOverlay
+    resource_bytes: Mapping[str, bytes]
     resource_fingerprints: Mapping[str, str]
 
     def __post_init__(self) -> None:
@@ -854,21 +921,65 @@ class RuntimeResourceBundle:
             (self.base_case, CaseConfig, "base_case"),
             (self.effective_case, CaseConfig, "effective_case"),
             (self.catalog, ComponentCatalog, "catalog"),
-            (self.control, ControlConfig, "control"),
-            (self.validation_config, M6ValidationConfig, "validation_config"),
-            (self.m6_basis, M6Basis, "m6_basis"),
             (self.m5_overlay, M5RuntimeOverlay, "m5_overlay"),
         )
         for value, expected_type, name in expected_types:
             if not isinstance(value, expected_type):
                 raise TypeError(f"runtime bundle {name} has the wrong type")
+        if self.control is not None and not isinstance(self.control, ControlConfig):
+            raise TypeError("runtime bundle control has the wrong type")
+        if self.validation_config is not None:
+            from ..validation.config import M6ValidationConfig
+
+            if not isinstance(self.validation_config, M6ValidationConfig):
+                raise TypeError("runtime bundle validation_config has the wrong type")
+
+        fingerprints = dict(self.resource_fingerprints)
+        resource_ids = tuple(fingerprints)
+        registered_ids = list_runtime_resource_ids()
+        expected_order = tuple(
+            resource_id for resource_id in registered_ids if resource_id in fingerprints
+        )
+        if resource_ids != expected_order or not _CORE_RESOURCE_IDS.issubset(fingerprints):
+            raise RuntimeResourceError("runtime bundle resource fingerprint set differs")
+        payloads = dict(self.resource_bytes)
+        if tuple(payloads) != resource_ids:
+            raise RuntimeResourceError("runtime bundle resource bytes differ from fingerprints")
+        for resource_id, payload in payloads.items():
+            if not isinstance(payload, bytes):
+                raise TypeError("runtime bundle resource content must be bytes")
+            spec = get_runtime_resource_spec(resource_id)
+            actual = cdu_resource_bytes_sha256(payload, spec.source_path)
+            if actual != spec.expected_sha256 or fingerprints[resource_id] != actual:
+                raise RuntimeResourceError(
+                    f"runtime bundle resource {resource_id!r} fingerprint differs"
+                )
+
+        if (self.control is not None) != ("control.pi" in fingerprints):
+            raise RuntimeResourceError("runtime bundle control presence differs from resources")
         open_scenarios = dict(self.open_loop_scenarios)
         closed_scenarios = dict(self.closed_loop_scenarios)
-        if tuple(open_scenarios) != ("baseline", "feed_step") or any(
+        expected_open = tuple(
+            name
+            for name, resource_id in (
+                ("baseline", "scenario.open_loop.baseline"),
+                ("feed_step", "scenario.open_loop.feed_step"),
+            )
+            if resource_id in fingerprints
+        )
+        expected_closed = tuple(
+            name
+            for name, resource_id in (
+                ("baseline", "scenario.closed_loop.baseline"),
+                ("feed_step", "scenario.closed_loop.feed_step"),
+            )
+            if resource_id in fingerprints
+        )
+        if tuple(open_scenarios) != expected_open or any(
             not isinstance(value, ScenarioConfig) for value in open_scenarios.values()
         ):
             raise RuntimeResourceError("runtime open-loop scenario set differs")
-        if tuple(closed_scenarios) != ("baseline", "feed_step") or any(
+        if tuple(closed_scenarios) != expected_closed or any(
             not isinstance(value, ClosedLoopScenarioConfig) for value in closed_scenarios.values()
         ):
             raise RuntimeResourceError("runtime closed-loop scenario set differs")
@@ -882,19 +993,35 @@ class RuntimeResourceBundle:
             "closed_loop_scenarios",
             MappingProxyType(closed_scenarios),
         )
-        object.__setattr__(
-            self,
-            "m6_manifest",
-            _json_object(self.m6_manifest, context="M6 manifest"),
+        m6_resource_ids = {
+            "validation.m6",
+            "validation.m6_manifest",
+        }
+        present_m6_resource_ids = m6_resource_ids.intersection(fingerprints)
+        if present_m6_resource_ids and present_m6_resource_ids != m6_resource_ids:
+            raise RuntimeResourceError("runtime bundle M6 resource set is incomplete")
+        has_m6_resources = m6_resource_ids.issubset(fingerprints)
+        has_m6_values = (
+            self.validation_config is not None
+            and self.m6_manifest is not None
+            and self.m6_result_fingerprint is not None
         )
-        object.__setattr__(
-            self,
-            "m6_result_fingerprint",
-            _digest(self.m6_result_fingerprint, context="M6 result fingerprint"),
-        )
-        fingerprints = dict(self.resource_fingerprints)
-        if tuple(fingerprints) != list_runtime_resource_ids():
-            raise RuntimeResourceError("runtime bundle resource fingerprint set differs")
+        if has_m6_resources != has_m6_values:
+            raise RuntimeResourceError("runtime bundle M6 presence differs from resources")
+        if has_m6_values:
+            assert self.m6_manifest is not None
+            assert self.m6_result_fingerprint is not None
+            object.__setattr__(
+                self,
+                "m6_manifest",
+                _json_object(self.m6_manifest, context="M6 manifest"),
+            )
+            object.__setattr__(
+                self,
+                "m6_result_fingerprint",
+                _digest(self.m6_result_fingerprint, context="M6 result fingerprint"),
+            )
+        object.__setattr__(self, "resource_bytes", MappingProxyType(payloads))
         object.__setattr__(
             self,
             "resource_fingerprints",
@@ -905,6 +1032,21 @@ class RuntimeResourceBundle:
                 }
             ),
         )
+
+    def require_control(self) -> ControlConfig:
+        if self.control is None:
+            raise RuntimeResourceError("runtime resource closure does not include control")
+        return self.control
+
+    def require_validation_config(self) -> M6ValidationConfig:
+        if self.validation_config is None:
+            raise RuntimeResourceError("runtime resource closure does not include M6 config")
+        return self.validation_config
+
+    def require_m6_result_fingerprint(self) -> str:
+        if self.m6_result_fingerprint is None:
+            raise RuntimeResourceError("runtime resource closure does not include M6 evidence")
+        return self.m6_result_fingerprint
 
 
 def _validate_m6_manifest(value: Mapping[str, JsonValue]) -> str:
@@ -948,14 +1090,64 @@ def _validate_m6_manifest(value: Mapping[str, JsonValue]) -> str:
     return _digest(raw["result_fingerprint"], context="M6 result fingerprint")
 
 
-def load_runtime_resource_bundle() -> RuntimeResourceBundle:
-    """Load and cross-check every built-in input without requiring a repository root."""
+def _analysis_basis_fingerprint(
+    model: ModelConfig,
+    case: CaseConfig,
+    catalog: ComponentCatalog,
+    overlay: M5RuntimeOverlay,
+) -> str:
+    return canonical_fingerprint(
+        {
+            "schema_version": "1.0.0",
+            "analysis_version": _M6_ANALYSIS_BASIS_VERSION,
+            "model": model.as_dict(),
+            "case": case.as_dict(),
+            "component_catalog": catalog.as_dict(),
+            "base_parameter_set_version": overlay.base_parameter_set_version,
+            "derived_parameter_set_version": overlay.derived_parameter_set_version,
+            "base_case_version": overlay.base_case_version,
+            "derived_case_version": overlay.derived_case_version,
+            "m5_pipeline_fingerprint": overlay.pipeline_result_fingerprint,
+            "m5_manifest_sha256": overlay.m5_manifest_sha256,
+            "m5_manifest_fingerprint": overlay.m5_manifest_fingerprint,
+            "m5_artifact_sha256": dict(overlay.m5_artifact_sha256),
+            "effective_object_fingerprints": {
+                "calibrated_model_object": overlay.calibrated_model_object_fingerprint,
+                "effective_case_object": overlay.effective_case_object_fingerprint,
+                "component_catalog_object": overlay.component_catalog_object_fingerprint,
+            },
+            "metadata": {
+                "synthetic": "true",
+                "data_origin": "M6_synthetic_validation",
+                "claim_scope": "engineering_validation_only",
+            },
+        }
+    )
 
-    base_model = ModelConfig.from_mapping(_loader_mapping("model.base"))
-    catalog = ComponentCatalog.from_mapping(_loader_mapping("catalog.components"))
-    base_case = CaseConfig.from_mapping(_loader_mapping("case.base"))
-    control = ControlConfig.from_mapping(_loader_mapping("control.pi"))
-    overlay = load_m5_runtime_overlay()
+
+def load_runtime_resource_bundle(
+    preset: RuntimePreset | None = None,
+) -> RuntimeResourceBundle:
+    """Load one preset's explicit input closure, or all resources for inspection."""
+
+    resource_ids = (
+        list_runtime_resource_ids() if preset is None else runtime_resource_ids_for_preset(preset)
+    )
+    loaded_bytes = {
+        resource_id: read_runtime_resource_bytes(resource_id) for resource_id in resource_ids
+    }
+
+    def mapping(resource_id: str) -> Mapping[str, object]:
+        try:
+            payload = loaded_bytes[resource_id]
+        except KeyError as exc:
+            raise RuntimeResourceError(f"runtime resource closure lacks {resource_id!r}") from exc
+        return _loader_mapping_from_bytes(resource_id, payload)
+
+    base_model = ModelConfig.from_mapping(mapping("model.base"))
+    catalog = ComponentCatalog.from_mapping(mapping("catalog.components"))
+    base_case = CaseConfig.from_mapping(mapping("case.base"))
+    overlay = M5RuntimeOverlay.from_mapping(mapping("overlay.m5"))
     effective_model, effective_case = overlay.apply(base_model, base_case)
     if canonical_fingerprint(catalog.as_dict()) != overlay.component_catalog_object_fingerprint:
         raise RuntimeResourceError("component catalog fingerprint differs from M5 overlay")
@@ -965,12 +1157,25 @@ def load_runtime_resource_bundle() -> RuntimeResourceBundle:
         software_version="0.1.0",
         catalog=catalog,
     )
-    validate_control_compatibility(control, effective_model, effective_case)
+    if (
+        _analysis_basis_fingerprint(effective_model, effective_case, catalog, overlay)
+        != overlay.analysis_basis_fingerprint
+    ):
+        raise RuntimeResourceError("portable analysis basis fingerprint differs from M5 overlay")
 
-    open_scenarios = {
-        "baseline": ScenarioConfig.from_mapping(_loader_mapping("scenario.open_loop.baseline")),
-        "feed_step": ScenarioConfig.from_mapping(_loader_mapping("scenario.open_loop.feed_step")),
-    }
+    control = (
+        ControlConfig.from_mapping(mapping("control.pi")) if "control.pi" in loaded_bytes else None
+    )
+    if control is not None:
+        validate_control_compatibility(control, effective_model, effective_case)
+
+    open_scenarios: dict[str, ScenarioConfig] = {}
+    for name, resource_id in (
+        ("baseline", "scenario.open_loop.baseline"),
+        ("feed_step", "scenario.open_loop.feed_step"),
+    ):
+        if resource_id in loaded_bytes:
+            open_scenarios[name] = ScenarioConfig.from_mapping(mapping(resource_id))
     for open_scenario in open_scenarios.values():
         validate_config_compatibility(
             effective_model,
@@ -979,64 +1184,53 @@ def load_runtime_resource_bundle() -> RuntimeResourceBundle:
             catalog=catalog,
             scenario=open_scenario,
         )
-    closed_scenarios = {
-        "baseline": ClosedLoopScenarioConfig.from_mapping(
-            _loader_mapping("scenario.closed_loop.baseline")
-        ),
-        "feed_step": ClosedLoopScenarioConfig.from_mapping(
-            _loader_mapping("scenario.closed_loop.feed_step")
-        ),
-    }
+    closed_scenarios: dict[str, ClosedLoopScenarioConfig] = {}
+    for name, resource_id in (
+        ("baseline", "scenario.closed_loop.baseline"),
+        ("feed_step", "scenario.closed_loop.feed_step"),
+    ):
+        if resource_id in loaded_bytes:
+            closed_scenarios[name] = ClosedLoopScenarioConfig.from_mapping(mapping(resource_id))
     for closed_scenario in closed_scenarios.values():
+        if control is None:  # pragma: no cover - guarded by the fixed closure
+            raise RuntimeResourceError("closed-loop scenario requires control resources")
         validate_closed_loop_scenario_compatibility(control, closed_scenario)
 
-    validation_config = M6ValidationConfig.from_mapping(_loader_mapping("validation.m6"))
-    if validation_config.input_fingerprint != _M6_CONFIG_FINGERPRINT:
-        raise RuntimeResourceError("M6 validation config fingerprint differs")
-    if (
-        validation_config.model_version != overlay.model_version
-        or validation_config.model_config_version != overlay.base_model_config_version
-        or validation_config.base_parameter_set_version != overlay.base_parameter_set_version
-        or validation_config.derived_parameter_set_version != overlay.derived_parameter_set_version
-        or validation_config.base_case_version != overlay.base_case_version
-        or validation_config.derived_case_version != overlay.derived_case_version
-        or validation_config.control_version != control.control_version
-    ):
-        raise RuntimeResourceError("M6 validation lineage differs from runtime resources")
+    validation_config: M6ValidationConfig | None = None
+    m6_manifest: Mapping[str, JsonValue] | None = None
+    m6_result_fingerprint: str | None = None
+    if "validation.m6" in loaded_bytes:
+        from ..validation.config import M6ValidationConfig
 
-    m6_basis = M6Basis(
-        schema_version="1.0.0",
-        analysis_version=validation_config.analysis_basis_version,
-        model=effective_model,
-        case=effective_case,
-        catalog=catalog,
-        base_parameter_set_version=overlay.base_parameter_set_version,
-        derived_parameter_set_version=overlay.derived_parameter_set_version,
-        base_case_version=overlay.base_case_version,
-        derived_case_version=overlay.derived_case_version,
-        m5_pipeline_fingerprint=overlay.pipeline_result_fingerprint,
-        m5_manifest_sha256=overlay.m5_manifest_sha256,
-        m5_manifest_fingerprint=overlay.m5_manifest_fingerprint,
-        m5_artifact_sha256=overlay.m5_artifact_sha256,
-        effective_object_fingerprints={
-            "calibrated_model_object": overlay.calibrated_model_object_fingerprint,
-            "effective_case_object": overlay.effective_case_object_fingerprint,
-            "component_catalog_object": overlay.component_catalog_object_fingerprint,
-        },
-        metadata={
-            "synthetic": "true",
-            "data_origin": "M6_synthetic_validation",
-            "claim_scope": "engineering_validation_only",
-        },
-    )
-    if m6_basis.analysis_basis_fingerprint != overlay.analysis_basis_fingerprint:
-        raise RuntimeResourceError("portable M6 basis fingerprint differs from M5 overlay")
+        if control is None:  # pragma: no cover - guarded by the fixed closure
+            raise RuntimeResourceError("M6 resources require control resources")
+        validation_config = M6ValidationConfig.from_mapping(mapping("validation.m6"))
+        if validation_config.input_fingerprint != _M6_CONFIG_FINGERPRINT:
+            raise RuntimeResourceError("M6 validation config fingerprint differs")
+        if (
+            validation_config.analysis_basis_version != _M6_ANALYSIS_BASIS_VERSION
+            or validation_config.model_version != overlay.model_version
+            or validation_config.model_config_version != overlay.base_model_config_version
+            or validation_config.base_parameter_set_version != overlay.base_parameter_set_version
+            or validation_config.derived_parameter_set_version
+            != overlay.derived_parameter_set_version
+            or validation_config.base_case_version != overlay.base_case_version
+            or validation_config.derived_case_version != overlay.derived_case_version
+            or validation_config.control_version != control.control_version
+        ):
+            raise RuntimeResourceError("M6 validation lineage differs from runtime resources")
+        m6_manifest = _runtime_resource_json_from_bytes(
+            "validation.m6_manifest",
+            loaded_bytes["validation.m6_manifest"],
+        )
+        m6_result_fingerprint = _validate_m6_manifest(m6_manifest)
 
-    m6_manifest = read_runtime_resource_json("validation.m6_manifest")
-    m6_result_fingerprint = _validate_m6_manifest(m6_manifest)
     resource_fingerprints = {
-        resource_id: runtime_resource_sha256(resource_id)
-        for resource_id in list_runtime_resource_ids()
+        resource_id: cdu_resource_bytes_sha256(
+            loaded_bytes[resource_id],
+            get_runtime_resource_spec(resource_id).source_path,
+        )
+        for resource_id in resource_ids
     }
     return RuntimeResourceBundle(
         base_model=base_model,
@@ -1050,8 +1244,8 @@ def load_runtime_resource_bundle() -> RuntimeResourceBundle:
         validation_config=validation_config,
         m6_manifest=m6_manifest,
         m6_result_fingerprint=m6_result_fingerprint,
-        m6_basis=m6_basis,
         m5_overlay=overlay,
+        resource_bytes=loaded_bytes,
         resource_fingerprints=resource_fingerprints,
     )
 

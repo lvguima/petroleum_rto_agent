@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import os
 import stat
 from pathlib import Path
 from typing import Final
-
-from ._json import decode_json_object, strict_keys
 
 LOCAL_DMX_API_CREDENTIAL_FILE: Final[Path] = Path(__file__).with_name("dmx_api.json")
 
@@ -24,8 +23,7 @@ def load_local_dmx_api_key(path: Path = LOCAL_DMX_API_CREDENTIAL_FILE) -> str | 
     """Load a local API key from a protected file without following symbolic links.
 
     The checkout-only file may contain either the bare key or a strict JSON object
-    shaped as ``{"api_key": "..."}``. Missing files return ``None`` so the caller
-    can retain the environment-variable fallback.
+    shaped as ``{"api_key": "..."}``. Missing files return ``None``.
     """
 
     if not isinstance(path, Path):
@@ -59,14 +57,15 @@ def load_local_dmx_api_key(path: Path = LOCAL_DMX_API_CREDENTIAL_FILE) -> str | 
         raise LocalCredentialError("local credential file must contain printable ASCII") from exc
     if source.startswith("{"):
         try:
-            raw = decode_json_object(
-                payload,
-                context="local DMXAPI credential file",
-                maximum_bytes=_MAXIMUM_CREDENTIAL_FILE_BYTES,
+            raw = json.loads(
+                source,
+                object_pairs_hook=_reject_duplicate_keys,
+                parse_constant=_reject_json_constant,
             )
-            strict_keys(raw, required={"api_key"}, context="local DMXAPI credential file")
+            if not isinstance(raw, dict) or set(raw) != {"api_key"}:
+                raise ValueError("invalid credential object")
             value = raw["api_key"]
-        except (TypeError, ValueError) as exc:
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
             raise LocalCredentialError("local credential JSON contract is invalid") from exc
         if not isinstance(value, str):
             raise LocalCredentialError("local credential JSON contract is invalid")
@@ -80,6 +79,19 @@ def load_local_dmx_api_key(path: Path = LOCAL_DMX_API_CREDENTIAL_FILE) -> str | 
     ):
         raise LocalCredentialError("local credential value is invalid")
     return credential
+
+
+def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate credential JSON key")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value: str) -> object:
+    raise ValueError(f"unsupported credential JSON constant: {value}")
 
 
 __all__ = [

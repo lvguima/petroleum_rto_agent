@@ -5,6 +5,7 @@ import math
 import pytest
 
 from petroleum_rto.cdu.core.math_utils import (
+    ConvergenceError,
     NumericalError,
     bisect_root,
     clamp,
@@ -27,7 +28,7 @@ def test_bisection_converges_or_fails_explicitly() -> None:
         bisect_root(lambda value: value * value + 1.0, -1.0, 1.0)
     with pytest.raises(ValueError, match="finite"):
         bisect_root(lambda _value: math.nan, 0.0, 1.0)
-    with pytest.raises(NumericalError, match="did not converge"):
+    with pytest.raises(ConvergenceError, match="did not converge"):
         bisect_root(lambda value: value - 0.3, 0.0, 1.0, tolerance=1e-30, max_iterations=1)
 
 

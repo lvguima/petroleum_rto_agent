@@ -7,8 +7,8 @@ import pytest
 
 from petroleum_rto.cdu.runtime.api import run
 from petroleum_rto.cdu.runtime.artifacts import read_run
-from petroleum_rto.cdu.runtime.presets import load_preset
-from petroleum_rto.cdu.runtime.resources import list_runtime_resource_ids
+from petroleum_rto.cdu.runtime.presets import get_preset, load_preset
+from petroleum_rto.cdu.runtime.resources import runtime_resource_ids_for_preset
 
 
 @pytest.mark.parametrize(
@@ -38,7 +38,7 @@ def test_all_public_presets_execute_publish_and_reload(
     assert reloaded.manifest.manifest_fingerprint == written.manifest.manifest_fingerprint
     assert reloaded.manifest.artifact_state == "complete"
     assert sum(key.startswith("input.") for key in reloaded.manifest.artifacts) == len(
-        list_runtime_resource_ids()
+        runtime_resource_ids_for_preset(get_preset(preset_id))
     )
 
     if preset_id in {"open-loop-feed-step", "closed-loop-feed-step"}:

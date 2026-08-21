@@ -37,8 +37,8 @@ from petroleum_rto.rto.communication.models import (
     UNSUPPORTED_SAFE_MESSAGES,
 )
 from petroleum_rto.rto.contracts.reference import ContractRef
+from petroleum_rto.rto.intent import OptimizationIntent
 from petroleum_rto.rto.runtime import build_intent_communication_service
-from petroleum_rto.rto.unified_inputs import OptimizationIntent
 
 
 def _raw_intent(

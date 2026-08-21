@@ -1,116 +1,91 @@
-# 垂域模型与统一RTO通信协议
+# 垂域模型与统一 RTO 通信协议
 
-_严格意图合同边界 · 更新日期：2026-08-21 · 定义安全能力投影、意图生成、结构化修复、用户澄清和确定性交接。_
+_当前 D0 边界：为未来垂域模型生成严格 `OptimizationIntent` 提供中立合同与确定性协商服务。_
 
 ---
 
-## 📋 协议目标
+## 📋 定位与实现状态
 
-本协议位于垂域模型的严格意图生成路径和统一RTO之间。它不规定普通聊天界面，也不把提示词、网络客户端、密钥或模型供应商写进RTO核心；它只冻结自然语言进入`ProblemBuilder`前必须满足的业务合同。
+[`petroleum_rto.rto.communication`](../../src/petroleum_rto/rto/communication/) 当前包含：
 
-协议完成以下闭环：
+- 版本化请求、响应、能力投影、调用结果和协商结果合同
+- 严格且有界的 JSON 解码
+- 确定性的请求创建、响应校验、一次完整修复和用户澄清服务
+- 供应商中立的 [`DomainModelPort`](../../src/petroleum_rto/rto/communication/ports.py) 协议
+- 当前合同的自动反例与金标准数据
 
-1. RTO提供经过脱敏的公开能力快照
-2. 垂域模型根据用户表达生成完整`OptimizationIntent`
-3. RTO严格校验响应结构、请求关联和能力版本
-4. 结构错误返回机器修复指令，最多允许一次完整重生成
-5. 业务歧义转换为确定性用户问题
-6. 用户回答后，垂域模型生成一份完整替代Intent
-7. 供应商失败返回独立`ProviderError`，不冒充业务`unsupported`或工艺不可行
-8. 只有`resolved`结果才能交给受信上下文绑定和`ProblemBuilder`
+它不是普通聊天入口，也不是已经接线的模型运行系统。当前没有 `DomainModelPort` 的生产实现，没有供应商 profile、模型发现、质量评测、多协议适配、模型意图生成 CLI、会话运行时或调用证据持久化。现有 [`DomainModelInvocationResult`](../../src/petroleum_rto/rto/communication/invocation.py) 只是未来适配器必须返回的中立合同，不代表这些运行能力已经存在。
 
-> 📌 **边界：** 垂域模型不接收具体运行上下文值，不选择求解器，不输出模型内部路径，也不能创建或覆盖系统硬门禁。
+源码区 [DMX 对话工具](../domain_model/01_聚合式垂域模型综合说明.md) 不实现本协议。普通 Chat 回复不能进入 `ProblemBuilder`，`/result` 也只是已有结果的反向只读解释。
 
-## 🔗 角色与依赖
+## 🔗 职责与信任边界
 
-| 角色 | 输入 | 输出 | 明确禁止 |
-| --- | --- | --- | --- |
-| 用户 | 业务要求、澄清回答 | 自然语言 | 直接构造内部仿真字段 |
-| 严格意图兼容运行时 | `DomainModelRequest`、模型调用和本地校验 | 供应商调用或有界语义结果 | 将供应商错误交给Resolver，或调用求解与仿真 |
-| 垂域模型调用方 | 公开能力和用户业务表达 | `DomainModelInvocationResult` | 运行上下文、算法ID、任意公式或阈值 |
-| 通信服务 | 公开能力、模型原始响应 | `CommunicationResult` | 调用求解器、仿真或猜测用户意图 |
-| `IntentResolver` | 严格Intent、能力视图 | resolved/clarification/unsupported | 注入上下文或自动更改业务含义 |
-| 受信调用方 | resolved Intent、受信Context | `OptimizationProblem` | 让垂域模型生成现场事实 |
+| 角色 | 当前或未来职责 | 明确禁止 |
+| --- | --- | --- |
+| `IntentCommunicationService` | 投影安全能力、创建请求、严格校验响应、产生结构化结果 | 网络调用、读取运行上下文、求解或仿真 |
+| 未来受信组合层 | 调用服务和未来模型适配器；只在 `resolved` 后独立绑定受信 Context | 绕过通信服务或把模型输出升级为现场事实 |
+| 未来 `DomainModelPort` 实现 | 接收自足请求并返回供应商中立调用结果 | 接收受信 Context、选择求解器或调用仿真 |
+| `IntentResolver` | 校验原子能力、方向、优先级、返回请求和兼容性 | 猜测业务意图或注入上下文 |
+| `ProblemBuilder` | 将已解析意图与独立受信 Context 编译成问题 | 接受普通 Chat 文本或未解析候选意图 |
 
-[`petroleum_rto.domain_model`](../../src/petroleum_rto/domain_model/)只依赖[`rto.communication`](../../src/petroleum_rto/rto/communication/)公开合同和请求自带的安全[`DomainCapabilityManifest`](../../src/petroleum_rto/rto/communication/models.py)快照。该对象由RTO内部能力事实确定性投影，但不是内部`PublicCapabilityManifest`的原样外发；RTO、CDU和未来HYSYS内部对象不得反向泄漏到垂域模块。
-
-## 🔄 通信顺序
+通信服务不会调用 `DomainModelPort`。未来组合层必须显式完成调用，再把成功结果中的原始响应交给服务校验；供应商失败停留在外层，不进入语义协商。
 
 ```mermaid
 sequenceDiagram
-    accTitle: 垂域模型意图协商顺序
-    accDescr: 用户、垂域模型运行时、供应商适配器、RTO通信服务与IntentResolver的交互，展示供应商失败、机器修复、用户澄清和已解析路径的隔离。
+    accTitle: 未来严格意图接线顺序
+    accDescr: 受信组合层在通信服务和未来垂域模型适配器之间显式传递自足请求与原始响应；只有已解析意图才能进入后续上下文绑定。
 
-    participant user as 👤 用户
-    participant runtime as ⚙️ 意图运行时
-    participant adapter as 🔌 供应商适配器
-    participant provider as ☁️ 聚合模型
-    participant gateway as 🛡️ RTO通信服务
-    participant resolver as 🔍 IntentResolver
+    participant trusted_caller as 🛡️ 受信组合层
+    participant communication_service as ⚙️ 通信服务
+    participant domain_adapter as 🔌 未来垂域适配器
+    participant intent_resolver as 🔍 IntentResolver
 
-    user->>runtime: 提交业务表达
-    runtime->>gateway: 创建DomainModelRequest
-    gateway-->>runtime: 自足请求与公开能力快照
-    runtime->>adapter: 外发检查后invoke
-    adapter->>provider: 固定端点与显式模型
-    provider-->>adapter: 原始供应商响应
-    adapter-->>runtime: DomainModelInvocationResult
+    trusted_caller->>communication_service: 创建自足请求
+    communication_service-->>trusted_caller: DomainModelRequest
+    trusted_caller->>domain_adapter: invoke(request)
+    domain_adapter-->>trusted_caller: DomainModelInvocationResult
 
-    alt ❌ 供应商失败
-        runtime-->>user: ProviderError
-    else 📦 获得原始模型文本
-        runtime->>gateway: 评估完整DomainModelResponse
-        gateway->>gateway: 严格结构与指纹校验
+    alt ❌ 供应商调用失败
+        trusted_caller->>trusted_caller: 返回ProviderError并停止
+    else 📦 获得原始响应
+        trusted_caller->>communication_service: 严格评估完整响应
+        communication_service->>intent_resolver: 校验意图与能力
+        intent_resolver-->>communication_service: Resolution
+        communication_service-->>trusted_caller: CommunicationResult
     end
 
-    alt ❌ 结构、关联或白名单歧义错误
-        gateway-->>runtime: RepairDirective
-        runtime->>adapter: 第2次完整生成
-        adapter-->>runtime: 完整替代响应
-        runtime->>gateway: 重新评估
-        gateway->>gateway: 执行最终校验
-    else 🔍 响应结构有效
-        gateway->>resolver: 校验能力与兼容性
-        resolver-->>gateway: 结构化Resolution
-    end
-
-    alt ⚠️ 需要用户澄清
-        gateway-->>runtime: ClarificationRequest
-        runtime-->>user: 1至3个确定性问题
-        user->>runtime: ClarificationAnswer + 新消息
-        runtime->>gateway: 新轮次请求
-    else ❌ 能力不支持
-        gateway-->>runtime: unsupported + 原因
-    else ✅ 意图已解析
-        gateway-->>runtime: resolved Intent引用
-        Note over runtime,gateway: 后续由受信调用方独立绑定Context
-    end
+    Note over trusted_caller,communication_service: 只有resolved结果可进入受信Context绑定
 ```
 
-通信服务是确定性语义边界：同一请求、同一能力快照和同一模型响应必须产生相同状态、问题、指纹和结构化错误。运行时负责调用与证据，但不改写通信服务的语义判定。
+## 📦 版本化机器合同
 
-## 📚 机器合同
+当前版本以源码常量为准：
 
-### DomainModelRequest
+| 合同 | Schema 版本 | 作用 |
+| --- | --- | --- |
+| `DomainCapabilityManifest` | `1.1.0` | 允许离开 RTO 信任边界的安全能力投影 |
+| `DomainModelRequest` | `1.2.0` | 自足请求、关联引用、澄清上下文和输出政策 |
+| `DomainModelResponse` | `1.1.0` | 完整 `intent` 或闭集 `unsupported` 响应 |
+| `DomainModelInvocationResult` | `1.0.0` | 未来适配器的成功或供应商失败联合 |
+| `CommunicationResult` | `1.0.0` | 修复、澄清、解析、不支持或失败结果 |
+| `OptimizationIntent` | `1.0.0` | 目标数量无关的严格业务意图 |
 
-通信服务发给垂域模型适配器的请求是自足快照，当前schema版本为`1.2.0`，关键字段如下。
+### 安全能力投影
 
-| 字段 | 语义 |
-| --- | --- |
-| `request_id/session_id` | 当前请求和会话身份 |
-| `turn_index` | 用户澄清轮次，从1开始 |
-| `model_attempt` | 同一轮模型生成次数，只允许1或2 |
-| `capability_manifest` | `DomainCapabilityManifest 1.1.0`安全能力快照，不含受信上下文字段、边界、门禁、路由或内部绑定 |
-| `capability_manifest_ref` | 能力快照ID与SHA-256，响应必须原样回显 |
-| `user_messages` | 只保存用户原始表达，不把模型解释冒充用户事实 |
-| `prior_intent` | 后续澄清轮次的上一份候选Intent |
-| `prior_clarification` | 上一轮确定性问题 |
-| `clarification_answers` | 与问题ID严格对应的用户回答 |
-| `feedback_issues` | 上一轮合同、能力或歧义问题 |
-| `output_schema_id/version` | 固定指向统一`OptimizationIntent 1.0.0` |
-| `output_policy` | 约束、上下文、求解器和替代响应政策 |
+`DomainCapabilityManifest` 只包含：
 
-`output_policy`固定为：
+- 指标、目标、决策变量和选择偏好的公开业务字段
+- 目标与决策变量的基数规则
+- 结果形式、备选默认值和候选数量上限
+- `engineering_simulation_only` 声明与能力指纹
+
+它不包含运行上下文字段或数值、决策边界、硬门禁阈值、执行路由、公式、内部引用、模型路径或适配器绑定。能力引用必须由响应原样回显；过期或串线引用不能进入意图解析。
+
+### 自足请求
+
+`DomainModelRequest` 保存请求和会话标识、轮次、模型尝试次数、安全能力快照、用户原始消息、必要的上一轮澄清状态、结构化反馈和目标输出 schema。首轮不携带推断出的上下文；后续轮次保留用户回答，但不能把模型解释冒充用户事实。
+
+固定输出政策为：
 
 ```json
 {
@@ -122,11 +97,18 @@ sequenceDiagram
 }
 ```
 
-`DomainCapabilityManifest`只发布业务安全的`metrics`、`objectives`、`decisions`、`selectors`、目标/决策基数规则和`result_output_rules`。它明确排除`context_fields`、决策边界、硬门禁、执行路由、公式、内部引用和适配器绑定；未来受信Context有哪些字段也不属于模型外发清单。`result_output_rules`只说明结果形式、是否默认返回备选和候选数量边界，不授予求解器或路由选择权。
+因此垂域模型不能提供受信工况、选择算法、覆盖系统门禁或用局部 JSON Patch 修补上一份意图。当前附加业务约束没有类型化参数绑定，非空 `constraints` 会返回 `unsupported`。
 
-### DomainModelResponse
+### 完整响应
 
-垂域模型每次只能返回完整响应，不支持JSON Patch或部分字段覆盖。
+`DomainModelResponse` 是严格标签联合：
+
+| `outcome` | 唯一负载 | 处理方式 |
+| --- | --- | --- |
+| `intent` | 完整 `OptimizationIntent` | 校验引用、合同、能力和歧义 |
+| `unsupported` | 固定 reason code 与对应安全消息 | 返回结构化不支持，不解析自由解释 |
+
+以下是语法完整的单目标响应形状；引用值仅作占位：
 
 ```json
 {
@@ -135,11 +117,11 @@ sequenceDiagram
   "response_id": "response-1-1",
   "request_ref": {
     "object_id": "intent-request-session-energy-t1-a1",
-    "fingerprint": "<当前请求的64位SHA-256>"
+    "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
   },
   "capability_manifest_ref": {
     "object_id": "cdu-rto-public-capabilities.domain-model",
-    "fingerprint": "<当前能力快照的64位SHA-256>"
+    "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
   },
   "outcome": "intent",
   "intent": {
@@ -174,155 +156,82 @@ sequenceDiagram
 }
 ```
 
-`DomainModelResponse 1.1.0`是严格标签联合：
+响应必须完整匹配当前请求引用和能力引用。两个联合分支不能并存，未知字段、重复 JSON 键、非有限数、非法 UTF-8、超限内容或错误类型都会在语义解析前被拒绝。
 
-| `outcome` | 唯一允许的负载 | 语义 |
-| --- | --- | --- |
-| `intent` | 完整`intent` | 进入本地合同、引用和Resolver校验 |
-| `unsupported` | `DomainModelUnsupported 1.0.0` | 只能使用版本化`reason_code`及其固定安全消息，不能自由输出解释 |
-
-两个分支不得同时出现，也不得缺少对应负载。`request_ref`或`capability_manifest_ref`不一致时，响应不能进入语义解析。这样可以拒绝迟到响应、缓存串线和使用旧能力目录生成的Intent。
-
-### DomainModelInvocationResult
-
-`DomainModelPort.invoke(request)`不直接返回已解析Intent，而是返回严格、供应商中立的原始调用结果。
-
-| 字段 | 语义 |
-| --- | --- |
-| `invocation_id/request_ref` | 调用身份与当前`DomainModelRequest`关联 |
-| `status` | 只能为`succeeded`或`failed` |
-| `attempts[]` | 连续编号的物理调用证据 |
-| `response` | 成功时的原始模型文本，最大128 KiB |
-| `error` | 失败时的最终`ProviderError` |
-
-`ProviderAttempt`保存provider身份/版本、provider request ID、实际返回模型、结束原因、耗时、usage和规范化错误。一个`DomainModelInvocationResult`不得混用供应商或版本，也不得同时携带成功响应和错误。
-
-每个语义调用在发送前、返回后和流式读取分块之间检查绝对期限；超过期限后才到达的结果会被拒收并保留结构化调用证据。同步HTTP客户端无法在阻塞I/O内部保证截止时刻的硬中断，因此期限是结果接受与重试预算，不是精确墙钟取消承诺。`maximum_concurrency=1`也是同一Python进程内的供应商调用限制，不是多个CLI进程共享的全局限流器。
-
-### CommunicationResult
-
-| 状态 | 含义 | 下一动作 |
-| --- | --- | --- |
-| `repair_required` | JSON结构、合同或引用错误，且还有一次模型重试额度 | 原请求同轮次重发，要求完整替代响应 |
-| `needs_clarification` | 模型明确标记业务歧义 | 向用户展示1至3个确定性问题 |
-| `resolved` | Intent结构和能力协商全部通过 | 交给受信Context绑定和ProblemBuilder |
-| `unsupported` | 用户要求或候选Intent超出已发布能力 | 向用户说明原因，不擅自改写目标 |
-| `failed` | 第二次模型响应仍违反合同 | 停止自动修复并交给调用方处理 |
-
-每个结果同时保存请求、响应和能力引用。`resolved`时不得携带问题；`needs_clarification`必须携带候选Intent和问题；`repair_required`必须携带完整替代指令；这些互斥条件由严格读取器校验。
-
-`CommunicationResult.failed`只表示有界语义生成后仍违反合同，不表示供应商故障。认证、支付、限流、HTTP、超时、拒绝、截断或模型漂移继续使用外层`ProviderError`。
-
-## 💬 澄清回路
+## 🔄 有界协商
 
 ```mermaid
 stateDiagram-v2
-    accTitle: 意图协商状态机
-    accDescr: 从等待模型响应到修复、用户澄清、已解析、不支持或失败的有限状态转换，自动修复最多执行一次。
+    accTitle: 严格意图协商状态
+    accDescr: 一个模型响应只能进入一次完整修复、有限用户澄清、已解析、不支持或失败状态，不存在无限重试或局部修补路径。
 
-    [*] --> AwaitingModel: 用户提交要求
+    state "等待完整响应" as awaiting_response
+    state "需要完整修复" as repair_required
+    state "需要用户澄清" as needs_clarification
+    state "已解析" as resolved
+    state "不支持" as unsupported
+    state "失败" as failed
 
-    AwaitingModel --> RepairRequired: 合同或引用错误
-    RepairRequired --> AwaitingModel: 第2次完整生成
-    RepairRequired --> Failed: 重试额度耗尽
-
-    AwaitingModel --> NeedsClarification: 存在业务歧义
-    NeedsClarification --> AwaitingModel: 用户回答并开启新轮次
-
-    AwaitingModel --> Unsupported: 能力或组合不支持
-    AwaitingModel --> Resolved: Intent解析通过
-
-    Resolved --> [*]: 交给受信上下文绑定
-    Unsupported --> [*]: 返回不支持原因
-    Failed --> [*]: 交给调用方处理
+    [*] --> awaiting_response
+    awaiting_response --> repair_required: 合同或关联错误
+    repair_required --> awaiting_response: 第2次完整生成
+    repair_required --> failed: 修复额度耗尽
+    awaiting_response --> needs_clarification: 已知业务歧义
+    needs_clarification --> awaiting_response: 用户回答后新轮次
+    awaiting_response --> unsupported: 能力或组合不支持
+    awaiting_response --> resolved: 严格校验通过
+    resolved --> [*]
+    unsupported --> [*]
+    failed --> [*]
 ```
 
-### 问题类型
-
-| 歧义代码 | 回答类型 | 选项来源 |
+| `CommunicationResult.status` | 语义 | 允许的下一动作 |
 | --- | --- | --- |
-| `objective-selection-ambiguous` | 多选 | 当前公开且可用的目标指标 |
-| `objective-priority-ambiguous` | 有序选择 | 当前候选Intent中的目标 |
-| `decision-variable-selection-ambiguous` | 多选 | 当前公开且端到端可用的决策变量 |
-| `result-alternatives-ambiguous` | 单选 | 只返回最终方案或同时返回备选 |
+| `repair_required` | 合同、JSON 或引用错误，仍有一次额度 | 同轮次生成一份完整替代响应 |
+| `needs_clarification` | 候选意图含已知业务歧义 | 展示确定性问题并创建新轮次 |
+| `resolved` | 意图和能力协商全部通过 | 交给受信 Context 绑定 |
+| `unsupported` | 请求超出公开能力或当前绑定能力 | 返回结构化原因，不改写目标 |
+| `failed` | 修复失败或澄清轮次耗尽 | 停止自动处理 |
 
-歧义代码是版本化白名单，不接受“其他代码+自由文本”。模型产生未知代码时，同轮先返回`unknown-ambiguity-code`并要求一次完整修复；修复后仍非法则`failed`。
+自动机器修复最多一次，即同一轮最多两次完整模型生成。单轮最多提出三个问题，一个会话最多三个澄清轮次。问题只能来自当前白名单：目标选择、目标优先级、决策变量选择和是否返回备选。未知歧义代码先进入机器修复；修复后仍非法则失败。
 
-单轮最多提出三个问题，一个会话最多进行三轮用户澄清。选择类回答必须严格命中问题声明的选项和数量；回答缺失、重复、越界或包含未发布ID时，在再次调用模型前直接拒绝。达到澄清轮次上限后结构化失败，不无限续问。
+用户回答必须匹配问题 ID、选项和数量。通信服务不会直接把回答写进意图，而是要求垂域模型在新轮次生成完整替代意图，再执行同样校验。
 
-用户回答不会由通信服务直接写入Intent。服务只创建新轮次，将上一份Intent、问题、回答和反馈一并交给垂域模型；垂域模型必须重新生成完整Intent，再经过同样的严格校验。
+## ⚠️ 错误分类
 
-## ⚠️ 错误与能力边界
+| 问题 | 结果 |
+| --- | --- |
+| 响应结构、JSON 或引用错误 | `repair_required`，额度耗尽后 `failed` |
+| 已知业务歧义 | `needs_clarification` |
+| 未发布目标、变量、方向或组合 | `unsupported` |
+| 非空自由业务约束 | `unsupported` |
+| 认证、支付、限流、传输、超时、拒绝、截断或模型漂移 | 外层 `ProviderError` |
+| 仿真、I/O、系统或求解错误 | 不属于本协议，不得伪装成业务不支持 |
 
-| 问题类别 | 示例 | 分类 |
-| --- | --- | --- |
-| 合同错误 | 缺字段、未知字段、非法类型、非有限数 | `repair_required`，最多一次 |
-| 协议错误 | 请求引用错误、能力快照过期 | `repair_required`，最多一次 |
-| 业务歧义 | 目标、优先级、变量或返回形式未确认 | `needs_clarification` |
-| 能力不支持 | 回流比当前无M4映射、目标方向错误 | `unsupported` |
-| 额外业务约束 | `constraints`非空但没有可信参数绑定 | `unsupported` |
-| 模型连续失败 | 第二次响应仍违反合同 | `failed` |
-| 供应商或传输失败 | 401、429、5xx、超时、拒绝或截断 | 外层`ProviderError`，不生成`CommunicationResult` |
-| 实际模型漂移 | 请求与返回模型ID不一致 | `ProviderError(category="model_mismatch")` |
+`ProviderError` 和 `CommunicationResult` 互斥：供应商调用失败时没有可供语义服务校验的模型响应。调用尝试、用量和规范化错误字段属于中立返回合同；当前没有负责重试、会话管理或落盘这些字段的生产运行时。
 
-当前`constraints_mode=system-only`。公开清单中的稳定、质量、收率和发布门禁用于说明系统一定会执行的规则，不表示垂域模型可以复制、关闭、改阈值或改变优先级。后续若实现类型化业务约束参数绑定，应升级通信合同和金标准，而不是放开任意公式字符串。
+## ✅ 交接门禁
 
-供应商5xx中的余额或配置提示当前仅通过保守响应体标记映射为不重试错误；真实供应商措辞尚待在线验证，不能把未知5xx自动解释为配置错误或业务不支持。
+只有 `CommunicationResult.status == "resolved"` 且携带同一份 `resolved_intent` 时，未来受信组合层才能继续：
 
-## 🧪 金标准与质量评测
+1. 独立取得并校验受信 `OperatingContext`
+2. 将已解析意图与 Context 交给 `ProblemBuilder`
+3. 由后续路由、求解、仿真和评价链执行
 
-首批机器样例位于[`data/rto/gold/domain_communication_v1.json`](../../data/rto/gold/domain_communication_v1.json)，覆盖：
+任何普通 Chat 文本、候选意图、修复结果、澄清中间态、`unsupported` 或供应商错误都不能越过该门禁。运行上下文只能来自受信调用方，不能由模型输出、用户澄清或通信服务推断。
 
-- 单目标Intent成功解析
-- 三目标Intent成功解析
-- 决策变量需要用户澄清
-- 延期回流比能力被明确拒绝
-- 未绑定业务约束被明确拒绝
+## 🧪 当前验证资产
 
-专项测试位于[`test_domain_communication.py`](../../tests/rto/unit/test_domain_communication.py)，还覆盖：
+- [D0 金标准](../../data/rto/gold/domain_communication_v1.json)覆盖单目标解析、多目标解析、决策变量澄清、未发布变量和未绑定业务约束；文件名中的 `v1` 是当前数据集版本，不是旧 RTO 执行分支
+- [通信协议专项测试](../../tests/rto/unit/test_domain_communication.py)覆盖安全能力投影、严格往返、引用篡改、一次完整修复、澄清上限、结构化不支持和 `resolved-only` 交接
+- [协议源码](../../src/petroleum_rto/rto/communication/)是字段、版本和状态不变量的权威来源
 
-- 公开能力快照严格往返和指纹闭合
-- 请求中无运行上下文值或求解器ID
-- 请求/能力引用过期时不进入语义解析
-- 模型结构错误只允许一次完整重生成
-- 未知歧义代码先进入机器修复，而不是生成自由文本问题
-- 已知歧义只展示当前可用能力，延期变量不进入选项
-- 用户回答完整性、选项和数量反例
-- 澄清轮次上限和供应商失败互斥形状
-- 通信结果跨字段篡改和能力引用篡改
+## 🚫 当前未实现
 
-D0合同及其反例继续保留：公开能力快照、请求关联、一次完整重生成、确定性澄清、显式`unsupported`和只有`resolved`才能交接的规则都不因Chat简化而放宽。
+- 具体垂域模型或供应商适配器
+- provider/profile 配置、模型发现或质量评测
+- 多协议解析、自动重试或供应商路由
+- 模型意图生成 CLI、会话运行时或调用证据仓储
+- Chat 自动转 Intent、自动 RTO 或任何现场接口
 
-当前普通用户入口不再暴露模型发现、评测、供应商profile或多协议命令。`rto-intent`与`rto-chat`都进入同一个内存多轮Chat界面；模型配置直接位于`chat_settings.py`，SK位于Git忽略的`dmx_api.json`。旧运行时、provider catalog、发现、评测和多协议适配器只保留为兼容代码，不再定义当前人机流程。
-
-默认DeepSeek已用本地SK完成真实短对话和一次单目标动态RTO安全摘要解释，但这只证明普通Chat及反向结果解释链路连通，不证明模型输出符合本节严格`OptimizationIntent`协议。普通Chat回答不能自动进入RTO；若以后恢复“对话自动生成严格Intent”，仍必须复用本协议，不得把自由文本直接交给求解器。
-
-## 💬 RTO结果解释回路
-
-RTO完成后不会自动把内部运行对象交给垂域模型。只有用户在Chat中显式执行`/result <run-dir|result.json>`时，组合层才会：
-
-1. 使用RTO严格reader重载已有运行
-2. 本地显示选中设定值
-3. 构造只含最终状态、设定值、目标改善、约束通过状态和离线声明的摘要
-4. 将该摘要作为一轮Chat消息发送给模型并直接显示解释
-
-该摘要排除`OperatingContext`、当前工况、求解器、公式、引用、指纹、文件路径、原始仿真证据和策略payload。模型不能修改RTO结果、批准或发布策略，也不能赋予现场控制权。结果解释是展示功能，不是`DomainModelRequest`/`DomainModelResponse`意图合同的一部分。
-
-## 📍 严格意图兼容交接
-
-需要自动生成严格Intent的兼容调用方必须实现[`DomainModelPort`](../../src/petroleum_rto/rto/communication/ports.py)：
-
-```python
-class DomainModelPort(Protocol):
-    @property
-    def provider_id(self) -> str: ...
-
-    @property
-    def provider_version(self) -> str: ...
-
-    def invoke(self, request: DomainModelRequest) -> DomainModelInvocationResult: ...
-```
-
-调用方可以使用本地模型、远程模型或测试替身，但只能返回原始文本与调用证据。成功响应必须由[`IntentCommunicationService`](../../src/petroleum_rto/rto/communication/service.py)严格解析；任何调用方都不能绕过通信服务直接调用`ProblemBuilder`。
-
-应用组合层通过RTO侧持有的`petroleum_rto.rto.communication.build_intent_communication_service()`取得使用包内权威能力快照的通信服务。DMX Chat配置、多轮CLI和结果解释见[DMX垂域模型与对话入口](../domain_model/01_聚合式垂域模型综合说明.md)。
+这些能力只有在出现当前明确需求时才实现；不得为了预留未来路径削弱本协议的信任边界。当前授权、验证结果和下一步以[项目实施状态](../STATUS.md)为准。

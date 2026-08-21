@@ -20,7 +20,7 @@ from .common import (
 from .problem import ENGINEERING_CLAIM_SCOPE
 from .reference import ContractRef
 
-SOLVER_RESULT_SCHEMA_VERSION: Final[str] = "1.0.0"
+SOLVER_RESULT_SCHEMA_VERSION: Final[str] = "2.0.0"
 SolverResultStatus = Literal[
     "success",
     "no_static_feasible",

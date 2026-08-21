@@ -1,4 +1,4 @@
-"""Minimal DMX chat CLI with safe simulation status and RTO result explanation."""
+"""Minimal DMX chat CLI with operating-status and RTO-result explanation."""
 
 from __future__ import annotations
 
@@ -18,18 +18,19 @@ _HELP = """可用命令：
 _SIMULATION_CONTEXT_PATH = Path("configs/rto/contexts/case_20260604.json")
 
 _STATUS_INSTRUCTION = (
-    "以下JSON是本地程序从严格校验的受信配置中读取的当前仿真基准工况。"
-    "请用简明中文回答用户原问题，原样保留数值和单位。"
-    "必须明确：这是按需离线仿真的配置快照，本次查询没有启动新仿真，"
-    "也不是DCS、历史库或实时现场数据；不得据此声称掌握现场实时工况。\n"
+    "以下是程序读取的当前工况数据。请先理解数据，再直接用简洁、自然的中文回答用户问题。"
+    "只使用这些数据能够支持的事实，提炼相关数值、单位、状态和工艺含义，不要输出JSON，"
+    "也不要复述输入结构。不得补造未提供的测量、设备、阈值、趋势、报警或执行结果。"
+    "如果用户询问整体工况，概括当前模式和关键参数；如果只询问一个参数，只回答相关内容。"
+    "如果同一句还要求优化或调整，只能解释目标并说明下一步需要形成优化预览；"
+    "不得声称已经运行优化、改变设定值或得到新的计算结果。\n"
 )
 
 _RESULT_INSTRUCTION = (
-    "以下JSON是本地程序严格读取后生成的离线RTO用户摘要。"
-    "请用简明中文解释结果，原样保留设定值、数值和单位；"
-    "必须说明它仅来自合成工程仿真、未经现场验证且没有现场控制权；"
-    "不得声称结果已批准、已发布、可直接下装或可替代人工审核。\n"
-    "RTO摘要JSON："
+    "以下是本地程序读取的RTO结果数据。请先理解数据，再用简洁、自然的中文直接解释结果，"
+    "保留设定值、数值和单位，不要输出JSON，也不要复述输入结构。"
+    "只回答用户问到的内容，不主动扩展无关说明。\n"
+    "RTO结果数据："
 )
 
 
@@ -68,7 +69,6 @@ def _load_rto_result_summary(source: str) -> Mapping[str, object]:
     workspace = Path.cwd().resolve()
     record = inspect_offline(
         run_dir,
-        repo_root=None,
         library_root=workspace / "runs" / "rto" / "strategy-library",
     )
     summary = build_chat_result_summary(record)
@@ -141,7 +141,7 @@ def _handle_result(
     _ask(session, f"{_RESULT_INSTRUCTION}{normalized}", output=output, error=error)
 
 
-def _is_simulation_status_query(message: str) -> bool:
+def _needs_operating_context(message: str) -> bool:
     compact = "".join(message.casefold().split())
     current_markers = ("当前", "现在", "目前", "实时", "此刻")
     subjects = ("常压", "装置", "cdu")
@@ -198,6 +198,8 @@ def _is_simulation_status_query(message: str) -> bool:
         return False
     if has_current and "工况" in compact:
         return True
+    if has_current and (has_subject or has_simulation_subject) and "状态" in compact:
+        return True
     if has_subject and any(
         question in compact
         for question in ("运行状态", "工况状态", "现在怎么样", "目前怎么样", "工况怎么样")
@@ -233,9 +235,7 @@ def _handle_status(
     except Exception:  # noqa: BLE001 - paths and trusted context details stay local
         _write_safe_error(error, "仿真工况读取或严格校验失败，未向模型发送任何内容。")
         return
-    print("当前仿真基准工况：", file=output)
-    print(json.dumps(dict(summary), ensure_ascii=False, sort_keys=True, indent=2), file=output)
-    prompt = f"{_STATUS_INSTRUCTION}用户问题：{question}\n仿真工况摘要JSON：{normalized}"
+    prompt = f"{_STATUS_INSTRUCTION}用户问题：{question}\n当前工况数据：{normalized}"
     _ask(session, prompt, output=output, error=error)
 
 
@@ -276,8 +276,13 @@ def _run_repl(
         if message.startswith("/"):
             _write_safe_error(error, "未知命令，请输入 /help 查看支持的命令。")
             continue
-        if _is_simulation_status_query(message):
-            _handle_status(session, message, output=output, error=error)
+        if _needs_operating_context(message):
+            _handle_status(
+                session,
+                message,
+                output=output,
+                error=error,
+            )
             continue
         _ask(session, message, output=output, error=error)
 

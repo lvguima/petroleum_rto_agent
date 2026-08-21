@@ -1,34 +1,42 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from petroleum_rto.rto.capabilities import ExecutionRoute
+from petroleum_rto.rto.problem import ProblemFeatureAnalyzer
 from petroleum_rto.rto.solvers import (
-    SOLVER_ROUTING_SCHEMA_VERSION,
     CandidateEvaluatorPort,
     ProblemFeatures,
     SolverDescriptor,
     SolverRegistry,
     SolverRouter,
-    SolverRoutingPolicy,
+    SolverRoutingDecision,
     SolverSupport,
 )
+from tests.rto.unit.test_unified_problem_contract import _objective, _problem
 
 
 class _Solver:
     def __init__(
         self,
         solver_id: str,
+        solver_version: str,
         *,
         supports_objective_counts: tuple[int, ...],
         deterministic: bool = True,
     ) -> None:
         self._descriptor = SolverDescriptor(
             solver_id=solver_id,
-            solver_version=f"{solver_id}-1.0.0",
+            solver_version=solver_version,
             deterministic=deterministic,
-            supported_result_modes=("pareto-set", "selected-solution"),
+            supported_result_modes=(
+                "pareto-and-selected",
+                "ranked-and-selected",
+                "selected-solution",
+            ),
         )
         self._counts = supports_objective_counts
         self.support_calls: list[ProblemFeatures] = []
@@ -52,31 +60,60 @@ class _Solver:
         raise AssertionError("routing must not call solve")
 
 
-def _features(*, objective_count: int = 1) -> ProblemFeatures:
-    return ProblemFeatures(
+def _execution_route(
+    algorithm_id: str,
+    algorithm_version: str,
+    *,
+    objective_count: int = 1,
+) -> ExecutionRoute:
+    return ExecutionRoute(
+        route_id=f"route-{algorithm_id}",
+        selector_id="single-objective-selector",
+        minimum_objectives=objective_count,
+        maximum_objectives=objective_count,
+        search_algorithm_id=algorithm_id,
+        search_algorithm_version=algorithm_version,
+        maximum_m2_candidates=81,
+        m2_preset_id="steady-baseline",
+        m4_preset_id="closed-loop-feed-step",
+        m4_event_time_s=600.0,
+        m4_duration_s=7200.0,
+        m4_time_step_s=1.0,
+        top_k=3,
+        feed_anchor_ratios=(1.0,),
+        tie_breaks=("proposal-fingerprint-asc",),
+    )
+
+
+def _routing_inputs(
+    algorithm_id: str = "scalar-grid",
+    algorithm_version: str = "1.0.0",
+    *,
+    objective_count: int = 1,
+):
+    route = _execution_route(
+        algorithm_id,
+        algorithm_version,
         objective_count=objective_count,
+    )
+    objectives = tuple(_objective(f"metric-{index}") for index in range(objective_count))
+    problem = replace(_problem(*objectives), execution_route_ref=route.ref)
+    return problem, ProblemFeatureAnalyzer().analyze(problem), route
+
+
+def _features() -> ProblemFeatures:
+    return ProblemFeatures(
+        objective_count=1,
         decision_count=2,
         bounded=True,
         grid_cardinality=81,
-        result_mode="selected-solution" if objective_count == 1 else "pareto-set",
+        result_mode="selected-solution",
         deterministic=True,
         maximum_evaluations=81,
-        gradient_availability="none",
-        evaluator_kind="paired-black-box",
-        dynamic_verification_required=True,
     )
 
 
-def _policy(*solver_order: str) -> SolverRoutingPolicy:
-    return SolverRoutingPolicy(
-        schema_version=SOLVER_ROUTING_SCHEMA_VERSION,
-        policy_version="routing-policy-1.0.0",
-        policy_id="default-routing-policy",
-        solver_order=solver_order,
-    )
-
-
-def test_problem_features_are_strict_and_fingerprinted() -> None:
+def test_problem_features_are_minimal_strict_and_fingerprinted() -> None:
     first = _features()
     second = _features()
 
@@ -88,42 +125,17 @@ def test_problem_features_are_strict_and_fingerprinted() -> None:
         "result_mode": "selected-solution",
         "deterministic": True,
         "maximum_evaluations": 81,
-        "gradient_availability": "none",
-        "evaluator_kind": "paired-black-box",
-        "dynamic_verification_required": True,
     }
     assert first.fingerprint == second.fingerprint
     with pytest.raises(ValueError, match="objective_count"):
-        ProblemFeatures(
-            0,
-            2,
-            True,
-            25,
-            "selected-solution",
-            True,
-            33,
-            "none",
-            "paired-black-box",
-            True,
-        )
+        replace(first, objective_count=0)
     with pytest.raises(TypeError, match="bounded"):
-        ProblemFeatures(  # type: ignore[arg-type]
-            1,
-            2,
-            1,
-            25,
-            "selected-solution",
-            True,
-            33,
-            "none",
-            "paired-black-box",
-            True,
-        )
+        replace(first, bounded=1)  # type: ignore[arg-type]
 
 
 def test_registry_rejects_duplicate_solver_ids_and_sorts_descriptors() -> None:
-    second = _Solver("solver-b", supports_objective_counts=(1,))
-    first = _Solver("solver-a", supports_objective_counts=(1,))
+    second = _Solver("solver-b", "1.0.0", supports_objective_counts=(1,))
+    first = _Solver("solver-a", "1.0.0", supports_objective_counts=(1,))
     registry = SolverRegistry((second, first))
 
     assert tuple(item.solver_id for item in registry.descriptors()) == (
@@ -132,97 +144,78 @@ def test_registry_rejects_duplicate_solver_ids_and_sorts_descriptors() -> None:
     )
     assert registry.get("solver-a") is first
     with pytest.raises(ValueError, match="already registered"):
-        registry.register(_Solver("solver-a", supports_objective_counts=(1, 2)))
+        registry.register(_Solver("solver-a", "1.0.0", supports_objective_counts=(1, 2)))
 
 
-def test_policy_order_selects_stably_independent_of_registration_order() -> None:
-    first = _Solver("scalar-a", supports_objective_counts=(1,))
-    preferred = _Solver("scalar-b", supports_objective_counts=(1,))
-    features = _features()
-    policy = _policy("scalar-b", "scalar-a")
+def test_execution_route_is_the_only_algorithm_source() -> None:
+    problem, features, route = _routing_inputs()
+    selected = _Solver("scalar-grid", "1.0.0", supports_objective_counts=(1,))
+    competing = _Solver("other-grid", "1.0.0", supports_objective_counts=(1, 2, 3))
 
-    left = SolverRouter().route(features, SolverRegistry((first, preferred)), policy)
-    right = SolverRouter().route(features, SolverRegistry((preferred, first)), policy)
+    left = SolverRouter().route(
+        problem,
+        features,
+        SolverRegistry((competing, selected)),
+        route,
+    )
+    right = SolverRouter().route(
+        problem,
+        features,
+        SolverRegistry((selected, competing)),
+        route,
+    )
 
-    assert left.solver is preferred
-    assert right.solver is preferred
+    assert left.solver is selected
+    assert right.solver is selected
     assert left.decision == right.decision
-    assert left.decision.status == "selected"
-    assert left.decision.selected_solver_id == "scalar-b"
-    assert tuple(item.solver_id for item in left.decision.considerations) == (
-        "scalar-b",
-        "scalar-a",
-    )
-    assert left.decision.fingerprint == right.decision.fingerprint
+    assert left.decision.execution_route_ref == route.ref
+    assert left.decision.algorithm_id == "scalar-grid"
+    assert competing.support_calls == []
 
 
-def test_router_returns_structured_unsupported_without_solving() -> None:
-    scalar = _Solver("scalar-grid", supports_objective_counts=(1,))
-    route = SolverRouter().route(
-        _features(objective_count=3),
-        SolverRegistry((scalar,)),
-        _policy("missing-solver", "scalar-grid"),
-    )
+def test_router_never_flattens_other_routes_when_required_solver_is_missing() -> None:
+    problem, features, route = _routing_inputs("missing-grid")
+    compatible = _Solver("compatible-grid", "1.0.0", supports_objective_counts=(1,))
 
-    assert route.solver is None
-    assert route.decision.status == "unsupported"
-    assert route.decision.reason_code == "no-compatible-solver"
-    assert route.decision.selected_solver_id is None
-    assert route.decision.considerations[0].reason_codes == ("solver-not-registered",)
-    assert route.decision.considerations[1].reason_codes == ("objective-count-unsupported",)
+    result = SolverRouter().route(problem, features, SolverRegistry((compatible,)), route)
+
+    assert result.solver is None
+    assert result.decision.status == "unsupported"
+    assert result.decision.reason_codes == ("solver-not-registered",)
+    assert compatible.support_calls == []
 
 
-def test_trusted_override_is_supported_checked_and_audited() -> None:
-    scalar = _Solver("scalar-grid", supports_objective_counts=(1,))
-    pareto = _Solver("pareto-grid", supports_objective_counts=(2, 3))
-    registry = SolverRegistry((scalar, pareto))
-    policy = _policy("scalar-grid")
+def test_router_requires_the_exact_route_algorithm_version_before_support_check() -> None:
+    problem, features, route = _routing_inputs("scalar-grid", "2.0.0")
+    wrong_version = _Solver("scalar-grid", "1.0.0", supports_objective_counts=(1,))
 
-    selected = SolverRouter().route(
-        _features(objective_count=3),
-        registry,
-        policy,
-        trusted_override="pareto-grid",
-    )
-    assert selected.solver is pareto
-    assert selected.decision.reason_code == "trusted-override-selected"
-    assert selected.decision.trusted_override == "pareto-grid"
+    result = SolverRouter().route(problem, features, SolverRegistry((wrong_version,)), route)
 
-    rejected = SolverRouter().route(
-        _features(objective_count=3),
-        registry,
-        policy,
-        trusted_override="scalar-grid",
-    )
-    assert rejected.solver is None
-    assert rejected.decision.status == "unsupported"
-    assert rejected.decision.reason_code == "trusted-override-unsupported"
-
-    missing = SolverRouter().route(
-        _features(),
-        registry,
-        policy,
-        trusted_override="not-registered",
-    )
-    assert missing.solver is None
-    assert missing.decision.reason_code == "trusted-override-not-registered"
+    assert result.solver is None
+    assert result.decision.reason_codes == ("solver-version-mismatch",)
+    assert wrong_version.support_calls == []
 
 
-def test_deterministic_requirement_is_part_of_solver_support() -> None:
-    stochastic = _Solver(
-        "stochastic-search",
-        supports_objective_counts=(1,),
-        deterministic=False,
-    )
+def test_router_keeps_solver_support_as_a_secondary_capability_guard() -> None:
+    problem, features, route = _routing_inputs(objective_count=3)
+    scalar = _Solver("scalar-grid", "1.0.0", supports_objective_counts=(1,))
 
-    route = SolverRouter().route(
-        _features(),
-        SolverRegistry((stochastic,)),
-        _policy("stochastic-search"),
-    )
+    result = SolverRouter().route(problem, features, SolverRegistry((scalar,)), route)
 
-    assert route.solver is None
-    assert route.decision.considerations[0].reason_codes == ("determinism-unsupported",)
+    assert result.solver is None
+    assert result.decision.reason_codes == ("objective-count-unsupported",)
+    assert scalar.support_calls == [features]
+
+
+def test_routing_decision_round_trips_and_rejects_removed_override_fields() -> None:
+    problem, features, route = _routing_inputs()
+    solver = _Solver("scalar-grid", "1.0.0", supports_objective_counts=(1,))
+    decision = SolverRouter().route(problem, features, SolverRegistry((solver,)), route).decision
+
+    assert SolverRoutingDecision.from_mapping(decision.as_dict()) == decision
+    stale = {**decision.as_dict(), "trusted_override": "scalar-grid"}
+    with pytest.raises(ValueError, match="fields differ"):
+        SolverRoutingDecision.from_mapping(stale)
 
 
 def test_solver_layer_has_no_simulator_or_cdu_dependency() -> None:

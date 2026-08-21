@@ -7,14 +7,14 @@ from typing import cast
 
 from ..capabilities import (
     BundleCapabilityView,
+    CapabilityBundle,
     PublicCapabilityManifest,
-    UnifiedCapabilityBundle,
     build_public_capability_manifest,
 )
 from ..contracts.common import JsonValue
 from ..contracts.reference import ContractRef
-from ..unified_inputs import CapabilityView, IntentResolutionIssue, IntentResolver
-from ..unified_inputs.models import OptimizationIntent
+from ..intent import CapabilityView, IntentResolutionIssue, IntentResolver
+from ..intent.models import OptimizationIntent
 from .loader import decode_domain_model_response
 from .models import (
     COMMUNICATION_RESULT_SCHEMA_ID,
@@ -60,14 +60,14 @@ class IntentCommunicationService:
     @classmethod
     def from_bundle(
         cls,
-        bundle: UnifiedCapabilityBundle,
+        bundle: CapabilityBundle,
         *,
         policy: IntentCommunicationPolicy | None = None,
     ) -> IntentCommunicationService:
         """Create the public gateway while keeping the internal bundle out of model requests."""
 
-        if not isinstance(bundle, UnifiedCapabilityBundle):
-            raise TypeError("bundle must be UnifiedCapabilityBundle")
+        if not isinstance(bundle, CapabilityBundle):
+            raise TypeError("bundle must be CapabilityBundle")
         return cls(
             build_public_capability_manifest(bundle),
             BundleCapabilityView(bundle),

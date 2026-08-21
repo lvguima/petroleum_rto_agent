@@ -24,19 +24,27 @@ from petroleum_rto.cdu.runtime.contracts import (
     JsonValue,
     RunRequest,
 )
-from petroleum_rto.cdu.runtime.presets import list_presets, load_preset
+from petroleum_rto.cdu.runtime.presets import get_preset, list_presets, load_preset
 from petroleum_rto.cdu.runtime.provenance import installed_source_tree_sha256
 from petroleum_rto.cdu.runtime.resources import (
     list_runtime_resource_ids,
     read_runtime_resource_bytes,
+    runtime_resource_ids_for_preset,
 )
 
 
-def _inputs() -> dict[str, bytes]:
-    return {
-        resource_id: read_runtime_resource_bytes(resource_id)
-        for resource_id in list_runtime_resource_ids()
-    }
+def _inputs(request: RunRequest) -> dict[str, bytes]:
+    try:
+        preset = get_preset(request.preset_id)
+    except (KeyError, TypeError):
+        resource_ids = list_runtime_resource_ids()
+    else:
+        resource_ids = (
+            runtime_resource_ids_for_preset(preset)
+            if request.run_type == preset.run_type
+            else list_runtime_resource_ids()
+        )
+    return {resource_id: read_runtime_resource_bytes(resource_id) for resource_id in resource_ids}
 
 
 def _request(*, run_id: str | None = None) -> RunRequest:
@@ -254,7 +262,7 @@ def test_manifest_last_run_round_trip_and_source_tree_hash(tmp_path: Path) -> No
         request,
         payload,
         tmp_path,
-        input_resources=_inputs(),
+        input_resources=_inputs(request),
         started_at_utc="2026-08-18T00:00:00Z",
         finished_at_utc="2026-08-18T00:00:01Z",
         wall_time_s=1.0,
@@ -314,7 +322,7 @@ def test_writer_rejects_fixed_preset_status_grid_and_sample_forgery(
 ) -> None:
     steady = _request(run_id="forged-steady-rejection")
     with pytest.raises(ValueError, match="status differs from fixed preset"):
-        write_run(steady, _rejected(steady), tmp_path, input_resources=_inputs())
+        write_run(steady, _rejected(steady), tmp_path, input_resources=_inputs(steady))
 
     structural = replace(
         load_preset("m6-structural-rejection"),
@@ -325,7 +333,7 @@ def test_writer_rejects_fixed_preset_status_grid_and_sample_forgery(
             structural,
             _success(structural),
             tmp_path,
-            input_resources=_inputs(),
+            input_resources=_inputs(structural),
         )
 
     dynamic = replace(
@@ -342,7 +350,7 @@ def test_writer_rejects_fixed_preset_status_grid_and_sample_forgery(
                 duration_s=1.0,
             ),
             tmp_path,
-            input_resources=_inputs(),
+            input_resources=_inputs(dynamic),
         )
     with pytest.raises(ValueError, match="sample count differs from fixed preset"):
         write_run(
@@ -352,7 +360,7 @@ def test_writer_rejects_fixed_preset_status_grid_and_sample_forgery(
                 timeseries=(),
             ),
             tmp_path,
-            input_resources=_inputs(),
+            input_resources=_inputs(dynamic),
         )
 
 
@@ -374,8 +382,11 @@ def test_writer_rejects_forged_or_nonexecutable_success_evidence(
     run_id = f"write-{attack.replace('_', '-')}-run"
     request, payload = _forged_request_and_payload(attack, run_id=run_id)
 
-    with pytest.raises(ValueError, match="derived provenance|non-executable"):
-        write_run(request, payload, tmp_path, input_resources=_inputs())
+    with pytest.raises(
+        ValueError,
+        match="derived provenance|non-executable|input resource|request closure",
+    ):
+        write_run(request, payload, tmp_path, input_resources=_inputs(request))
     assert not (tmp_path / run_id).exists()
 
 
@@ -401,7 +412,7 @@ def test_writer_and_reader_reject_reverse_manifest_timestamps(tmp_path: Path) ->
             request,
             _success(request),
             tmp_path,
-            input_resources=_inputs(),
+            input_resources=_inputs(request),
             started_at_utc="2026-08-18T00:00:01Z",
             finished_at_utc="2026-08-18T00:00:00Z",
         )
@@ -412,7 +423,7 @@ def test_writer_and_reader_reject_reverse_manifest_timestamps(tmp_path: Path) ->
         readable_request,
         _success(readable_request),
         tmp_path,
-        input_resources=_inputs(),
+        input_resources=_inputs(readable_request),
         started_at_utc="2026-08-18T00:00:00Z",
         finished_at_utc="2026-08-18T00:00:01Z",
     )
@@ -438,11 +449,28 @@ def test_reader_rejects_incomplete_or_tampered_run(tmp_path: Path) -> None:
         request,
         _success(request),
         tmp_path,
-        input_resources=_inputs(),
+        input_resources=_inputs(request),
     )
     result_path = written.run_dir / "result.json"
     result_path.write_bytes(result_path.read_bytes() + b"tampered")
     with pytest.raises(ValueError, match="hash/size mismatch"):
+        read_run(written.run_dir)
+
+
+def test_reader_rejects_previous_manifest_contract(tmp_path: Path) -> None:
+    request = _request(run_id="previous-manifest-contract")
+    written = write_run(
+        request,
+        _success(request),
+        tmp_path,
+        input_resources=_inputs(request),
+    )
+    _resign_manifest(
+        written.run_dir,
+        lambda manifest: manifest.__setitem__("manifest_version", "cdu-mini-run-manifest-v0.2.0"),
+    )
+
+    with pytest.raises(ValueError, match="manifest_version differs"):
         read_run(written.run_dir)
 
 
@@ -455,7 +483,7 @@ def test_run_ids_never_overwrite_and_rejected_evidence_round_trips(
         request,
         payload,
         tmp_path,
-        input_resources=_inputs(),
+        input_resources=_inputs(request),
     )
     assert read_run(first.run_dir).payload.runtime_status == "rejected"
     with pytest.raises(FileExistsError):
@@ -463,7 +491,7 @@ def test_run_ids_never_overwrite_and_rejected_evidence_round_trips(
             request,
             payload,
             tmp_path,
-            input_resources=_inputs(),
+            input_resources=_inputs(request),
         )
 
 
@@ -496,7 +524,7 @@ def test_nested_immutable_dynamic_samples_are_serialized_as_standard_json(
             request,
             payload,
             tmp_path,
-            input_resources=_inputs(),
+            input_resources=_inputs(request),
         )
 
     assert read_run(written.run_dir).payload.as_dict() == payload.as_dict()
@@ -581,7 +609,12 @@ def test_reader_rejects_resigned_manifest_input_and_status_contradictions(
     tmp_path: Path,
 ) -> None:
     request = _request(run_id="resigned-run")
-    written = write_run(request, _success(request), tmp_path, input_resources=_inputs())
+    written = write_run(
+        request,
+        _success(request),
+        tmp_path,
+        input_resources=_inputs(request),
+    )
 
     input_id = list_runtime_resource_ids()[0]
     input_path = written.run_dir / f"inputs/{input_id.replace('.', '__')}.json"
@@ -605,7 +638,7 @@ def test_reader_rejects_resigned_manifest_input_and_status_contradictions(
         status_request,
         _success(status_request),
         tmp_path,
-        input_resources=_inputs(),
+        input_resources=_inputs(status_request),
     )
     _resign_manifest(
         status_run.run_dir,
@@ -617,7 +650,12 @@ def test_reader_rejects_resigned_manifest_input_and_status_contradictions(
 
 def test_reader_rejects_missing_input_and_staged_or_orphan_files(tmp_path: Path) -> None:
     request = _request(run_id="layout-run")
-    written = write_run(request, _success(request), tmp_path, input_resources=_inputs())
+    written = write_run(
+        request,
+        _success(request),
+        tmp_path,
+        input_resources=_inputs(request),
+    )
     resource_id = list_runtime_resource_ids()[0]
     (written.run_dir / f"inputs/{resource_id.replace('.', '__')}.json").unlink()
     with pytest.raises(ValueError, match="file set|missing"):
@@ -630,11 +668,45 @@ def test_reader_rejects_missing_input_and_staged_or_orphan_files(tmp_path: Path)
             request_fingerprint=replace(request, run_id="staged-run").request_fingerprint,
         ),
         tmp_path,
-        input_resources=_inputs(),
+        input_resources=_inputs(request),
     )
     (second.run_dir / "orphan.stage").write_text("partial", encoding="utf-8")
     with pytest.raises(ValueError, match="staged"):
         read_run(second.run_dir)
+
+
+def test_reader_rejects_valid_but_irrelevant_input_resource(tmp_path: Path) -> None:
+    request = _request(run_id="irrelevant-input-run")
+    written = write_run(
+        request,
+        _success(request),
+        tmp_path,
+        input_resources=_inputs(request),
+    )
+    resource_id = "validation.m6"
+    payload = read_runtime_resource_bytes(resource_id)
+    relative = f"inputs/{resource_id.replace('.', '__')}.json"
+    (written.run_dir / relative).write_bytes(payload)
+
+    def add_irrelevant_resource(manifest: dict[str, object]) -> None:
+        artifacts = manifest["artifacts"]
+        sources = manifest["source_fingerprints"]
+        assert isinstance(artifacts, dict)
+        assert isinstance(sources, dict)
+        digest = hashlib.sha256(payload).hexdigest()
+        artifacts[f"input.{resource_id}"] = {
+            "path": relative,
+            "size_bytes": len(payload),
+            "sha256": digest,
+            "media_type": "application/json",
+            "schema": "source-resource",
+        }
+        sources[resource_id] = digest
+
+    _resign_manifest(written.run_dir, add_irrelevant_resource)
+
+    with pytest.raises(ValueError, match="request closure"):
+        read_run(written.run_dir)
 
 
 def test_reader_rejects_resigned_result_source_fingerprint_forgery(
@@ -642,7 +714,7 @@ def test_reader_rejects_resigned_result_source_fingerprint_forgery(
 ) -> None:
     request = _request(run_id="source-forgery-run")
     payload = _success(request)
-    written = write_run(request, payload, tmp_path, input_resources=_inputs())
+    written = write_run(request, payload, tmp_path, input_resources=_inputs(request))
     resource_id = list_runtime_resource_ids()[0]
     forged = replace(
         payload,
@@ -695,7 +767,7 @@ def test_reader_streams_timeseries_without_path_read_text(
         run_id="stream-reader-run",
     )
     payload = _success(request)
-    written = write_run(request, payload, tmp_path, input_resources=_inputs())
+    written = write_run(request, payload, tmp_path, input_resources=_inputs(request))
     original_read_text = Path.read_text
 
     def guarded_read_text(path: Path, *args: object, **kwargs: object) -> str:
@@ -717,7 +789,12 @@ def test_reader_rejects_resigned_conflicting_embedded_externalized_data(
     field: str,
 ) -> None:
     request = _request(run_id=f"embedded-{field}-run")
-    written = write_run(request, _success(request), tmp_path, input_resources=_inputs())
+    written = write_run(
+        request,
+        _success(request),
+        tmp_path,
+        input_resources=_inputs(request),
+    )
     result_path = written.run_dir / "result.json"
     result = json.loads(result_path.read_text(encoding="utf-8"))
     assert isinstance(result, dict)
@@ -772,7 +849,12 @@ def test_reader_requires_explicit_fingerprint_in_published_documents(
     error_match: str,
 ) -> None:
     request = _request(run_id=f"missing-{artifact_id}-fingerprint-run")
-    written = write_run(request, _success(request), tmp_path, input_resources=_inputs())
+    written = write_run(
+        request,
+        _success(request),
+        tmp_path,
+        input_resources=_inputs(request),
+    )
     artifact_path = written.run_dir / file_name
     document = json.loads(artifact_path.read_text(encoding="utf-8"))
     assert isinstance(document, dict)
@@ -823,7 +905,7 @@ def test_reader_rejects_fully_resigned_derived_provenance_forgery(
         original_request,
         _success(original_request),
         tmp_path,
-        input_resources=_inputs(),
+        input_resources=_inputs(original_request),
     )
     forged_request, forged_payload = _forged_request_and_payload(
         attack,
@@ -835,5 +917,8 @@ def test_reader_rejects_fully_resigned_derived_provenance_forgery(
         forged_payload,
     )
 
-    with pytest.raises(ValueError, match="derived provenance|non-executable"):
+    with pytest.raises(
+        ValueError,
+        match="derived provenance|non-executable|input resources|request closure",
+    ):
         read_run(written.run_dir)

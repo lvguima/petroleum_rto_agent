@@ -16,7 +16,4 @@ runs/*
 !runs/cdu/
 runs/cdu/*
 !runs/cdu/.gitkeep
-!runs/domain_model/
-runs/domain_model/*
-!runs/domain_model/.gitkeep
 /data/cdu/raw/

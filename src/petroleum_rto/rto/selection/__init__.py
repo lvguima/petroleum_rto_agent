@@ -1,5 +1,5 @@
-"""Unified preference ordering, dynamic fallback, and publishability."""
+"""Preference ordering, dynamic fallback, and publishability."""
 
-from .unified import FinalizationArtifacts, PublishabilityAssessor, UnifiedFinalSelector
+from .selector import FinalizationArtifacts, FinalSelector, PublishabilityAssessor
 
-__all__ = ["FinalizationArtifacts", "PublishabilityAssessor", "UnifiedFinalSelector"]
+__all__ = ["FinalSelector", "FinalizationArtifacts", "PublishabilityAssessor"]

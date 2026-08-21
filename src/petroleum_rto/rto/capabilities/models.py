@@ -1,4 +1,4 @@
-"""Strict immutable contracts for the unified RTO capability layer."""
+"""Strict immutable contracts for the RTO capability layer."""
 
 from __future__ import annotations
 
@@ -17,37 +17,22 @@ from ..contracts.common import (
     strict_keys,
     text,
 )
-from ..contracts.models import CLAIM_SCOPE
+from ..contracts.problem import ENGINEERING_CLAIM_SCOPE
 from ..contracts.reference import ContractRef
 
-CAPABILITY_SCHEMA_VERSION: Final[str] = "1.0.0"
+CAPABILITY_SCHEMA_VERSION: Final[str] = "2.0.0"
 
 Availability = Literal["available", "conditional", "deferred", "unsupported"]
 MetricDirection = Literal["equal", "minimize", "maximize"]
 ObjectiveSense = Literal["minimize", "maximize"]
 GuardrailOperator = Literal["eq", "le", "ge"]
 SelectorMethod = Literal["single-objective", "lexicographic"]
-ContextValueType = Literal["string", "number", "numeric-mapping", "contract-ref"]
-ContextFieldRole = Literal[
-    "identity",
-    "operating-fact",
-    "current-setpoint",
-    "initial-state",
-    "provenance",
-]
-CompatibilityRuleType = Literal[
-    "cardinality",
-    "requires-all",
-    "conflicts-with",
-    "requires-context",
-]
-CapabilityKind = Literal["metric", "objective", "decision", "guardrail", "selector", "context"]
 
 
 def _schema_and_claim(schema_version: str, claim_scope: str) -> None:
     if schema_version != CAPABILITY_SCHEMA_VERSION:
-        raise ValueError("schema_version differs from the unified capability contract")
-    if claim_scope != CLAIM_SCOPE:
+        raise ValueError("schema_version differs from the capability contract")
+    if claim_scope != ENGINEERING_CLAIM_SCOPE:
         raise ValueError("claim_scope must be engineering_simulation_only")
 
 
@@ -57,10 +42,6 @@ def _optional_text(value: object, *, context: str) -> str | None:
 
 def _optional_identifier(value: object, *, context: str) -> str | None:
     return None if value is None else identifier(value, context=context)
-
-
-def _optional_integer(value: object, *, context: str, minimum: int) -> int | None:
-    return None if value is None else integer(value, context=context, minimum=minimum)
 
 
 def _identifiers(value: object, *, context: str, allow_empty: bool = False) -> tuple[str, ...]:
@@ -188,12 +169,11 @@ class ObjectiveCapability:
     metric_id: str
     sense: ObjectiveSense
     normalization_scale: float
-    relative_improvement_policy: str
     availability: Availability
     availability_reason: str | None
 
     def __post_init__(self) -> None:
-        for name in ("objective_id", "metric_id", "relative_improvement_policy"):
+        for name in ("objective_id", "metric_id"):
             object.__setattr__(self, name, identifier(getattr(self, name), context=name))
         object.__setattr__(self, "business_name", text(self.business_name, context="business_name"))
         if self.sense not in {"minimize", "maximize"}:
@@ -218,7 +198,6 @@ class ObjectiveCapability:
                 "metric_id",
                 "sense",
                 "normalization_scale",
-                "relative_improvement_policy",
                 "availability",
                 "availability_reason",
             },
@@ -236,9 +215,6 @@ class ObjectiveCapability:
             metric_id=identifier(value["metric_id"], context="metric_id"),
             sense=sense,
             normalization_scale=finite(value["normalization_scale"], context="normalization_scale"),
-            relative_improvement_policy=identifier(
-                value["relative_improvement_policy"], context="relative_improvement_policy"
-            ),
             availability=availability,
             availability_reason=reason,
         )
@@ -250,7 +226,6 @@ class ObjectiveCapability:
             "metric_id": self.metric_id,
             "sense": self.sense,
             "normalization_scale": self.normalization_scale,
-            "relative_improvement_policy": self.relative_improvement_policy,
             "availability": self.availability,
             "availability_reason": self.availability_reason,
         }
@@ -268,21 +243,15 @@ class DecisionCapability:
     refine_step: float
     m2_parameter_path: str | None
     m4_loop_id: str | None
-    controller_owner: str
-    compiler_rule_id: str
-    confidence: str
     availability: Availability
     availability_reason: str | None
 
     def __post_init__(self) -> None:
-        for name in ("decision_id", "compiler_rule_id"):
-            object.__setattr__(self, name, identifier(getattr(self, name), context=name))
+        object.__setattr__(self, "decision_id", identifier(self.decision_id, context="decision_id"))
         for name in (
             "business_name",
             "display_unit",
             "canonical_unit",
-            "controller_owner",
-            "confidence",
         ):
             object.__setattr__(self, name, text(getattr(self, name), context=name))
         for name in ("m2_parameter_path", "m4_loop_id"):
@@ -318,9 +287,6 @@ class DecisionCapability:
                 "refine_step",
                 "m2_parameter_path",
                 "m4_loop_id",
-                "controller_owner",
-                "compiler_rule_id",
-                "confidence",
                 "availability",
                 "availability_reason",
             },
@@ -342,9 +308,6 @@ class DecisionCapability:
                 value["m2_parameter_path"], context="m2_parameter_path"
             ),
             m4_loop_id=_optional_identifier(value["m4_loop_id"], context="m4_loop_id"),
-            controller_owner=text(value["controller_owner"], context="controller_owner"),
-            compiler_rule_id=identifier(value["compiler_rule_id"], context="compiler_rule_id"),
-            confidence=identifier(value["confidence"], context="confidence"),
             availability=availability,
             availability_reason=reason,
         )
@@ -361,9 +324,6 @@ class DecisionCapability:
             "refine_step": self.refine_step,
             "m2_parameter_path": self.m2_parameter_path,
             "m4_loop_id": self.m4_loop_id,
-            "controller_owner": self.controller_owner,
-            "compiler_rule_id": self.compiler_rule_id,
-            "confidence": self.confidence,
             "availability": self.availability,
             "availability_reason": self.availability_reason,
         }
@@ -647,272 +607,6 @@ class CapabilityCatalog:
 
 
 @dataclass(frozen=True)
-class ContextFieldSpec:
-    field_id: str
-    json_pointer: str
-    value_type: ContextValueType
-    unit: str | None
-    required: bool
-    role: ContextFieldRole
-    source_authority: str
-    override_policy: str
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "field_id", identifier(self.field_id, context="field_id"))
-        if not isinstance(self.json_pointer, str) or not self.json_pointer.startswith("/"):
-            raise ValueError("json_pointer must start with /")
-        if self.value_type not in {"string", "number", "numeric-mapping", "contract-ref"}:
-            raise ValueError("unsupported context value_type")
-        object.__setattr__(self, "unit", _optional_text(self.unit, context="unit"))
-        if not isinstance(self.required, bool):
-            raise TypeError("required must be boolean")
-        if self.role not in {
-            "identity",
-            "operating-fact",
-            "current-setpoint",
-            "initial-state",
-            "provenance",
-        }:
-            raise ValueError("unsupported context field role")
-        for name in ("source_authority", "override_policy"):
-            object.__setattr__(self, name, identifier(getattr(self, name), context=name))
-
-    @classmethod
-    def from_mapping(cls, value: Mapping[str, object]) -> ContextFieldSpec:
-        strict_keys(
-            value,
-            required={
-                "field_id",
-                "json_pointer",
-                "value_type",
-                "unit",
-                "required",
-                "role",
-                "source_authority",
-                "override_policy",
-            },
-            context="context field",
-        )
-        value_type = value["value_type"]
-        if value_type not in {"string", "number", "numeric-mapping", "contract-ref"}:
-            raise ValueError("unsupported context value_type")
-        role = value["role"]
-        if role not in {
-            "identity",
-            "operating-fact",
-            "current-setpoint",
-            "initial-state",
-            "provenance",
-        }:
-            raise ValueError("unsupported context field role")
-        pointer = value["json_pointer"]
-        if not isinstance(pointer, str) or not pointer.startswith("/"):
-            raise ValueError("json_pointer must start with /")
-        return cls(
-            field_id=identifier(value["field_id"], context="field_id"),
-            json_pointer=pointer,
-            value_type=value_type,
-            unit=_optional_text(value["unit"], context="unit"),
-            required=boolean(value["required"], context="required"),
-            role=role,
-            source_authority=identifier(value["source_authority"], context="source_authority"),
-            override_policy=identifier(value["override_policy"], context="override_policy"),
-        )
-
-    def as_dict(self) -> dict[str, object]:
-        return {
-            "field_id": self.field_id,
-            "json_pointer": self.json_pointer,
-            "value_type": self.value_type,
-            "unit": self.unit,
-            "required": self.required,
-            "role": self.role,
-            "source_authority": self.source_authority,
-            "override_policy": self.override_policy,
-        }
-
-
-@dataclass(frozen=True)
-class ContextSchema:
-    schema_version: str
-    context_schema_id: str
-    context_schema_version: str
-    claim_scope: str
-    fields: tuple[ContextFieldSpec, ...]
-
-    def __post_init__(self) -> None:
-        _schema_and_claim(self.schema_version, self.claim_scope)
-        for name in ("context_schema_id", "context_schema_version"):
-            object.__setattr__(self, name, identifier(getattr(self, name), context=name))
-        fields = tuple(self.fields)
-        ids = tuple(item.field_id for item in fields)
-        pointers = tuple(item.json_pointer for item in fields)
-        if not fields or len(ids) != len(set(ids)) or ids != tuple(sorted(ids)):
-            raise ValueError("context field ids must be non-empty, unique and sorted")
-        if len(pointers) != len(set(pointers)):
-            raise ValueError("context json_pointer values must be unique")
-        object.__setattr__(self, "fields", fields)
-
-    @classmethod
-    def from_mapping(cls, value: object) -> ContextSchema:
-        raw = as_mapping(value, context="context schema")
-        strict_keys(
-            raw,
-            required={
-                "schema_version",
-                "context_schema_id",
-                "context_schema_version",
-                "claim_scope",
-                "fields",
-            },
-            context="context schema",
-        )
-        return cls(
-            schema_version=text(raw["schema_version"], context="schema_version"),
-            context_schema_id=identifier(raw["context_schema_id"], context="context_schema_id"),
-            context_schema_version=identifier(
-                raw["context_schema_version"], context="context_schema_version"
-            ),
-            claim_scope=text(raw["claim_scope"], context="claim_scope"),
-            fields=tuple(
-                ContextFieldSpec.from_mapping(as_mapping(item, context="context field"))
-                for item in as_sequence(raw["fields"], context="context fields")
-            ),
-        )
-
-    def as_dict(self) -> dict[str, object]:
-        return {
-            "schema_version": self.schema_version,
-            "context_schema_id": self.context_schema_id,
-            "context_schema_version": self.context_schema_version,
-            "claim_scope": self.claim_scope,
-            "fields": [item.as_dict() for item in self.fields],
-        }
-
-    @property
-    def fingerprint(self) -> str:
-        return canonical_fingerprint(self.as_dict())
-
-    @property
-    def ref(self) -> ContractRef:
-        return ContractRef(self.context_schema_id, self.fingerprint)
-
-
-@dataclass(frozen=True)
-class CompatibilityRule:
-    rule_id: str
-    rule_type: CompatibilityRuleType
-    subject_kind: CapabilityKind
-    subject_ids: tuple[str, ...]
-    related_ids: tuple[str, ...]
-    minimum_count: int | None
-    maximum_count: int | None
-    message: str
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "rule_id", identifier(self.rule_id, context="rule_id"))
-        if self.rule_type not in {
-            "cardinality",
-            "requires-all",
-            "conflicts-with",
-            "requires-context",
-        }:
-            raise ValueError("unsupported compatibility rule_type")
-        if self.subject_kind not in {
-            "metric",
-            "objective",
-            "decision",
-            "guardrail",
-            "selector",
-            "context",
-        }:
-            raise ValueError("unsupported compatibility subject_kind")
-        subjects = tuple(identifier(item, context="subject_id") for item in self.subject_ids)
-        related = tuple(identifier(item, context="related_id") for item in self.related_ids)
-        if not subjects or len(subjects) != len(set(subjects)):
-            raise ValueError("subject_ids must be non-empty and unique")
-        if len(related) != len(set(related)):
-            raise ValueError("related_ids must be unique")
-        object.__setattr__(self, "subject_ids", subjects)
-        object.__setattr__(self, "related_ids", related)
-        minimum = _optional_integer(self.minimum_count, context="minimum_count", minimum=0)
-        maximum = _optional_integer(self.maximum_count, context="maximum_count", minimum=0)
-        if self.rule_type == "cardinality":
-            if minimum is None or maximum is None or minimum > maximum:
-                raise ValueError("cardinality rules require an ordered count range")
-            if maximum > len(subjects):
-                raise ValueError("cardinality maximum exceeds subject count")
-        elif minimum is not None or maximum is not None:
-            raise ValueError("only cardinality rules may define count bounds")
-        if self.rule_type != "cardinality" and not related:
-            raise ValueError("non-cardinality rules require related_ids")
-        object.__setattr__(self, "minimum_count", minimum)
-        object.__setattr__(self, "maximum_count", maximum)
-        object.__setattr__(self, "message", text(self.message, context="message"))
-
-    @classmethod
-    def from_mapping(cls, value: Mapping[str, object]) -> CompatibilityRule:
-        strict_keys(
-            value,
-            required={
-                "rule_id",
-                "rule_type",
-                "subject_kind",
-                "subject_ids",
-                "related_ids",
-                "minimum_count",
-                "maximum_count",
-                "message",
-            },
-            context="compatibility rule",
-        )
-        rule_type = value["rule_type"]
-        if rule_type not in {
-            "cardinality",
-            "requires-all",
-            "conflicts-with",
-            "requires-context",
-        }:
-            raise ValueError("unsupported compatibility rule_type")
-        subject_kind = value["subject_kind"]
-        if subject_kind not in {
-            "metric",
-            "objective",
-            "decision",
-            "guardrail",
-            "selector",
-            "context",
-        }:
-            raise ValueError("unsupported compatibility subject_kind")
-        return cls(
-            rule_id=identifier(value["rule_id"], context="rule_id"),
-            rule_type=rule_type,
-            subject_kind=subject_kind,
-            subject_ids=_identifiers(value["subject_ids"], context="subject_ids"),
-            related_ids=_identifiers(value["related_ids"], context="related_ids", allow_empty=True),
-            minimum_count=_optional_integer(
-                value["minimum_count"], context="minimum_count", minimum=0
-            ),
-            maximum_count=_optional_integer(
-                value["maximum_count"], context="maximum_count", minimum=0
-            ),
-            message=text(value["message"], context="message"),
-        )
-
-    def as_dict(self) -> dict[str, object]:
-        return {
-            "rule_id": self.rule_id,
-            "rule_type": self.rule_type,
-            "subject_kind": self.subject_kind,
-            "subject_ids": list(self.subject_ids),
-            "related_ids": list(self.related_ids),
-            "minimum_count": self.minimum_count,
-            "maximum_count": self.maximum_count,
-            "message": self.message,
-        }
-
-
-@dataclass(frozen=True)
 class ExecutionRoute:
     route_id: str
     selector_id: str
@@ -920,7 +614,6 @@ class ExecutionRoute:
     maximum_objectives: int
     search_algorithm_id: str
     search_algorithm_version: str
-    points_per_dimension: int | None
     maximum_m2_candidates: int
     m2_preset_id: str
     m4_preset_id: str
@@ -929,7 +622,6 @@ class ExecutionRoute:
     m4_time_step_s: float
     top_k: int
     feed_anchor_ratios: tuple[float, ...]
-    cache_policy: str
     tie_breaks: tuple[str, ...]
 
     def __post_init__(self) -> None:
@@ -940,7 +632,6 @@ class ExecutionRoute:
             "search_algorithm_version",
             "m2_preset_id",
             "m4_preset_id",
-            "cache_policy",
         ):
             object.__setattr__(self, name, identifier(getattr(self, name), context=name))
         minimum = integer(self.minimum_objectives, context="minimum_objectives", minimum=1)
@@ -949,11 +640,6 @@ class ExecutionRoute:
             raise ValueError("execution route objective range is inverted")
         object.__setattr__(self, "minimum_objectives", minimum)
         object.__setattr__(self, "maximum_objectives", maximum)
-        object.__setattr__(
-            self,
-            "points_per_dimension",
-            _optional_integer(self.points_per_dimension, context="points_per_dimension", minimum=2),
-        )
         object.__setattr__(
             self,
             "maximum_m2_candidates",
@@ -994,7 +680,6 @@ class ExecutionRoute:
                 "maximum_objectives",
                 "search_algorithm_id",
                 "search_algorithm_version",
-                "points_per_dimension",
                 "maximum_m2_candidates",
                 "m2_preset_id",
                 "m4_preset_id",
@@ -1003,7 +688,6 @@ class ExecutionRoute:
                 "m4_time_step_s",
                 "top_k",
                 "feed_anchor_ratios",
-                "cache_policy",
                 "tie_breaks",
             },
             context="execution route",
@@ -1023,9 +707,6 @@ class ExecutionRoute:
             search_algorithm_version=identifier(
                 value["search_algorithm_version"], context="search_algorithm_version"
             ),
-            points_per_dimension=_optional_integer(
-                value["points_per_dimension"], context="points_per_dimension", minimum=2
-            ),
             maximum_m2_candidates=integer(
                 value["maximum_m2_candidates"], context="maximum_m2_candidates", minimum=1
             ),
@@ -1039,7 +720,6 @@ class ExecutionRoute:
                 finite(item, context="feed_anchor_ratio")
                 for item in as_sequence(value["feed_anchor_ratios"], context="feed_anchor_ratios")
             ),
-            cache_policy=identifier(value["cache_policy"], context="cache_policy"),
             tie_breaks=_identifiers(value["tie_breaks"], context="tie_breaks"),
         )
 
@@ -1051,7 +731,6 @@ class ExecutionRoute:
             "maximum_objectives": self.maximum_objectives,
             "search_algorithm_id": self.search_algorithm_id,
             "search_algorithm_version": self.search_algorithm_version,
-            "points_per_dimension": self.points_per_dimension,
             "maximum_m2_candidates": self.maximum_m2_candidates,
             "m2_preset_id": self.m2_preset_id,
             "m4_preset_id": self.m4_preset_id,
@@ -1060,9 +739,16 @@ class ExecutionRoute:
             "m4_time_step_s": self.m4_time_step_s,
             "top_k": self.top_k,
             "feed_anchor_ratios": list(self.feed_anchor_ratios),
-            "cache_policy": self.cache_policy,
             "tie_breaks": list(self.tie_breaks),
         }
+
+    @property
+    def fingerprint(self) -> str:
+        return canonical_fingerprint(self.as_dict())
+
+    @property
+    def ref(self) -> ContractRef:
+        return ContractRef(self.route_id, self.fingerprint)
 
 
 @dataclass(frozen=True)
@@ -1120,13 +806,10 @@ class SystemPolicy:
     policy_id: str
     policy_version: str
     capability_catalog_id: str
-    context_schema_id: str
     claim_scope: str
-    compatibility_rules: tuple[CompatibilityRule, ...]
     execution_routes: tuple[ExecutionRoute, ...]
     hard_guardrails: tuple[GuardrailBinding, ...]
     publishability_guardrails: tuple[GuardrailBinding, ...]
-    allowed_assumptions: tuple[str, ...]
 
     def __post_init__(self) -> None:
         _schema_and_claim(self.schema_version, self.claim_scope)
@@ -1134,15 +817,12 @@ class SystemPolicy:
             "policy_id",
             "policy_version",
             "capability_catalog_id",
-            "context_schema_id",
         ):
             object.__setattr__(self, name, identifier(getattr(self, name), context=name))
-        rules = tuple(self.compatibility_rules)
         routes = tuple(self.execution_routes)
         hard = tuple(self.hard_guardrails)
         publishability = tuple(self.publishability_guardrails)
         for name, values, ids in (
-            ("compatibility rules", rules, tuple(item.rule_id for item in rules)),
             ("execution routes", routes, tuple(item.route_id for item in routes)),
             ("hard guardrails", hard, tuple(item.guardrail_id for item in hard)),
             (
@@ -1165,16 +845,9 @@ class SystemPolicy:
         bound_priorities = tuple(item.priority for item in (*hard, *publishability))
         if len(bound_priorities) != len(set(bound_priorities)):
             raise ValueError("guardrail priorities must not repeat across policy sections")
-        assumptions = tuple(
-            identifier(item, context="allowed_assumption") for item in self.allowed_assumptions
-        )
-        if len(assumptions) != len(set(assumptions)):
-            raise ValueError("allowed_assumptions must be unique")
-        object.__setattr__(self, "compatibility_rules", rules)
         object.__setattr__(self, "execution_routes", routes)
         object.__setattr__(self, "hard_guardrails", hard)
         object.__setattr__(self, "publishability_guardrails", publishability)
-        object.__setattr__(self, "allowed_assumptions", assumptions)
 
     @classmethod
     def from_mapping(cls, value: object) -> SystemPolicy:
@@ -1186,13 +859,10 @@ class SystemPolicy:
                 "policy_id",
                 "policy_version",
                 "capability_catalog_id",
-                "context_schema_id",
                 "claim_scope",
-                "compatibility_rules",
                 "execution_routes",
                 "hard_guardrails",
                 "publishability_guardrails",
-                "allowed_assumptions",
             },
             context="system policy",
         )
@@ -1203,12 +873,7 @@ class SystemPolicy:
             capability_catalog_id=identifier(
                 raw["capability_catalog_id"], context="capability_catalog_id"
             ),
-            context_schema_id=identifier(raw["context_schema_id"], context="context_schema_id"),
             claim_scope=text(raw["claim_scope"], context="claim_scope"),
-            compatibility_rules=tuple(
-                CompatibilityRule.from_mapping(as_mapping(item, context="compatibility rule"))
-                for item in as_sequence(raw["compatibility_rules"], context="compatibility_rules")
-            ),
             execution_routes=tuple(
                 ExecutionRoute.from_mapping(as_mapping(item, context="execution route"))
                 for item in as_sequence(raw["execution_routes"], context="execution_routes")
@@ -1223,9 +888,6 @@ class SystemPolicy:
                     raw["publishability_guardrails"], context="publishability_guardrails"
                 )
             ),
-            allowed_assumptions=_identifiers(
-                raw["allowed_assumptions"], context="allowed_assumptions", allow_empty=True
-            ),
         )
 
     def as_dict(self) -> dict[str, object]:
@@ -1234,15 +896,12 @@ class SystemPolicy:
             "policy_id": self.policy_id,
             "policy_version": self.policy_version,
             "capability_catalog_id": self.capability_catalog_id,
-            "context_schema_id": self.context_schema_id,
             "claim_scope": self.claim_scope,
-            "compatibility_rules": [item.as_dict() for item in self.compatibility_rules],
             "execution_routes": [item.as_dict() for item in self.execution_routes],
             "hard_guardrails": [item.as_dict() for item in self.hard_guardrails],
             "publishability_guardrails": [
                 item.as_dict() for item in self.publishability_guardrails
             ],
-            "allowed_assumptions": list(self.allowed_assumptions),
         }
 
     @property
@@ -1255,51 +914,19 @@ class SystemPolicy:
 
 
 @dataclass(frozen=True)
-class UnifiedCapabilityBundle:
+class CapabilityBundle:
     catalog: CapabilityCatalog
-    context_schema: ContextSchema
     system_policy: SystemPolicy
 
     def __post_init__(self) -> None:
         if not isinstance(self.catalog, CapabilityCatalog):
             raise TypeError("catalog must be CapabilityCatalog")
-        if not isinstance(self.context_schema, ContextSchema):
-            raise TypeError("context_schema must be ContextSchema")
         if not isinstance(self.system_policy, SystemPolicy):
             raise TypeError("system_policy must be SystemPolicy")
         if self.system_policy.capability_catalog_id != self.catalog.catalog_id:
             raise ValueError("system policy references another capability catalog")
-        if self.system_policy.context_schema_id != self.context_schema.context_schema_id:
-            raise ValueError("system policy references another context schema")
-        if (
-            len(
-                {
-                    self.catalog.claim_scope,
-                    self.context_schema.claim_scope,
-                    self.system_policy.claim_scope,
-                }
-            )
-            != 1
-        ):
-            raise ValueError("unified capability claim scopes differ")
-
-        ids_by_kind: dict[str, set[str]] = {
-            "metric": {item.metric_id for item in self.catalog.metrics},
-            "objective": {item.objective_id for item in self.catalog.objectives},
-            "decision": {item.decision_id for item in self.catalog.decisions},
-            "guardrail": {item.guardrail_id for item in self.catalog.guardrails},
-            "selector": {item.selector_id for item in self.catalog.selectors},
-            "context": {item.field_id for item in self.context_schema.fields},
-        }
-        all_ids = set().union(*ids_by_kind.values())
-        for rule in self.system_policy.compatibility_rules:
-            if not set(rule.subject_ids).issubset(ids_by_kind[rule.subject_kind]):
-                raise ValueError("compatibility rule references an unknown subject")
-            if rule.rule_type == "requires-context":
-                if not set(rule.related_ids).issubset(ids_by_kind["context"]):
-                    raise ValueError("requires-context rule references an unknown context field")
-            elif not set(rule.related_ids).issubset(all_ids):
-                raise ValueError("compatibility rule references an unknown related capability")
+        if self.catalog.claim_scope != self.system_policy.claim_scope:
+            raise ValueError("capability claim scopes differ")
 
         selector_by_id = {item.selector_id: item for item in self.catalog.selectors}
         covered_counts: set[int] = set()
@@ -1333,7 +960,6 @@ class UnifiedCapabilityBundle:
         return canonical_fingerprint(
             {
                 "catalog_ref": self.catalog.ref.as_dict(),
-                "context_schema_ref": self.context_schema.ref.as_dict(),
                 "system_policy_ref": self.system_policy.ref.as_dict(),
             }
         )

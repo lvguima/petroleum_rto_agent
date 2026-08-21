@@ -31,9 +31,10 @@ from petroleum_rto.cdu.runtime.contracts import (
     RunRequest,
     RuntimeStatus,
 )
+from petroleum_rto.cdu.runtime.presets import get_preset
 from petroleum_rto.cdu.runtime.resources import (
-    list_runtime_resource_ids,
     read_runtime_resource_bytes,
+    runtime_resource_ids_for_preset,
 )
 
 RunOne = Callable[[RunRequest, Path], RunRecord]
@@ -204,7 +205,7 @@ def _publisher(
             output_root,
             input_resources={
                 resource_id: read_runtime_resource_bytes(resource_id)
-                for resource_id in list_runtime_resource_ids()
+                for resource_id in runtime_resource_ids_for_preset(get_preset(request.preset_id))
             },
         )
 

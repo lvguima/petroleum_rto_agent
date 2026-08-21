@@ -1,4 +1,4 @@
-"""Unified candidate proposal and vector-evaluation contracts."""
+"""Candidate proposal and vector-evaluation contracts."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from .evidence import RunEvidenceRef
 from .problem import ENGINEERING_CLAIM_SCOPE, ObjectiveSense
 from .reference import ContractRef
 
-CANDIDATE_SCHEMA_VERSION: Final[str] = "1.0.0"
+CANDIDATE_SCHEMA_VERSION: Final[str] = "2.0.0"
 EvaluationStatus = Literal[
     "feasible",
     "process_infeasible",

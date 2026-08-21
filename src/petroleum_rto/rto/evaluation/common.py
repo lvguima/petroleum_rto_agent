@@ -1,54 +1,25 @@
-"""Shared strict extraction and paired-evidence checks."""
+"""Stage-neutral invariants shared by paired evaluators."""
 
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
 
-from ..compilation import CompiledPair, assert_compiled_pair
-from ..contracts import (
-    CLAIM_SCOPE,
-    RTO_SCHEMA_VERSION,
-    CandidateEvaluationV1,
-    CandidateProposalV1,
-    ConstraintOutcomeV1,
-    ConstraintRuleV1,
-    EvaluationStage,
-    EvaluationStatus,
-    OptimizationProblemV1,
-    SimulationRunBundleV1,
+from ..capabilities.models import CapabilityCatalog
+from ..compilation import CompiledPair
+from ..compilation.compiler import assert_compiled_pair
+from ..contracts.candidate import CandidateProposal, ConstraintOutcome
+from ..contracts.context import OperatingContext
+from ..contracts.problem import ConstraintRule, OptimizationProblem
+from ..contracts.simulation import (
+    SimulationEvaluationRequest,
+    SimulationPreview,
+    SimulationRunBundle,
 )
 
 
-def path_value(root: object, dotted_path: str) -> object:
-    current = root
-    for part in dotted_path.split("."):
-        if not isinstance(current, Mapping) or part not in current:
-            raise KeyError(dotted_path)
-        current = current[part]
-    return current
-
-
-def finite_path(root: object, dotted_path: str) -> float:
-    value = path_value(root, dotted_path)
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise TypeError(f"{dotted_path} is not numeric")
-    result = float(value)
-    if not math.isfinite(result):
-        raise ValueError(f"{dotted_path} is not finite")
-    return result
-
-
-def boolean_path(root: object, dotted_path: str) -> bool:
-    value = path_value(root, dotted_path)
-    if not isinstance(value, bool):
-        raise TypeError(f"{dotted_path} is not boolean")
-    return value
-
-
 def normalized_action_l1(
-    problem: OptimizationProblemV1,
-    proposal: CandidateProposalV1,
+    problem: OptimizationProblem,
+    proposal: CandidateProposal,
 ) -> float:
     total = 0.0
     for domain in problem.decision_domains:
@@ -59,31 +30,31 @@ def normalized_action_l1(
     return total
 
 
-def constraint_outcome(
-    rule: ConstraintRuleV1,
-    candidate_value: float,
-    *,
-    baseline_value: float | None = None,
-) -> ConstraintOutcomeV1:
+def safe_normalized_action_l1(
+    problem: OptimizationProblem,
+    proposal: CandidateProposal,
+) -> float:
+    try:
+        return normalized_action_l1(problem, proposal)
+    except (KeyError, TypeError, ValueError):
+        return 0.0
+
+
+def constraint_outcome(rule: ConstraintRule, value: float) -> ConstraintOutcome:
     if rule.operator == "le":
-        margin = (rule.limit - candidate_value) / rule.normalization_scale
-        passed = candidate_value <= rule.limit
+        margin = (rule.limit - value) / rule.normalization_scale
+        passed = value <= rule.limit
     elif rule.operator == "ge":
-        margin = (candidate_value - rule.limit) / rule.normalization_scale
-        passed = candidate_value >= rule.limit
+        margin = (value - rule.limit) / rule.normalization_scale
+        passed = value >= rule.limit
     else:
-        margin = -abs(candidate_value - rule.limit) / rule.normalization_scale
-        passed = math.isclose(candidate_value, rule.limit, rel_tol=0.0, abs_tol=1e-12)
-        if passed:
-            margin = 0.0
-    return ConstraintOutcomeV1(
+        passed = math.isclose(value, rule.limit, rel_tol=0.0, abs_tol=1e-12)
+        margin = 0.0 if passed else -abs(value - rule.limit) / rule.normalization_scale
+    return ConstraintOutcome(
         constraint_id=rule.constraint_id,
-        stage=rule.stage,
         metric_id=rule.metric_id,
-        operator=rule.operator,
+        raw_value=value,
         limit=rule.limit,
-        candidate_value=candidate_value,
-        baseline_value=baseline_value,
         normalized_margin=margin,
         passed=passed,
     )
@@ -91,14 +62,16 @@ def constraint_outcome(
 
 def validate_pair_bundles(
     pair: CompiledPair,
-    baseline: SimulationRunBundleV1,
-    candidate: SimulationRunBundleV1,
+    problem: OptimizationProblem,
+    catalog: CapabilityCatalog,
+    baseline: SimulationRunBundle,
+    candidate: SimulationRunBundle,
 ) -> None:
-    assert_compiled_pair(pair)
+    assert_compiled_pair(pair, problem, catalog)
     if pair.baseline.provider_request_fingerprint != baseline.provider_request_fingerprint:
-        raise ValueError("baseline evidence does not match the compiled provider request")
+        raise ValueError("baseline evidence does not match its compiled provider request")
     if pair.candidate.provider_request_fingerprint != candidate.provider_request_fingerprint:
-        raise ValueError("candidate evidence does not match the compiled provider request")
+        raise ValueError("candidate evidence does not match its compiled provider request")
     if (
         baseline.provider_id != candidate.provider_id
         or baseline.provider_id != pair.baseline.provider_id
@@ -126,36 +99,25 @@ def validate_pair_bundles(
         raise ValueError("paired evidence stable source fingerprints differ")
 
 
-def error_evaluation(
-    problem: OptimizationProblemV1,
-    proposal: CandidateProposalV1,
-    *,
-    stage: EvaluationStage,
-    status: EvaluationStatus,
-    reason_code: str,
-) -> CandidateEvaluationV1:
-    if status not in {"invalid_request", "evaluation_error"}:
-        raise ValueError("error evaluation status must be invalid_request or evaluation_error")
-    return CandidateEvaluationV1(
-        schema_version=RTO_SCHEMA_VERSION,
-        evaluation_version="candidate-evaluation-v1",
-        stage=stage,
-        status=status,
-        problem_ref=problem.ref,
-        context_ref=problem.context_ref,
-        proposal_ref=proposal.ref,
-        pair_id=f"pair-{stage.lower()}-{proposal.fingerprint[:16]}",
-        objective_metric_id=None,
-        baseline_objective=None,
-        candidate_objective=None,
-        objective_delta=None,
-        relative_improvement=None,
-        metrics={},
-        constraints=(),
-        minimum_normalized_margin=None,
-        normalized_action_l1=normalized_action_l1(problem, proposal),
-        reason_codes=(reason_code,),
-        baseline_evidence=None,
-        candidate_evidence=None,
-        claim_scope=CLAIM_SCOPE,
-    )
+def validate_preview(
+    request: SimulationEvaluationRequest,
+    preview: SimulationPreview,
+    context: OperatingContext,
+) -> None:
+    if preview.simulation_request_ref != request.ref:
+        raise ValueError("preview references another simulation request")
+    if preview.provider_id != request.provider_id:
+        raise ValueError("preview provider differs from the simulation request")
+    if preview.base_object_fingerprints.get("model") != context.model_ref.fingerprint:
+        raise ValueError("preview model fingerprint differs from the operating context")
+    if preview.base_object_fingerprints.get("case") != context.case_ref.fingerprint:
+        raise ValueError("preview case fingerprint differs from the operating context")
+
+
+__all__ = [
+    "constraint_outcome",
+    "normalized_action_l1",
+    "safe_normalized_action_l1",
+    "validate_pair_bundles",
+    "validate_preview",
+]

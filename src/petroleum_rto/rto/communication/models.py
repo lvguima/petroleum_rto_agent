@@ -1,4 +1,4 @@
-"""Strict contracts for communication between a domain model and unified RTO."""
+"""Strict contracts for communication between a domain model and RTO."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from ..contracts.common import (
     thaw_json,
 )
 from ..contracts.reference import ContractRef
-from ..unified_inputs import (
+from ..intent import (
     OPTIMIZATION_INTENT_SCHEMA_ID,
     OPTIMIZATION_INTENT_SCHEMA_VERSION,
     OptimizationIntent,
@@ -769,11 +769,38 @@ class DomainCapabilityManifest:
     def from_public(cls, manifest: PublicCapabilityManifest) -> DomainCapabilityManifest:
         if not isinstance(manifest, PublicCapabilityManifest):
             raise TypeError("manifest must be PublicCapabilityManifest")
+        available_objectives = tuple(
+            row for row in manifest.objectives if row["availability"] == "available"
+        )
+        available_decisions = tuple(
+            row for row in manifest.decisions if row["availability"] == "available"
+        )
+        objective_minimum = min(
+            integer(row["minimum_objectives"], context="minimum_objectives", minimum=1)
+            for row in manifest.execution_routes
+        )
+        objective_maximum = max(
+            integer(row["maximum_objectives"], context="maximum_objectives", minimum=1)
+            for row in manifest.execution_routes
+        )
         cardinality_rules = tuple(
-            row
-            for row in manifest.compatibility_rules
-            if row["rule_type"] == "cardinality"
-            and row["subject_kind"] in {"objective", "decision"}
+            freeze_json_mapping(row, context="derived cardinality rule")
+            for row in (
+                {
+                    "rule_id": "available-decision-cardinality",
+                    "subject_kind": "decision",
+                    "subject_ids": tuple(row["decision_id"] for row in available_decisions),
+                    "minimum_count": 1,
+                    "maximum_count": len(available_decisions),
+                },
+                {
+                    "rule_id": "execution-route-objective-cardinality",
+                    "subject_kind": "objective",
+                    "subject_ids": tuple(row["objective_id"] for row in available_objectives),
+                    "minimum_count": objective_minimum,
+                    "maximum_count": objective_maximum,
+                },
+            )
         )
         return cls(
             schema_id=DOMAIN_CAPABILITY_MANIFEST_SCHEMA_ID,
@@ -1007,7 +1034,7 @@ class DomainModelRequest:
         if attempt > 1 and not issues:
             raise ValueError("repair attempts require structured feedback issues")
         if self.output_schema_id != OPTIMIZATION_INTENT_SCHEMA_ID:
-            raise ValueError("output_schema_id must be the unified OptimizationIntent schema")
+            raise ValueError("output_schema_id must be the OptimizationIntent schema")
         if self.output_schema_version != OPTIMIZATION_INTENT_SCHEMA_VERSION:
             raise ValueError("output_schema_version differs from OptimizationIntent")
 

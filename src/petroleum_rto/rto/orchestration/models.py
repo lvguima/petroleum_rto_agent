@@ -1,4 +1,4 @@
-"""Strict R6 offline workflow request, result, event and manifest contracts."""
+"""Strict objective-count-neutral offline workflow artifact contracts."""
 
 from __future__ import annotations
 
@@ -7,22 +7,21 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import PurePosixPath
 from types import MappingProxyType
-from typing import Literal
+from typing import Final, Literal
 
-from ..contracts import (
-    CLAIM_SCOPE,
-    RTO_SCHEMA_VERSION,
-    CandidateEvaluationV1,
-    CandidateProposalV1,
-    ContractRef,
-    OperatingContextV1,
-    OptimizationProblemV1,
+from ..capabilities.models import (
+    CapabilityBundle,
+    CapabilityCatalog,
+    SystemPolicy,
 )
+from ..contracts.candidate import CandidateEvaluation, CandidateProposal
 from ..contracts.common import (
     as_mapping,
     as_sequence,
+    boolean,
     canonical_fingerprint,
     digest,
+    finite,
     identifier,
     integer,
     numeric_mapping,
@@ -30,17 +29,29 @@ from ..contracts.common import (
     string_mapping,
     text,
 )
+from ..contracts.context import OperatingContext
+from ..contracts.finalization import (
+    FinalizationResult,
+    PublishabilityAssessment,
+)
+from ..contracts.problem import ENGINEERING_CLAIM_SCOPE, OptimizationProblem
+from ..contracts.reference import ContractRef
+from ..contracts.solver_result import SolverResult
+from ..solvers.models import SolverRoutingDecision
 
+OFFLINE_WORKFLOW_SCHEMA_ID: Final[str] = "offline-rto-workflow"
+OFFLINE_WORKFLOW_SCHEMA_VERSION: Final[str] = "2.0.0"
+OFFLINE_MANIFEST_VERSION: Final[str] = "offline-rto-manifest-2.0.0"
 OfflineRunStatus = Literal["completed_draft", "completed_without_strategy", "failed"]
+CoveragePolicy = Literal["point", "sampled-anchors"]
 
 
-def _schema(value: str) -> None:
-    if value != RTO_SCHEMA_VERSION:
-        raise ValueError("schema_version differs from the RTO V1 contract")
-
-
-def _claim(value: str) -> None:
-    if value != CLAIM_SCOPE:
+def _schema_claim(schema_id: str, schema_version: str, claim_scope: str) -> None:
+    if schema_id != OFFLINE_WORKFLOW_SCHEMA_ID:
+        raise ValueError("schema_id differs from the offline workflow contract")
+    if schema_version != OFFLINE_WORKFLOW_SCHEMA_VERSION:
+        raise ValueError("schema_version differs from the offline workflow contract")
+    if claim_scope != ENGINEERING_CLAIM_SCOPE:
         raise ValueError("claim_scope must be engineering_simulation_only")
 
 
@@ -49,7 +60,7 @@ def _timestamp(value: object, *, context: str) -> str:
     try:
         parsed = datetime.fromisoformat(raw)
     except ValueError as exc:
-        raise ValueError(f"{context} must be an ISO-8601 timestamp") from exc
+        raise ValueError(f"{context} must be ISO-8601") from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError(f"{context} must include an explicit timezone")
     return raw
@@ -59,289 +70,75 @@ def _optional_ref(value: object, *, context: str) -> ContractRef | None:
     return None if value is None else ContractRef.from_mapping(as_mapping(value, context=context))
 
 
-@dataclass(frozen=True)
-class AnchorAttemptV1:
-    ratio: float
-    context: OperatingContextV1
-    problem: OptimizationProblemV1
-    proposal: CandidateProposalV1
-    static_evaluation: CandidateEvaluationV1
-    dynamic_evaluation: CandidateEvaluationV1 | None
-
-    def __post_init__(self) -> None:
-        from ..contracts.common import finite
-
-        object.__setattr__(self, "ratio", finite(self.ratio, context="anchor ratio"))
-        if self.ratio <= 0.0:
-            raise ValueError("anchor ratio must be positive")
-        if self.problem.context_ref != self.context.ref:
-            raise ValueError("anchor problem references another context")
-        if (
-            self.proposal.problem_ref != self.problem.ref
-            or self.proposal.context_ref != self.context.ref
-        ):
-            raise ValueError("anchor proposal references another problem or context")
-        if (
-            self.static_evaluation.stage != "M2"
-            or self.static_evaluation.proposal_ref != self.proposal.ref
-        ):
-            raise ValueError("anchor static evaluation differs from proposal")
-        if self.dynamic_evaluation is not None and (
-            self.dynamic_evaluation.stage != "M4"
-            or self.dynamic_evaluation.proposal_ref != self.proposal.ref
-        ):
-            raise ValueError("anchor dynamic evaluation differs from proposal")
-        if self.static_evaluation.status != "feasible" and self.dynamic_evaluation is not None:
-            raise ValueError("non-feasible M2 anchor must not execute M4")
-
-    @property
-    def passed(self) -> bool:
-        return (
-            self.static_evaluation.status == "feasible"
-            and self.dynamic_evaluation is not None
-            and self.dynamic_evaluation.status == "feasible"
-        )
-
-    def fingerprint_payload(self) -> dict[str, object]:
-        return {
-            "ratio": self.ratio,
-            "context_ref": self.context.ref.as_dict(),
-            "problem_ref": self.problem.ref.as_dict(),
-            "proposal_ref": self.proposal.ref.as_dict(),
-            "static_evaluation_ref": self.static_evaluation.ref.as_dict(),
-            "dynamic_evaluation_ref": (
-                None if self.dynamic_evaluation is None else self.dynamic_evaluation.ref.as_dict()
-            ),
-            "passed": self.passed,
-        }
-
-    def as_dict(self) -> dict[str, object]:
-        return {
-            **self.fingerprint_payload(),
-            "context": self.context.fingerprint_payload(),
-            "problem": self.problem.as_dict(),
-            "proposal": self.proposal.as_dict(),
-            "static_evaluation": self.static_evaluation.as_dict(),
-            "dynamic_evaluation": (
-                None if self.dynamic_evaluation is None else self.dynamic_evaluation.as_dict()
-            ),
-        }
-
-    @classmethod
-    def from_mapping(cls, value: Mapping[str, object]) -> AnchorAttemptV1:
-        from ..contracts.common import finite
-
-        required = {
-            "ratio",
-            "context_ref",
-            "problem_ref",
-            "proposal_ref",
-            "static_evaluation_ref",
-            "dynamic_evaluation_ref",
-            "passed",
-            "context",
-            "problem",
-            "proposal",
-            "static_evaluation",
-            "dynamic_evaluation",
-        }
-        strict_keys(value, required=required, context="anchor attempt")
-        dynamic_raw = value["dynamic_evaluation"]
-        result = cls(
-            ratio=finite(value["ratio"], context="ratio"),
-            context=OperatingContextV1.from_mapping(
-                as_mapping(value["context"], context="context")
-            ),
-            problem=OptimizationProblemV1.from_mapping(
-                as_mapping(value["problem"], context="problem")
-            ),
-            proposal=CandidateProposalV1.from_mapping(
-                as_mapping(value["proposal"], context="proposal")
-            ),
-            static_evaluation=CandidateEvaluationV1.from_mapping(
-                as_mapping(value["static_evaluation"], context="static_evaluation")
-            ),
-            dynamic_evaluation=(
-                None
-                if dynamic_raw is None
-                else CandidateEvaluationV1.from_mapping(
-                    as_mapping(dynamic_raw, context="dynamic_evaluation")
-                )
-            ),
-        )
-        refs = {
-            "context_ref": result.context.ref,
-            "problem_ref": result.problem.ref,
-            "proposal_ref": result.proposal.ref,
-            "static_evaluation_ref": result.static_evaluation.ref,
-            "dynamic_evaluation_ref": (
-                None if result.dynamic_evaluation is None else result.dynamic_evaluation.ref
-            ),
-        }
-        for field, expected in refs.items():
-            supplied = _optional_ref(value[field], context=field)
-            if supplied != expected:
-                raise ValueError(f"{field} differs from embedded anchor object")
-        from ..contracts.common import boolean
-
-        if boolean(value["passed"], context="passed") != result.passed:
-            raise ValueError("anchor passed flag differs from evaluations")
-        return result
+def _validate_identity(
+    value: Mapping[str, object],
+    *,
+    ref: ContractRef,
+    ref_field: str,
+    fingerprint_field: str,
+) -> None:
+    supplied_ref = value.get(ref_field)
+    if (
+        supplied_ref is not None
+        and ContractRef.from_mapping(as_mapping(supplied_ref, context=ref_field)) != ref
+    ):
+        raise ValueError(f"{ref_field} differs from artifact content")
+    supplied_fingerprint = value.get(fingerprint_field)
+    if (
+        supplied_fingerprint is not None
+        and digest(supplied_fingerprint, context=fingerprint_field) != ref.fingerprint
+    ):
+        raise ValueError(f"{fingerprint_field} differs from artifact content")
 
 
 @dataclass(frozen=True)
-class AnchorValidationResultV1:
-    schema_version: str
-    validation_version: str
-    selected_action: Mapping[str, float]
-    attempts: tuple[AnchorAttemptV1, ...]
-    claim_scope: str
+class OfflineRtoRequest:
+    """Trusted wrapper joining one business intent to one operating context."""
 
-    def __post_init__(self) -> None:
-        _schema(self.schema_version)
-        _claim(self.claim_scope)
-        object.__setattr__(
-            self,
-            "validation_version",
-            identifier(self.validation_version, context="validation_version"),
-        )
-        action = numeric_mapping(self.selected_action, context="selected_action")
-        if set(action) != {
-            "furnace_temperature_target_k",
-            "tower_top_pressure_target_pa_a",
-        }:
-            raise ValueError("selected_action must contain exactly two V1 variables")
-        object.__setattr__(self, "selected_action", action)
-        attempts = tuple(self.attempts)
-        ratios = tuple(item.ratio for item in attempts)
-        if not attempts or ratios != tuple(sorted(set(ratios))):
-            raise ValueError("anchor attempts must be non-empty, unique and sorted")
-        if any(dict(item.proposal.decision_values) != dict(action) for item in attempts):
-            raise ValueError("anchor attempts must evaluate the selected action")
-        object.__setattr__(self, "attempts", attempts)
-
-    @property
-    def passed_attempts(self) -> tuple[AnchorAttemptV1, ...]:
-        return tuple(item for item in self.attempts if item.passed)
-
-    def fingerprint_payload(self) -> dict[str, object]:
-        return {
-            "schema_version": self.schema_version,
-            "validation_version": self.validation_version,
-            "selected_action": dict(self.selected_action),
-            "attempts": [item.fingerprint_payload() for item in self.attempts],
-            "claim_scope": self.claim_scope,
-        }
-
-    @property
-    def fingerprint(self) -> str:
-        return canonical_fingerprint(self.fingerprint_payload())
-
-    @property
-    def ref(self) -> ContractRef:
-        return ContractRef(f"anchor-validation-{self.fingerprint[:16]}", self.fingerprint)
-
-    def as_dict(self) -> dict[str, object]:
-        return {
-            **self.fingerprint_payload(),
-            "validation_ref": self.ref.as_dict(),
-            "attempts": [item.as_dict() for item in self.attempts],
-        }
-
-    @classmethod
-    def from_mapping(cls, value: Mapping[str, object]) -> AnchorValidationResultV1:
-        required = {
-            "schema_version",
-            "validation_version",
-            "selected_action",
-            "attempts",
-            "claim_scope",
-        }
-        strict_keys(
-            value, required=required, optional={"validation_ref"}, context="anchor validation"
-        )
-        result = cls(
-            schema_version=text(value["schema_version"], context="schema_version"),
-            validation_version=identifier(
-                value["validation_version"], context="validation_version"
-            ),
-            selected_action=numeric_mapping(value["selected_action"], context="selected_action"),
-            attempts=tuple(
-                AnchorAttemptV1.from_mapping(as_mapping(item, context="anchor attempt"))
-                for item in as_sequence(value["attempts"], context="attempts")
-            ),
-            claim_scope=text(value["claim_scope"], context="claim_scope"),
-        )
-        if value.get("validation_ref") is not None:
-            supplied = ContractRef.from_mapping(
-                as_mapping(value["validation_ref"], context="validation_ref")
-            )
-            if supplied != result.ref:
-                raise ValueError("validation_ref differs from anchor validation")
-        return result
-
-
-@dataclass(frozen=True)
-class OfflineRtoRequestV1:
+    schema_id: str
     schema_version: str
     request_version: str
     intent_ref: ContractRef
     context_ref: ContractRef
-    decision_catalog_ref: ContractRef
-    kpi_catalog_ref: ContractRef
-    constraint_profile_ref: ContractRef
-    policy_ref: ContractRef
+    capability_catalog_ref: ContractRef
+    system_policy_ref: ContractRef
+    execution_route_ref: ContractRef
     provider_id: str
-    coverage_policy: str
+    coverage_policy: CoveragePolicy
     claim_scope: str
-    external_request_ref: ContractRef | None = None
 
     def __post_init__(self) -> None:
-        _schema(self.schema_version)
-        _claim(self.claim_scope)
+        _schema_claim(self.schema_id, self.schema_version, self.claim_scope)
         object.__setattr__(
             self, "request_version", identifier(self.request_version, context="request_version")
         )
         for name in (
             "intent_ref",
             "context_ref",
-            "decision_catalog_ref",
-            "kpi_catalog_ref",
-            "constraint_profile_ref",
-            "policy_ref",
+            "capability_catalog_ref",
+            "system_policy_ref",
+            "execution_route_ref",
         ):
             if not isinstance(getattr(self, name), ContractRef):
-                raise TypeError(f"{name} must be a ContractRef")
-        if self.external_request_ref is not None and not isinstance(
-            self.external_request_ref, ContractRef
-        ):
-            raise TypeError("external_request_ref must be a ContractRef or None")
+                raise TypeError(f"{name} must be ContractRef")
         object.__setattr__(self, "provider_id", identifier(self.provider_id, context="provider_id"))
-        object.__setattr__(
-            self,
-            "coverage_policy",
-            identifier(self.coverage_policy, context="coverage_policy"),
-        )
         if self.coverage_policy not in {"point", "sampled-anchors"}:
-            raise ValueError("unsupported offline coverage_policy")
+            raise ValueError("unsupported coverage policy")
 
     def fingerprint_payload(self) -> dict[str, object]:
-        payload: dict[str, object] = {
+        return {
+            "schema_id": self.schema_id,
             "schema_version": self.schema_version,
             "request_version": self.request_version,
             "intent_ref": self.intent_ref.as_dict(),
             "context_ref": self.context_ref.as_dict(),
-            "decision_catalog_ref": self.decision_catalog_ref.as_dict(),
-            "kpi_catalog_ref": self.kpi_catalog_ref.as_dict(),
-            "constraint_profile_ref": self.constraint_profile_ref.as_dict(),
-            "policy_ref": self.policy_ref.as_dict(),
+            "capability_catalog_ref": self.capability_catalog_ref.as_dict(),
+            "system_policy_ref": self.system_policy_ref.as_dict(),
+            "execution_route_ref": self.execution_route_ref.as_dict(),
             "provider_id": self.provider_id,
             "coverage_policy": self.coverage_policy,
             "claim_scope": self.claim_scope,
         }
-        if self.external_request_ref is not None:
-            payload["external_request_ref"] = self.external_request_ref.as_dict()
-        return payload
 
     @property
     def fingerprint(self) -> str:
@@ -363,57 +160,47 @@ class OfflineRtoRequestV1:
         }
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, object]) -> OfflineRtoRequestV1:
-        required = {
-            "schema_version",
-            "request_version",
+    def from_mapping(cls, value: Mapping[str, object]) -> OfflineRtoRequest:
+        ref_fields = {
             "intent_ref",
             "context_ref",
-            "decision_catalog_ref",
-            "kpi_catalog_ref",
-            "constraint_profile_ref",
-            "policy_ref",
-            "provider_id",
-            "coverage_policy",
-            "claim_scope",
+            "capability_catalog_ref",
+            "system_policy_ref",
+            "execution_route_ref",
         }
         strict_keys(
             value,
-            required=required,
-            optional={"workflow_id", "request_fingerprint", "external_request_ref"},
+            required={
+                "schema_id",
+                "schema_version",
+                "request_version",
+                *ref_fields,
+                "provider_id",
+                "coverage_policy",
+                "claim_scope",
+            },
+            optional={"workflow_id", "request_fingerprint"},
             context="offline RTO request",
         )
+        coverage = value["coverage_policy"]
+        if coverage not in {"point", "sampled-anchors"}:
+            raise ValueError("unsupported coverage policy")
+        refs = {
+            name: ContractRef.from_mapping(as_mapping(value[name], context=name))
+            for name in ref_fields
+        }
         result = cls(
+            schema_id=text(value["schema_id"], context="schema_id"),
             schema_version=text(value["schema_version"], context="schema_version"),
             request_version=identifier(value["request_version"], context="request_version"),
-            intent_ref=ContractRef.from_mapping(
-                as_mapping(value["intent_ref"], context="intent_ref")
-            ),
-            context_ref=ContractRef.from_mapping(
-                as_mapping(value["context_ref"], context="context_ref")
-            ),
-            decision_catalog_ref=ContractRef.from_mapping(
-                as_mapping(value["decision_catalog_ref"], context="decision_catalog_ref")
-            ),
-            kpi_catalog_ref=ContractRef.from_mapping(
-                as_mapping(value["kpi_catalog_ref"], context="kpi_catalog_ref")
-            ),
-            constraint_profile_ref=ContractRef.from_mapping(
-                as_mapping(value["constraint_profile_ref"], context="constraint_profile_ref")
-            ),
-            policy_ref=ContractRef.from_mapping(
-                as_mapping(value["policy_ref"], context="policy_ref")
-            ),
+            intent_ref=refs["intent_ref"],
+            context_ref=refs["context_ref"],
+            capability_catalog_ref=refs["capability_catalog_ref"],
+            system_policy_ref=refs["system_policy_ref"],
+            execution_route_ref=refs["execution_route_ref"],
             provider_id=identifier(value["provider_id"], context="provider_id"),
-            coverage_policy=identifier(value["coverage_policy"], context="coverage_policy"),
+            coverage_policy=coverage,
             claim_scope=text(value["claim_scope"], context="claim_scope"),
-            external_request_ref=(
-                None
-                if value.get("external_request_ref") is None
-                else ContractRef.from_mapping(
-                    as_mapping(value["external_request_ref"], context="external_request_ref")
-                )
-            ),
         )
         if value.get("workflow_id") not in {None, result.workflow_id}:
             raise ValueError("workflow_id differs from request content")
@@ -427,41 +214,209 @@ class OfflineRtoRequestV1:
 
 
 @dataclass(frozen=True)
-class OfflineRtoResultV1:
+class CapabilityBundleSnapshot:
+    """Complete internal capability inputs required for portable strict replay."""
+
+    schema_id: str
     schema_version: str
-    result_version: str
-    status: OfflineRunStatus
-    request_ref: ContractRef
+    snapshot_version: str
+    bundle: CapabilityBundle
+    claim_scope: str
+
+    def __post_init__(self) -> None:
+        _schema_claim(self.schema_id, self.schema_version, self.claim_scope)
+        object.__setattr__(
+            self,
+            "snapshot_version",
+            identifier(self.snapshot_version, context="snapshot_version"),
+        )
+        if not isinstance(self.bundle, CapabilityBundle):
+            raise TypeError("bundle must be CapabilityBundle")
+        if self.bundle.catalog.claim_scope != self.claim_scope:
+            raise ValueError("capability bundle claim scope differs from its snapshot")
+
+    def fingerprint_payload(self) -> dict[str, object]:
+        return {
+            "schema_id": self.schema_id,
+            "schema_version": self.schema_version,
+            "snapshot_version": self.snapshot_version,
+            "catalog": self.bundle.catalog.as_dict(),
+            "system_policy": self.bundle.system_policy.as_dict(),
+            "bundle_fingerprint": self.bundle.fingerprint,
+            "claim_scope": self.claim_scope,
+        }
+
+    @property
+    def fingerprint(self) -> str:
+        return canonical_fingerprint(self.fingerprint_payload())
+
+    @property
+    def ref(self) -> ContractRef:
+        return ContractRef(f"capability-snapshot-{self.fingerprint[:16]}", self.fingerprint)
+
+    def as_dict(self) -> dict[str, object]:
+        return {**self.fingerprint_payload(), "snapshot_ref": self.ref.as_dict()}
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, object]) -> CapabilityBundleSnapshot:
+        strict_keys(
+            value,
+            required={
+                "schema_id",
+                "schema_version",
+                "snapshot_version",
+                "catalog",
+                "system_policy",
+                "bundle_fingerprint",
+                "claim_scope",
+            },
+            optional={"snapshot_ref"},
+            context="capability bundle snapshot",
+        )
+        bundle = CapabilityBundle(
+            catalog=CapabilityCatalog.from_mapping(value["catalog"]),
+            system_policy=SystemPolicy.from_mapping(value["system_policy"]),
+        )
+        if digest(value["bundle_fingerprint"], context="bundle_fingerprint") != bundle.fingerprint:
+            raise ValueError("bundle_fingerprint differs from nested capability objects")
+        result = cls(
+            schema_id=text(value["schema_id"], context="schema_id"),
+            schema_version=text(value["schema_version"], context="schema_version"),
+            snapshot_version=identifier(value["snapshot_version"], context="snapshot_version"),
+            bundle=bundle,
+            claim_scope=text(value["claim_scope"], context="claim_scope"),
+        )
+        supplied = value.get("snapshot_ref")
+        if (
+            supplied is not None
+            and ContractRef.from_mapping(as_mapping(supplied, context="snapshot_ref")) != result.ref
+        ):
+            raise ValueError("snapshot_ref differs from capability content")
+        return result
+
+
+@dataclass(frozen=True)
+class SolverExecutionArtifact:
+    """Persist the solver result together with its referenced proposals and M2 evidence."""
+
+    schema_id: str
+    schema_version: str
+    execution_version: str
+    routing_fingerprint: str
+    result: SolverResult
+    claim_scope: str
+
+    def __post_init__(self) -> None:
+        _schema_claim(self.schema_id, self.schema_version, self.claim_scope)
+        object.__setattr__(
+            self,
+            "execution_version",
+            identifier(self.execution_version, context="execution_version"),
+        )
+        object.__setattr__(
+            self,
+            "routing_fingerprint",
+            digest(self.routing_fingerprint, context="routing_fingerprint"),
+        )
+        if not isinstance(self.result, SolverResult):
+            raise TypeError("result must be SolverResult")
+
+    def fingerprint_payload(self) -> dict[str, object]:
+        return {
+            "schema_id": self.schema_id,
+            "schema_version": self.schema_version,
+            "execution_version": self.execution_version,
+            "routing_fingerprint": self.routing_fingerprint,
+            "solver_result": self.result.fingerprint_payload(),
+            "claim_scope": self.claim_scope,
+        }
+
+    @property
+    def fingerprint(self) -> str:
+        return canonical_fingerprint(self.fingerprint_payload())
+
+    @property
+    def ref(self) -> ContractRef:
+        return ContractRef(f"solver-execution-{self.fingerprint[:16]}", self.fingerprint)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            **self.fingerprint_payload(),
+            "solver_result": self.result.as_dict(),
+            "execution_ref": self.ref.as_dict(),
+        }
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, object]) -> SolverExecutionArtifact:
+        strict_keys(
+            value,
+            required={
+                "schema_id",
+                "schema_version",
+                "execution_version",
+                "routing_fingerprint",
+                "solver_result",
+                "claim_scope",
+            },
+            optional={"execution_ref"},
+            context="solver execution artifact",
+        )
+        result = cls(
+            schema_id=text(value["schema_id"], context="schema_id"),
+            schema_version=text(value["schema_version"], context="schema_version"),
+            execution_version=identifier(value["execution_version"], context="execution_version"),
+            routing_fingerprint=digest(value["routing_fingerprint"], context="routing_fingerprint"),
+            result=SolverResult.from_mapping(
+                as_mapping(value["solver_result"], context="solver_result")
+            ),
+            claim_scope=text(value["claim_scope"], context="claim_scope"),
+        )
+        supplied = value.get("execution_ref")
+        if (
+            supplied is not None
+            and ContractRef.from_mapping(as_mapping(supplied, context="execution_ref"))
+            != result.ref
+        ):
+            raise ValueError("execution_ref differs from solver execution content")
+        return result
+
+
+@dataclass(frozen=True)
+class DynamicVerificationArtifact:
+    """Ordered M4 evaluations for exactly one static shortlist prefix."""
+
+    schema_id: str
+    schema_version: str
+    verification_version: str
     problem_ref: ContractRef
-    static_search_ref: ContractRef
-    optimization_result_ref: ContractRef
-    strategy_ref: ContractRef | None
-    requested_anchor_count: int
-    passed_anchor_count: int
+    static_selection_ref: ContractRef
+    evaluations: tuple[CandidateEvaluation, ...]
+    applicable: bool
     termination_reason: str
     claim_scope: str
 
     def __post_init__(self) -> None:
-        _schema(self.schema_version)
-        _claim(self.claim_scope)
+        _schema_claim(self.schema_id, self.schema_version, self.claim_scope)
         object.__setattr__(
-            self, "result_version", identifier(self.result_version, context="result_version")
+            self,
+            "verification_version",
+            identifier(self.verification_version, context="verification_version"),
         )
-        if self.status not in {"completed_draft", "completed_without_strategy", "failed"}:
-            raise ValueError("unsupported offline RTO result status")
-        for name in ("request_ref", "problem_ref", "static_search_ref", "optimization_result_ref"):
+        for name in ("problem_ref", "static_selection_ref"):
             if not isinstance(getattr(self, name), ContractRef):
-                raise TypeError(f"{name} must be a ContractRef")
-        if self.strategy_ref is not None and not isinstance(self.strategy_ref, ContractRef):
-            raise TypeError("strategy_ref must be a ContractRef")
-        for name in ("requested_anchor_count", "passed_anchor_count"):
-            object.__setattr__(self, name, integer(getattr(self, name), context=name))
-        if self.passed_anchor_count > self.requested_anchor_count:
-            raise ValueError("passed_anchor_count exceeds requested_anchor_count")
-        if (self.status == "completed_draft") != (self.strategy_ref is not None):
-            raise ValueError("only completed_draft may contain a strategy_ref")
-        if self.status == "completed_draft" and self.passed_anchor_count < 1:
-            raise ValueError("completed draft requires at least one passing anchor")
+                raise TypeError(f"{name} must be ContractRef")
+        evaluations = tuple(self.evaluations)
+        if any(not isinstance(item, CandidateEvaluation) for item in evaluations):
+            raise TypeError("dynamic evaluations must contain CandidateEvaluation")
+        if any(item.stage != "M4" or item.problem_ref != self.problem_ref for item in evaluations):
+            raise ValueError("dynamic evaluations differ from the verification problem or stage")
+        refs = tuple(item.proposal_ref for item in evaluations)
+        if len(refs) != len(set(refs)):
+            raise ValueError("dynamic evaluations must contain unique proposals")
+        object.__setattr__(self, "evaluations", evaluations)
+        object.__setattr__(self, "applicable", boolean(self.applicable, context="applicable"))
+        if self.applicable != bool(evaluations):
+            raise ValueError("applicable must equal whether M4 evaluations exist")
         object.__setattr__(
             self,
             "termination_reason",
@@ -470,13 +425,486 @@ class OfflineRtoResultV1:
 
     def fingerprint_payload(self) -> dict[str, object]:
         return {
+            "schema_id": self.schema_id,
+            "schema_version": self.schema_version,
+            "verification_version": self.verification_version,
+            "problem_ref": self.problem_ref.as_dict(),
+            "static_selection_ref": self.static_selection_ref.as_dict(),
+            "evaluations": [item.fingerprint_payload() for item in self.evaluations],
+            "applicable": self.applicable,
+            "termination_reason": self.termination_reason,
+            "claim_scope": self.claim_scope,
+        }
+
+    @property
+    def fingerprint(self) -> str:
+        return canonical_fingerprint(self.fingerprint_payload())
+
+    @property
+    def ref(self) -> ContractRef:
+        return ContractRef(f"dynamic-verification-{self.fingerprint[:16]}", self.fingerprint)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            **self.fingerprint_payload(),
+            "evaluations": [item.as_dict() for item in self.evaluations],
+            "verification_ref": self.ref.as_dict(),
+        }
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, object]) -> DynamicVerificationArtifact:
+        strict_keys(
+            value,
+            required={
+                "schema_id",
+                "schema_version",
+                "verification_version",
+                "problem_ref",
+                "static_selection_ref",
+                "evaluations",
+                "applicable",
+                "termination_reason",
+                "claim_scope",
+            },
+            optional={"verification_ref"},
+            context="dynamic verification artifact",
+        )
+        result = cls(
+            schema_id=text(value["schema_id"], context="schema_id"),
+            schema_version=text(value["schema_version"], context="schema_version"),
+            verification_version=identifier(
+                value["verification_version"], context="verification_version"
+            ),
+            problem_ref=ContractRef.from_mapping(
+                as_mapping(value["problem_ref"], context="problem_ref")
+            ),
+            static_selection_ref=ContractRef.from_mapping(
+                as_mapping(value["static_selection_ref"], context="static_selection_ref")
+            ),
+            evaluations=tuple(
+                CandidateEvaluation.from_mapping(as_mapping(item, context="dynamic evaluation"))
+                for item in as_sequence(value["evaluations"], context="evaluations")
+            ),
+            applicable=boolean(value["applicable"], context="applicable"),
+            termination_reason=identifier(
+                value["termination_reason"], context="termination_reason"
+            ),
+            claim_scope=text(value["claim_scope"], context="claim_scope"),
+        )
+        supplied = value.get("verification_ref")
+        if (
+            supplied is not None
+            and ContractRef.from_mapping(as_mapping(supplied, context="verification_ref"))
+            != result.ref
+        ):
+            raise ValueError("verification_ref differs from dynamic verification content")
+        return result
+
+
+@dataclass(frozen=True)
+class FinalizationArtifact:
+    """Single-file commit of optional publishability and the terminal selector result."""
+
+    schema_id: str
+    schema_version: str
+    artifact_version: str
+    static_selection_ref: ContractRef
+    publishability: PublishabilityAssessment | None
+    result: FinalizationResult
+    claim_scope: str
+
+    def __post_init__(self) -> None:
+        _schema_claim(self.schema_id, self.schema_version, self.claim_scope)
+        object.__setattr__(
+            self,
+            "artifact_version",
+            identifier(self.artifact_version, context="artifact_version"),
+        )
+        if not isinstance(self.static_selection_ref, ContractRef):
+            raise TypeError("static_selection_ref must be ContractRef")
+        if self.publishability is not None and not isinstance(
+            self.publishability, PublishabilityAssessment
+        ):
+            raise TypeError("publishability must be PublishabilityAssessment or None")
+        if not isinstance(self.result, FinalizationResult):
+            raise TypeError("result must be FinalizationResult")
+        if self.result.static_selection_ref != self.static_selection_ref:
+            raise ValueError("finalization result references another static selection")
+        expected = None if self.publishability is None else self.publishability.ref
+        if self.result.publishability_assessment_ref != expected:
+            raise ValueError("finalization result references another publishability assessment")
+
+    def fingerprint_payload(self) -> dict[str, object]:
+        return {
+            "schema_id": self.schema_id,
+            "schema_version": self.schema_version,
+            "artifact_version": self.artifact_version,
+            "static_selection_ref": self.static_selection_ref.as_dict(),
+            "publishability": (
+                None if self.publishability is None else self.publishability.as_dict()
+            ),
+            "result": self.result.as_dict(),
+            "claim_scope": self.claim_scope,
+        }
+
+    @property
+    def fingerprint(self) -> str:
+        return canonical_fingerprint(self.fingerprint_payload())
+
+    @property
+    def ref(self) -> ContractRef:
+        return ContractRef(f"finalization-artifact-{self.fingerprint[:16]}", self.fingerprint)
+
+    def as_dict(self) -> dict[str, object]:
+        return {**self.fingerprint_payload(), "artifact_ref": self.ref.as_dict()}
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, object]) -> FinalizationArtifact:
+        strict_keys(
+            value,
+            required={
+                "schema_id",
+                "schema_version",
+                "artifact_version",
+                "static_selection_ref",
+                "publishability",
+                "result",
+                "claim_scope",
+            },
+            optional={"artifact_ref"},
+            context="finalization artifact",
+        )
+        publishability_raw = value["publishability"]
+        result = cls(
+            schema_id=text(value["schema_id"], context="schema_id"),
+            schema_version=text(value["schema_version"], context="schema_version"),
+            artifact_version=identifier(value["artifact_version"], context="artifact_version"),
+            static_selection_ref=ContractRef.from_mapping(
+                as_mapping(value["static_selection_ref"], context="static_selection_ref")
+            ),
+            publishability=(
+                None
+                if publishability_raw is None
+                else PublishabilityAssessment.from_mapping(
+                    as_mapping(publishability_raw, context="publishability")
+                )
+            ),
+            result=FinalizationResult.from_mapping(as_mapping(value["result"], context="result")),
+            claim_scope=text(value["claim_scope"], context="claim_scope"),
+        )
+        supplied = value.get("artifact_ref")
+        if (
+            supplied is not None
+            and ContractRef.from_mapping(as_mapping(supplied, context="artifact_ref")) != result.ref
+        ):
+            raise ValueError("artifact_ref differs from finalization content")
+        return result
+
+
+@dataclass(frozen=True)
+class AnchorAttempt:
+    """One selected absolute action evaluated at one trusted feed anchor."""
+
+    ratio: float
+    context: OperatingContext
+    problem: OptimizationProblem
+    proposal: CandidateProposal
+    static_evaluation: CandidateEvaluation
+    dynamic_evaluation: CandidateEvaluation | None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "ratio", finite(self.ratio, context="ratio"))
+        if self.ratio <= 0.0:
+            raise ValueError("anchor ratio must be positive")
+        if self.problem.context_ref != self.context.ref:
+            raise ValueError("anchor problem references another context")
+        if (
+            self.proposal.problem_ref != self.problem.ref
+            or self.proposal.context_ref != self.context.ref
+        ):
+            raise ValueError("anchor proposal references another problem or context")
+        if (
+            self.static_evaluation.stage != self.problem.evaluation_plan.static_stage
+            or self.static_evaluation.problem_ref != self.problem.ref
+            or self.static_evaluation.context_ref != self.context.ref
+            or self.static_evaluation.proposal_ref != self.proposal.ref
+        ):
+            raise ValueError("anchor static evaluation differs from proposal")
+        if self.dynamic_evaluation is not None and (
+            self.dynamic_evaluation.stage != self.problem.evaluation_plan.dynamic_stage
+            or self.dynamic_evaluation.problem_ref != self.problem.ref
+            or self.dynamic_evaluation.context_ref != self.context.ref
+            or self.dynamic_evaluation.proposal_ref != self.proposal.ref
+        ):
+            raise ValueError("anchor dynamic evaluation differs from proposal")
+        if self.static_evaluation.status != "feasible" and self.dynamic_evaluation is not None:
+            raise ValueError("non-feasible M2 anchor must not execute M4")
+
+    @property
+    def passed(self) -> bool:
+        return (
+            self.static_evaluation.status == "feasible"
+            and self.dynamic_evaluation is not None
+            and self.dynamic_evaluation.status == "feasible"
+        )
+
+    def semantic_payload(self) -> dict[str, object]:
+        return {
+            "ratio": self.ratio,
+            "passed": self.passed,
+            "context": self.context.as_dict(),
+            "problem": self.problem.as_dict(),
+            "proposal": self.proposal.as_dict(),
+            "static_evaluation": self.static_evaluation.fingerprint_payload(),
+            "dynamic_evaluation": (
+                None
+                if self.dynamic_evaluation is None
+                else self.dynamic_evaluation.fingerprint_payload()
+            ),
+        }
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            **self.semantic_payload(),
+            "static_evaluation": self.static_evaluation.as_dict(),
+            "dynamic_evaluation": (
+                None if self.dynamic_evaluation is None else self.dynamic_evaluation.as_dict()
+            ),
+        }
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, object]) -> AnchorAttempt:
+        strict_keys(
+            value,
+            required={
+                "ratio",
+                "passed",
+                "context",
+                "problem",
+                "proposal",
+                "static_evaluation",
+                "dynamic_evaluation",
+            },
+            context="anchor attempt",
+        )
+        dynamic_raw = value["dynamic_evaluation"]
+        result = cls(
+            ratio=finite(value["ratio"], context="ratio"),
+            context=OperatingContext.from_mapping(as_mapping(value["context"], context="context")),
+            problem=OptimizationProblem.from_mapping(
+                as_mapping(value["problem"], context="problem")
+            ),
+            proposal=CandidateProposal.from_mapping(
+                as_mapping(value["proposal"], context="proposal")
+            ),
+            static_evaluation=CandidateEvaluation.from_mapping(
+                as_mapping(value["static_evaluation"], context="static_evaluation")
+            ),
+            dynamic_evaluation=(
+                None
+                if dynamic_raw is None
+                else CandidateEvaluation.from_mapping(
+                    as_mapping(dynamic_raw, context="dynamic_evaluation")
+                )
+            ),
+        )
+        if boolean(value["passed"], context="passed") != result.passed:
+            raise ValueError("anchor passed flag differs from its evaluations")
+        return result
+
+
+@dataclass(frozen=True)
+class AnchorValidationResult:
+    """Discrete sampled coverage; it never claims a continuous operating interval."""
+
+    schema_id: str
+    schema_version: str
+    validation_version: str
+    central_problem_ref: ContractRef
+    selected_action: Mapping[str, float]
+    attempts: tuple[AnchorAttempt, ...]
+    claim_scope: str
+
+    def __post_init__(self) -> None:
+        _schema_claim(self.schema_id, self.schema_version, self.claim_scope)
+        object.__setattr__(
+            self,
+            "validation_version",
+            identifier(self.validation_version, context="validation_version"),
+        )
+        if not isinstance(self.central_problem_ref, ContractRef):
+            raise TypeError("central_problem_ref must be ContractRef")
+        action = numeric_mapping(self.selected_action, context="selected_action")
+        if not action:
+            raise ValueError("selected_action must be non-empty")
+        object.__setattr__(self, "selected_action", action)
+        attempts = tuple(self.attempts)
+        ratios = tuple(item.ratio for item in attempts)
+        if not attempts or ratios != tuple(sorted(set(ratios))):
+            raise ValueError("anchor attempts must be non-empty, unique and sorted")
+        if any(dict(item.proposal.decision_values) != dict(action) for item in attempts):
+            raise ValueError("anchor attempts must evaluate the selected action")
+        if any(item.problem.intent_ref != attempts[0].problem.intent_ref for item in attempts):
+            raise ValueError("anchor attempts must retain one business intent")
+        object.__setattr__(self, "attempts", attempts)
+
+    @property
+    def passed(self) -> bool:
+        return all(item.passed for item in self.attempts)
+
+    def fingerprint_payload(self) -> dict[str, object]:
+        return {
+            "schema_id": self.schema_id,
+            "schema_version": self.schema_version,
+            "validation_version": self.validation_version,
+            "central_problem_ref": self.central_problem_ref.as_dict(),
+            "selected_action": dict(self.selected_action),
+            "attempts": [item.semantic_payload() for item in self.attempts],
+            "passed": self.passed,
+            "claim_scope": self.claim_scope,
+        }
+
+    @property
+    def fingerprint(self) -> str:
+        return canonical_fingerprint(self.fingerprint_payload())
+
+    @property
+    def ref(self) -> ContractRef:
+        return ContractRef(f"anchor-validation-{self.fingerprint[:16]}", self.fingerprint)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            **self.fingerprint_payload(),
+            "attempts": [item.as_dict() for item in self.attempts],
+            "validation_ref": self.ref.as_dict(),
+        }
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, object]) -> AnchorValidationResult:
+        strict_keys(
+            value,
+            required={
+                "schema_id",
+                "schema_version",
+                "validation_version",
+                "central_problem_ref",
+                "selected_action",
+                "attempts",
+                "passed",
+                "claim_scope",
+            },
+            optional={"validation_ref"},
+            context="anchor validation",
+        )
+        result = cls(
+            schema_id=text(value["schema_id"], context="schema_id"),
+            schema_version=text(value["schema_version"], context="schema_version"),
+            validation_version=identifier(
+                value["validation_version"], context="validation_version"
+            ),
+            central_problem_ref=ContractRef.from_mapping(
+                as_mapping(value["central_problem_ref"], context="central_problem_ref")
+            ),
+            selected_action=numeric_mapping(value["selected_action"], context="selected_action"),
+            attempts=tuple(
+                AnchorAttempt.from_mapping(as_mapping(item, context="anchor attempt"))
+                for item in as_sequence(value["attempts"], context="attempts")
+            ),
+            claim_scope=text(value["claim_scope"], context="claim_scope"),
+        )
+        if boolean(value["passed"], context="passed") != result.passed:
+            raise ValueError("anchor validation passed flag differs from its attempts")
+        supplied = value.get("validation_ref")
+        if (
+            supplied is not None
+            and ContractRef.from_mapping(as_mapping(supplied, context="validation_ref"))
+            != result.ref
+        ):
+            raise ValueError("validation_ref differs from anchor validation content")
+        return result
+
+
+@dataclass(frozen=True)
+class OfflineRtoResult:
+    """Terminal workflow summary; optimization outcomes remain in finalization.json."""
+
+    schema_id: str
+    schema_version: str
+    result_version: str
+    status: OfflineRunStatus
+    request_ref: ContractRef
+    problem_ref: ContractRef
+    routing_ref: ContractRef
+    solver_execution_ref: ContractRef
+    static_selection_ref: ContractRef
+    dynamic_verification_ref: ContractRef
+    finalization_ref: ContractRef
+    anchor_validation_ref: ContractRef | None
+    strategy_ref: ContractRef | None
+    requested_anchor_count: int
+    passed_anchor_count: int
+    termination_reason: str
+    claim_scope: str
+
+    def __post_init__(self) -> None:
+        _schema_claim(self.schema_id, self.schema_version, self.claim_scope)
+        object.__setattr__(
+            self, "result_version", identifier(self.result_version, context="result_version")
+        )
+        if self.status not in {"completed_draft", "completed_without_strategy", "failed"}:
+            raise ValueError("unsupported offline result status")
+        for name in (
+            "request_ref",
+            "problem_ref",
+            "routing_ref",
+            "solver_execution_ref",
+            "static_selection_ref",
+            "dynamic_verification_ref",
+            "finalization_ref",
+        ):
+            if not isinstance(getattr(self, name), ContractRef):
+                raise TypeError(f"{name} must be ContractRef")
+        for name in ("anchor_validation_ref", "strategy_ref"):
+            if getattr(self, name) is not None and not isinstance(getattr(self, name), ContractRef):
+                raise TypeError(f"{name} must be ContractRef or None")
+        object.__setattr__(
+            self,
+            "requested_anchor_count",
+            integer(self.requested_anchor_count, context="requested_anchor_count"),
+        )
+        object.__setattr__(
+            self,
+            "passed_anchor_count",
+            integer(self.passed_anchor_count, context="passed_anchor_count"),
+        )
+        if self.passed_anchor_count > self.requested_anchor_count:
+            raise ValueError("passed anchor count exceeds requested anchor count")
+        if self.status == "completed_draft" and self.strategy_ref is None:
+            raise ValueError("completed_draft requires a strategy ref")
+        if self.status != "completed_draft" and self.strategy_ref is not None:
+            raise ValueError("non-draft result cannot contain a strategy ref")
+        object.__setattr__(
+            self,
+            "termination_reason",
+            identifier(self.termination_reason, context="termination_reason"),
+        )
+
+    def fingerprint_payload(self) -> dict[str, object]:
+        return {
+            "schema_id": self.schema_id,
             "schema_version": self.schema_version,
             "result_version": self.result_version,
             "status": self.status,
             "request_ref": self.request_ref.as_dict(),
             "problem_ref": self.problem_ref.as_dict(),
-            "static_search_ref": self.static_search_ref.as_dict(),
-            "optimization_result_ref": self.optimization_result_ref.as_dict(),
+            "routing_ref": self.routing_ref.as_dict(),
+            "solver_execution_ref": self.solver_execution_ref.as_dict(),
+            "static_selection_ref": self.static_selection_ref.as_dict(),
+            "dynamic_verification_ref": self.dynamic_verification_ref.as_dict(),
+            "finalization_ref": self.finalization_ref.as_dict(),
+            "anchor_validation_ref": (
+                None if self.anchor_validation_ref is None else self.anchor_validation_ref.as_dict()
+            ),
             "strategy_ref": None if self.strategy_ref is None else self.strategy_ref.as_dict(),
             "requested_anchor_count": self.requested_anchor_count,
             "passed_anchor_count": self.passed_anchor_count,
@@ -493,29 +921,44 @@ class OfflineRtoResultV1:
         return ContractRef(f"offline-result-{self.fingerprint[:16]}", self.fingerprint)
 
     def as_dict(self) -> dict[str, object]:
-        return {**self.fingerprint_payload(), "result_ref": self.ref.as_dict()}
+        return {
+            **self.fingerprint_payload(),
+            "result_ref": self.ref.as_dict(),
+            "result_fingerprint": self.fingerprint,
+        }
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, object]) -> OfflineRtoResultV1:
+    def from_mapping(cls, value: Mapping[str, object]) -> OfflineRtoResult:
         required = {
+            "schema_id",
             "schema_version",
             "result_version",
             "status",
             "request_ref",
             "problem_ref",
-            "static_search_ref",
-            "optimization_result_ref",
+            "routing_ref",
+            "solver_execution_ref",
+            "static_selection_ref",
+            "dynamic_verification_ref",
+            "finalization_ref",
+            "anchor_validation_ref",
             "strategy_ref",
             "requested_anchor_count",
             "passed_anchor_count",
             "termination_reason",
             "claim_scope",
         }
-        strict_keys(value, required=required, optional={"result_ref"}, context="offline RTO result")
+        strict_keys(
+            value,
+            required=required,
+            optional={"result_ref", "result_fingerprint"},
+            context="offline RTO result",
+        )
         status = value["status"]
         if status not in {"completed_draft", "completed_without_strategy", "failed"}:
-            raise ValueError("unsupported offline RTO result status")
+            raise ValueError("unsupported offline result status")
         result = cls(
+            schema_id=text(value["schema_id"], context="schema_id"),
             schema_version=text(value["schema_version"], context="schema_version"),
             result_version=identifier(value["result_version"], context="result_version"),
             status=status,
@@ -525,11 +968,23 @@ class OfflineRtoResultV1:
             problem_ref=ContractRef.from_mapping(
                 as_mapping(value["problem_ref"], context="problem_ref")
             ),
-            static_search_ref=ContractRef.from_mapping(
-                as_mapping(value["static_search_ref"], context="static_search_ref")
+            routing_ref=ContractRef.from_mapping(
+                as_mapping(value["routing_ref"], context="routing_ref")
             ),
-            optimization_result_ref=ContractRef.from_mapping(
-                as_mapping(value["optimization_result_ref"], context="optimization_result_ref")
+            solver_execution_ref=ContractRef.from_mapping(
+                as_mapping(value["solver_execution_ref"], context="solver_execution_ref")
+            ),
+            static_selection_ref=ContractRef.from_mapping(
+                as_mapping(value["static_selection_ref"], context="static_selection_ref")
+            ),
+            dynamic_verification_ref=ContractRef.from_mapping(
+                as_mapping(value["dynamic_verification_ref"], context="dynamic_verification_ref")
+            ),
+            finalization_ref=ContractRef.from_mapping(
+                as_mapping(value["finalization_ref"], context="finalization_ref")
+            ),
+            anchor_validation_ref=_optional_ref(
+                value["anchor_validation_ref"], context="anchor_validation_ref"
             ),
             strategy_ref=_optional_ref(value["strategy_ref"], context="strategy_ref"),
             requested_anchor_count=integer(
@@ -543,37 +998,39 @@ class OfflineRtoResultV1:
             ),
             claim_scope=text(value["claim_scope"], context="claim_scope"),
         )
-        if value.get("result_ref") is not None:
-            supplied = ContractRef.from_mapping(
-                as_mapping(value["result_ref"], context="result_ref")
-            )
-            if supplied != result.ref:
-                raise ValueError("result_ref differs from offline result content")
+        _validate_identity(
+            value,
+            ref=result.ref,
+            ref_field="result_ref",
+            fingerprint_field="result_fingerprint",
+        )
         return result
 
 
 @dataclass(frozen=True)
-class WorkflowEventV1:
+class WorkflowEvent:
+    schema_id: str
     schema_version: str
     event_version: str
     workflow_ref: ContractRef
     sequence: int
     stage: str
-    object_ref: ContractRef | None
+    object_ref: ContractRef
     occurred_at: str
     previous_event_fingerprint: str | None
+    claim_scope: str
 
     def __post_init__(self) -> None:
-        _schema(self.schema_version)
+        _schema_claim(self.schema_id, self.schema_version, self.claim_scope)
         object.__setattr__(
             self, "event_version", identifier(self.event_version, context="event_version")
         )
-        if not isinstance(self.workflow_ref, ContractRef):
-            raise TypeError("workflow_ref must be a ContractRef")
         object.__setattr__(self, "sequence", integer(self.sequence, context="sequence"))
         object.__setattr__(self, "stage", identifier(self.stage, context="stage"))
-        if self.object_ref is not None and not isinstance(self.object_ref, ContractRef):
-            raise TypeError("object_ref must be a ContractRef")
+        if not isinstance(self.workflow_ref, ContractRef) or not isinstance(
+            self.object_ref, ContractRef
+        ):
+            raise TypeError("workflow event refs must be ContractRef")
         object.__setattr__(self, "occurred_at", _timestamp(self.occurred_at, context="occurred_at"))
         if self.previous_event_fingerprint is not None:
             object.__setattr__(
@@ -581,19 +1038,19 @@ class WorkflowEventV1:
                 "previous_event_fingerprint",
                 digest(self.previous_event_fingerprint, context="previous_event_fingerprint"),
             )
-        if (self.sequence == 0) != (self.previous_event_fingerprint is None):
-            raise ValueError("only first workflow event may omit previous fingerprint")
 
     def fingerprint_payload(self) -> dict[str, object]:
         return {
+            "schema_id": self.schema_id,
             "schema_version": self.schema_version,
             "event_version": self.event_version,
             "workflow_ref": self.workflow_ref.as_dict(),
             "sequence": self.sequence,
             "stage": self.stage,
-            "object_ref": None if self.object_ref is None else self.object_ref.as_dict(),
+            "object_ref": self.object_ref.as_dict(),
             "occurred_at": self.occurred_at,
             "previous_event_fingerprint": self.previous_event_fingerprint,
+            "claim_scope": self.claim_scope,
         }
 
     @property
@@ -604,21 +1061,27 @@ class WorkflowEventV1:
         return {**self.fingerprint_payload(), "event_fingerprint": self.fingerprint}
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, object]) -> WorkflowEventV1:
-        required = {
-            "schema_version",
-            "event_version",
-            "workflow_ref",
-            "sequence",
-            "stage",
-            "object_ref",
-            "occurred_at",
-            "previous_event_fingerprint",
-        }
+    def from_mapping(cls, value: Mapping[str, object]) -> WorkflowEvent:
         strict_keys(
-            value, required=required, optional={"event_fingerprint"}, context="workflow event"
+            value,
+            required={
+                "schema_id",
+                "schema_version",
+                "event_version",
+                "workflow_ref",
+                "sequence",
+                "stage",
+                "object_ref",
+                "occurred_at",
+                "previous_event_fingerprint",
+                "claim_scope",
+            },
+            optional={"event_fingerprint"},
+            context="workflow event",
         )
+        previous = value["previous_event_fingerprint"]
         result = cls(
+            schema_id=text(value["schema_id"], context="schema_id"),
             schema_version=text(value["schema_version"], context="schema_version"),
             event_version=identifier(value["event_version"], context="event_version"),
             workflow_ref=ContractRef.from_mapping(
@@ -626,27 +1089,27 @@ class WorkflowEventV1:
             ),
             sequence=integer(value["sequence"], context="sequence"),
             stage=identifier(value["stage"], context="stage"),
-            object_ref=_optional_ref(value["object_ref"], context="object_ref"),
+            object_ref=ContractRef.from_mapping(
+                as_mapping(value["object_ref"], context="object_ref")
+            ),
             occurred_at=_timestamp(value["occurred_at"], context="occurred_at"),
             previous_event_fingerprint=(
-                None
-                if value["previous_event_fingerprint"] is None
-                else digest(
-                    value["previous_event_fingerprint"], context="previous_event_fingerprint"
-                )
+                None if previous is None else digest(previous, context="previous_event_fingerprint")
             ),
+            claim_scope=text(value["claim_scope"], context="claim_scope"),
         )
         supplied = value.get("event_fingerprint")
         if (
             supplied is not None
             and digest(supplied, context="event_fingerprint") != result.fingerprint
         ):
-            raise ValueError("event_fingerprint differs from workflow event")
+            raise ValueError("event_fingerprint differs from event content")
         return result
 
 
 @dataclass(frozen=True)
-class OfflineRtoManifestV1:
+class OfflineRtoManifest:
+    schema_id: str
     schema_version: str
     manifest_version: str
     workflow_ref: ContractRef
@@ -657,27 +1120,28 @@ class OfflineRtoManifestV1:
     claim_scope: str
 
     def __post_init__(self) -> None:
-        _schema(self.schema_version)
-        _claim(self.claim_scope)
+        _schema_claim(self.schema_id, self.schema_version, self.claim_scope)
         object.__setattr__(
             self,
             "manifest_version",
             identifier(self.manifest_version, context="manifest_version"),
         )
+        if self.manifest_version != OFFLINE_MANIFEST_VERSION:
+            raise ValueError("manifest_version differs from the workflow contract")
         if not isinstance(self.workflow_ref, ContractRef) or not isinstance(
             self.result_ref, ContractRef
         ):
-            raise TypeError("manifest refs must be ContractRef values")
-        raw_files = as_mapping(self.files, context="manifest files")
+            raise TypeError("manifest refs must be ContractRef")
+        raw_files = as_mapping(self.files, context="files")
         files: dict[str, str] = {}
-        for raw_path, raw_digest in raw_files.items():
-            path = PurePosixPath(raw_path)
-            if path.is_absolute() or ".." in path.parts or str(path) != raw_path:
-                raise ValueError("manifest file path must be a normalized relative POSIX path")
-            files[raw_path] = digest(raw_digest, context=f"manifest files.{raw_path}")
-        if not files or tuple(files) != tuple(sorted(files)):
-            raise ValueError("manifest files must be non-empty and sorted")
-        object.__setattr__(self, "files", MappingProxyType(files))
+        for relative, value in raw_files.items():
+            path = PurePosixPath(relative)
+            if path.is_absolute() or ".." in path.parts or len(path.parts) != 1:
+                raise ValueError("manifest files must be safe top-level paths")
+            files[relative] = digest(value, context=f"files.{relative}")
+        if not files:
+            raise ValueError("manifest files cannot be empty")
+        object.__setattr__(self, "files", MappingProxyType(dict(sorted(files.items()))))
         object.__setattr__(
             self,
             "software_versions",
@@ -687,6 +1151,7 @@ class OfflineRtoManifestV1:
 
     def fingerprint_payload(self) -> dict[str, object]:
         return {
+            "schema_id": self.schema_id,
             "schema_version": self.schema_version,
             "manifest_version": self.manifest_version,
             "workflow_ref": self.workflow_ref.as_dict(),
@@ -705,21 +1170,25 @@ class OfflineRtoManifestV1:
         return {**self.fingerprint_payload(), "manifest_fingerprint": self.fingerprint}
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, object]) -> OfflineRtoManifestV1:
-        required = {
-            "schema_version",
-            "manifest_version",
-            "workflow_ref",
-            "result_ref",
-            "files",
-            "software_versions",
-            "created_at",
-            "claim_scope",
-        }
+    def from_mapping(cls, value: Mapping[str, object]) -> OfflineRtoManifest:
         strict_keys(
-            value, required=required, optional={"manifest_fingerprint"}, context="offline manifest"
+            value,
+            required={
+                "schema_id",
+                "schema_version",
+                "manifest_version",
+                "workflow_ref",
+                "result_ref",
+                "files",
+                "software_versions",
+                "created_at",
+                "claim_scope",
+                "manifest_fingerprint",
+            },
+            context="offline RTO manifest",
         )
         result = cls(
+            schema_id=text(value["schema_id"], context="schema_id"),
             schema_version=text(value["schema_version"], context="schema_version"),
             manifest_version=identifier(value["manifest_version"], context="manifest_version"),
             workflow_ref=ContractRef.from_mapping(
@@ -735,17 +1204,39 @@ class OfflineRtoManifestV1:
             created_at=_timestamp(value["created_at"], context="created_at"),
             claim_scope=text(value["claim_scope"], context="claim_scope"),
         )
-        supplied = value.get("manifest_fingerprint")
-        if (
-            supplied is not None
-            and digest(supplied, context="manifest_fingerprint") != result.fingerprint
-        ):
+        supplied = digest(value["manifest_fingerprint"], context="manifest_fingerprint")
+        if supplied != result.fingerprint:
             raise ValueError("manifest_fingerprint differs from manifest content")
         return result
 
 
-def parse_workflow_events(value: object) -> tuple[WorkflowEventV1, ...]:
-    return tuple(
-        WorkflowEventV1.from_mapping(as_mapping(item, context="workflow event"))
-        for item in as_sequence(value, context="workflow events")
-    )
+def routing_ref(decision: SolverRoutingDecision) -> ContractRef:
+    if not isinstance(decision, SolverRoutingDecision):
+        raise TypeError("decision must be SolverRoutingDecision")
+    return ContractRef(f"solver-routing-{decision.fingerprint[:16]}", decision.fingerprint)
+
+
+def finalization_ref(result: FinalizationResult) -> ContractRef:
+    if not isinstance(result, FinalizationResult):
+        raise TypeError("result must be FinalizationResult")
+    return result.ref
+
+
+__all__ = [
+    "OFFLINE_WORKFLOW_SCHEMA_ID",
+    "OFFLINE_WORKFLOW_SCHEMA_VERSION",
+    "AnchorAttempt",
+    "AnchorValidationResult",
+    "CapabilityBundleSnapshot",
+    "CoveragePolicy",
+    "DynamicVerificationArtifact",
+    "FinalizationArtifact",
+    "OfflineRtoManifest",
+    "OfflineRtoRequest",
+    "OfflineRtoResult",
+    "OfflineRunStatus",
+    "SolverExecutionArtifact",
+    "WorkflowEvent",
+    "finalization_ref",
+    "routing_ref",
+]
