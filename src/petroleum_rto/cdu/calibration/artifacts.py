@@ -12,6 +12,7 @@ from types import MappingProxyType
 from typing import cast
 
 from ..core.config import canonical_fingerprint
+from ..repository import resolve_cdu_repository_path
 from .etl import file_sha256
 from .observations import Observation, load_observation_catalog
 from .pipeline import M5PipelineResult
@@ -71,13 +72,7 @@ def _safe_repo_input(repo_root: Path, relative_path: str) -> Path:
     parsed = PurePosixPath(relative_path)
     if parsed.is_absolute() or not parsed.parts or "." in parsed.parts or ".." in parsed.parts:
         raise ValueError(f"unsafe repository-relative source path: {relative_path}")
-    root = repo_root.resolve()
-    result = (root / parsed).resolve()
-    try:
-        result.relative_to(root)
-    except ValueError as exc:
-        raise ValueError(f"source path escapes repository: {relative_path}") from exc
-    return result
+    return resolve_cdu_repository_path(repo_root, relative_path)
 
 
 def _load_result_observations(
@@ -805,8 +800,8 @@ def _safe_output(
             f"{artifact_name} must be a {suffix} file under {allowed_relative}"
         )
     root = repo_root.resolve()
-    allowed_root = (root / allowed).resolve()
-    output = (root / parsed).resolve()
+    allowed_root = resolve_cdu_repository_path(root, allowed_relative).resolve()
+    output = resolve_cdu_repository_path(root, relative_path).resolve()
     try:
         output.relative_to(allowed_root)
     except ValueError as exc:

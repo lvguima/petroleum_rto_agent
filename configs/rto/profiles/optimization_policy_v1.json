@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "policy_version": "optimization-policy-v1",
+  "policy_id": "cdu-v1-policy",
+  "claim_scope": "engineering_simulation_only",
+  "priority_profile_id": "stability-quality-yield-energy-v1",
+  "evaluation": {
+    "m2_preset_id": "steady-baseline",
+    "m4_preset_id": "closed-loop-feed-step",
+    "m4_event_time_s": 600.0,
+    "m4_duration_s": 7200.0,
+    "m4_time_step_s": 1.0,
+    "top_k": 3,
+    "feed_anchor_ratios": [0.95, 1.0, 1.05]
+  },
+  "search": {
+    "algorithm_id": "coarse-grid-local-refine",
+    "algorithm_version": "deterministic-search-v1",
+    "maximum_m2_executions": 33,
+    "objective_tie_policy": "exact-margin-action-fingerprint",
+    "cache_policy": "canonical-si-vector-v1"
+  }
+}

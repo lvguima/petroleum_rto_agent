@@ -208,7 +208,7 @@ def _parser() -> argparse.ArgumentParser:
     selection = run_parser.add_mutually_exclusive_group(required=True)
     selection.add_argument("--preset")
     selection.add_argument("--request", type=Path)
-    run_parser.add_argument("--output", type=Path, default=Path("runs"))
+    run_parser.add_argument("--output", type=Path, default=Path("runs/cdu"))
     run_parser.add_argument("--confirm-preview")
     run_display = run_parser.add_mutually_exclusive_group()
     run_display.add_argument("--quiet", action="store_true")
@@ -219,7 +219,7 @@ def _parser() -> argparse.ArgumentParser:
     batch_selection = batch.add_mutually_exclusive_group(required=True)
     batch_selection.add_argument("--request", type=Path)
     batch_selection.add_argument("--resume", type=Path)
-    batch.add_argument("--output", type=Path, default=Path("runs"))
+    batch.add_argument("--output", type=Path, default=Path("runs/cdu"))
     batch.add_argument("--retry-failed", action="store_true")
     batch.add_argument("--json", action="store_true", dest="as_json")
 

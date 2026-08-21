@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import math
 import re
@@ -27,6 +26,7 @@ from ..core.config import (
     validate_config_compatibility,
 )
 from ..properties.components import ComponentCatalog
+from ..repository import canonicalize_cdu_resource_bytes, cdu_resource_bytes_sha256
 from ..validation.basis import M6Basis
 from ..validation.config import M6ValidationConfig
 from .contracts import JsonValue
@@ -331,7 +331,8 @@ def read_runtime_resource_bytes(resource_id: str) -> bytes:
         raise RuntimeResourceError(
             f"cannot read bundled runtime resource {resource_id!r}: {exc}"
         ) from exc
-    actual = hashlib.sha256(payload).hexdigest()
+    payload = canonicalize_cdu_resource_bytes(payload, spec.source_path)
+    actual = cdu_resource_bytes_sha256(payload, spec.source_path)
     if actual != spec.expected_sha256:
         raise RuntimeResourceError(f"bundled runtime resource {resource_id!r} SHA-256 mismatch")
     return payload
@@ -373,7 +374,11 @@ def _loader_mapping(resource_id: str) -> Mapping[str, object]:
 def runtime_resource_sha256(resource_id: str) -> str:
     """Return the verified package bytes SHA-256 for one logical resource."""
 
-    return hashlib.sha256(read_runtime_resource_bytes(resource_id)).hexdigest()
+    spec = get_runtime_resource_spec(resource_id)
+    return cdu_resource_bytes_sha256(
+        read_runtime_resource_bytes(resource_id),
+        spec.source_path,
+    )
 
 
 @dataclass(frozen=True)

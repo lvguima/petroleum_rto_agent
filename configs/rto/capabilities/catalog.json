@@ -1,0 +1,288 @@
+{
+  "schema_version": "1.0.0",
+  "catalog_id": "cdu-rto-capability-catalog",
+  "catalog_version": "1.0.0",
+  "claim_scope": "engineering_simulation_only",
+  "metrics": [
+    {
+      "metric_id": "m2_evaluable",
+      "business_name": "M2结构与数值可评价性",
+      "stage": "M2",
+      "unit": "1",
+      "direction": "equal",
+      "formula_ref": "runtime_convergence_conservation_finite_nonnegative_v1",
+      "source_paths": [
+        "runtime_status",
+        "engine_status",
+        "summary.flowsheet.balance",
+        "summary.flowsheet.diagnostics.conservation_gate_passed"
+      ],
+      "proxy": false,
+      "availability": "available",
+      "availability_reason": null
+    },
+    {
+      "metric_id": "m4_acceptance_passed",
+      "business_name": "M4闭环稳定性验收",
+      "stage": "M4",
+      "unit": "1",
+      "direction": "equal",
+      "formula_ref": "existing_m4_acceptance_v1",
+      "source_paths": [
+        "summary.acceptance_passed",
+        "summary.control_fingerprint"
+      ],
+      "proxy": false,
+      "availability": "available",
+      "availability_reason": null
+    },
+    {
+      "metric_id": "quality_proxy_max_abs_relative_change",
+      "business_name": "产品质量代理最大相对偏离",
+      "stage": "M2",
+      "unit": "1",
+      "direction": "minimize",
+      "formula_ref": "max_abs_relative_change_with_small_denominator_guard_v1",
+      "source_paths": [
+        "summary.flowsheet.qualities.gasoline.density_kg_m3_proxy",
+        "summary.flowsheet.qualities.gasoline.t50_k_proxy",
+        "summary.flowsheet.qualities.kerosene.density_kg_m3_proxy",
+        "summary.flowsheet.qualities.kerosene.t50_k_proxy",
+        "summary.flowsheet.qualities.light_diesel.density_kg_m3_proxy",
+        "summary.flowsheet.qualities.light_diesel.t50_k_proxy",
+        "summary.flowsheet.qualities.heavy_diesel.density_kg_m3_proxy",
+        "summary.flowsheet.qualities.heavy_diesel.t50_k_proxy"
+      ],
+      "proxy": true,
+      "availability": "available",
+      "availability_reason": null
+    },
+    {
+      "metric_id": "specific_furnace_fuel_energy_mj_per_t",
+      "business_name": "单位进料炉燃料热负荷代理",
+      "stage": "M2",
+      "unit": "MJ/t",
+      "direction": "minimize",
+      "formula_ref": "furnace_fuel_w_div_feed_kg_s_div_1000_v1",
+      "source_paths": [
+        "summary.flowsheet.diagnostics.furnace_fuel_duty_w",
+        "summary.flowsheet.streams.fresh_crude.mass_flow_kg_s"
+      ],
+      "proxy": true,
+      "availability": "available",
+      "availability_reason": null
+    },
+    {
+      "metric_id": "specific_furnace_fuel_improvement_fraction",
+      "business_name": "单位进料炉燃料热负荷相对改善",
+      "stage": "post_selection",
+      "unit": "1",
+      "direction": "maximize",
+      "formula_ref": "paired_baseline_minus_candidate_over_baseline_v1",
+      "source_paths": [
+        "paired.specific_furnace_fuel_energy_mj_per_t"
+      ],
+      "proxy": true,
+      "availability": "available",
+      "availability_reason": null
+    },
+    {
+      "metric_id": "valuable_distillate_yield",
+      "business_name": "有价值馏分收率",
+      "stage": "M2",
+      "unit": "mass_fraction",
+      "direction": "maximize",
+      "formula_ref": "sum_gasoline_kerosene_light_and_heavy_diesel_yields_v1",
+      "source_paths": [
+        "summary.flowsheet.diagnostics.gasoline_yield_mass_fraction",
+        "summary.flowsheet.diagnostics.kerosene_yield_mass_fraction",
+        "summary.flowsheet.diagnostics.light_diesel_yield_mass_fraction",
+        "summary.flowsheet.diagnostics.heavy_diesel_yield_mass_fraction"
+      ],
+      "proxy": true,
+      "availability": "available",
+      "availability_reason": null
+    },
+    {
+      "metric_id": "valuable_distillate_yield_delta",
+      "business_name": "有价值馏分收率相对基准差值",
+      "stage": "M2",
+      "unit": "mass_fraction",
+      "direction": "maximize",
+      "formula_ref": "paired_candidate_minus_baseline_v1",
+      "source_paths": [
+        "paired.valuable_distillate_yield"
+      ],
+      "proxy": true,
+      "availability": "available",
+      "availability_reason": null
+    }
+  ],
+  "objectives": [
+    {
+      "objective_id": "maximize-valuable-distillate-yield",
+      "business_name": "提高有价值馏分收率",
+      "metric_id": "valuable_distillate_yield",
+      "sense": "maximize",
+      "normalization_scale": 0.002,
+      "relative_improvement_policy": "directional-relative",
+      "availability": "available",
+      "availability_reason": null
+    },
+    {
+      "objective_id": "minimize-quality-proxy-change",
+      "business_name": "减小产品质量代理偏离",
+      "metric_id": "quality_proxy_max_abs_relative_change",
+      "sense": "minimize",
+      "normalization_scale": 0.005,
+      "relative_improvement_policy": "zero-baseline-null",
+      "availability": "available",
+      "availability_reason": null
+    },
+    {
+      "objective_id": "minimize-specific-furnace-energy",
+      "business_name": "降低单位进料炉燃料热负荷代理",
+      "metric_id": "specific_furnace_fuel_energy_mj_per_t",
+      "sense": "minimize",
+      "normalization_scale": 1.0,
+      "relative_improvement_policy": "directional-relative",
+      "availability": "available",
+      "availability_reason": null
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "furnace_temperature_target_k",
+      "business_name": "炉出口温度目标",
+      "display_unit": "degC",
+      "canonical_unit": "K",
+      "lower_bound": 626.35,
+      "upper_bound": 630.35,
+      "coarse_step": 1.0,
+      "refine_step": 0.5,
+      "m2_parameter_path": "operating.furnace_outlet_temperature_c",
+      "m4_loop_id": "furnace_temperature",
+      "controller_owner": "furnace_temperature_pi",
+      "compiler_rule_id": "absolute_k_to_celsius_and_kelvin_ratio_v1",
+      "confidence": "synthetic_local_range",
+      "availability": "available",
+      "availability_reason": null
+    },
+    {
+      "decision_id": "reflux_ratio_target",
+      "business_name": "回流比目标",
+      "display_unit": "1",
+      "canonical_unit": "1",
+      "lower_bound": 0.4275,
+      "upper_bound": 0.4725,
+      "coarse_step": 0.01125,
+      "refine_step": 0.005625,
+      "m2_parameter_path": "operation.reflux_ratio",
+      "m4_loop_id": null,
+      "controller_owner": "unavailable_high_level_sp",
+      "compiler_rule_id": "deferred_no_m4_mapping_v1",
+      "confidence": "synthetic_local_range",
+      "availability": "deferred",
+      "availability_reason": "当前没有可发布的M4高层设定值映射。"
+    },
+    {
+      "decision_id": "tower_top_pressure_target_pa_a",
+      "business_name": "塔顶压力目标",
+      "display_unit": "MPa(g)",
+      "canonical_unit": "Pa(a)",
+      "lower_bound": 150325.0,
+      "upper_bound": 154325.0,
+      "coarse_step": 1000.0,
+      "refine_step": 500.0,
+      "m2_parameter_path": "operating.tower_top_pressure_mpa_g",
+      "m4_loop_id": "top_pressure",
+      "controller_owner": "top_pressure_pi",
+      "compiler_rule_id": "absolute_pa_to_gauge_mpa_and_absolute_ratio_v1",
+      "confidence": "synthetic_local_range",
+      "availability": "available",
+      "availability_reason": null
+    }
+  ],
+  "guardrails": [
+    {
+      "guardrail_id": "m2-structural-numeric",
+      "business_name": "M2结构、收敛、守恒和数值有效性门禁",
+      "metric_id": "m2_evaluable",
+      "stage": "M2",
+      "unit": "1",
+      "allowed_operators": [
+        "eq"
+      ],
+      "availability": "available",
+      "availability_reason": null
+    },
+    {
+      "guardrail_id": "m4-stability-acceptance",
+      "business_name": "M4闭环稳定性门禁",
+      "metric_id": "m4_acceptance_passed",
+      "stage": "M4",
+      "unit": "1",
+      "allowed_operators": [
+        "eq"
+      ],
+      "availability": "available",
+      "availability_reason": null
+    },
+    {
+      "guardrail_id": "minimum-publishable-energy-improvement",
+      "business_name": "策略草稿最小能耗代理改善门禁",
+      "metric_id": "specific_furnace_fuel_improvement_fraction",
+      "stage": "post_selection",
+      "unit": "1",
+      "allowed_operators": [
+        "ge"
+      ],
+      "availability": "available",
+      "availability_reason": null
+    },
+    {
+      "guardrail_id": "quality-proxy-preservation",
+      "business_name": "产品质量代理保持门禁",
+      "metric_id": "quality_proxy_max_abs_relative_change",
+      "stage": "M2",
+      "unit": "1",
+      "allowed_operators": [
+        "le"
+      ],
+      "availability": "available",
+      "availability_reason": null
+    },
+    {
+      "guardrail_id": "valuable-distillate-yield-preservation",
+      "business_name": "有价值馏分收率保持门禁",
+      "metric_id": "valuable_distillate_yield_delta",
+      "stage": "M2",
+      "unit": "mass_fraction",
+      "allowed_operators": [
+        "ge"
+      ],
+      "availability": "available",
+      "availability_reason": null
+    }
+  ],
+  "selectors": [
+    {
+      "selector_id": "lexicographic-selector",
+      "business_name": "显式优先级词典序选择",
+      "method": "lexicographic",
+      "minimum_objectives": 2,
+      "maximum_objectives": 3,
+      "availability": "available",
+      "availability_reason": null
+    },
+    {
+      "selector_id": "single-objective-selector",
+      "business_name": "单目标确定性选择",
+      "method": "single-objective",
+      "minimum_objectives": 1,
+      "maximum_objectives": 1,
+      "availability": "available",
+      "availability_reason": null
+    }
+  ]
+}

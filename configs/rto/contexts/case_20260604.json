@@ -1,0 +1,44 @@
+{
+  "schema_id": "operating-context",
+  "schema_version": "1.0.0",
+  "context_version": "1.0.0",
+  "context_id": "case-20260604-nominal",
+  "context_schema_ref": {
+    "object_id": "cdu-operating-context-schema",
+    "fingerprint": "ca804f20b4314cbeac97b5a77f491f483685e1f7d5d1f89ed872d1e4ac25d97d"
+  },
+  "provider_id": "cdu-m7",
+  "model_ref": {
+    "object_id": "cdu-effective-model",
+    "fingerprint": "49c04b222ab817ca2b27922171c832d562adcd55e80cda480c94b3142e0d2473"
+  },
+  "case_ref": {
+    "object_id": "case-20260604-effective",
+    "fingerprint": "6687e0637c0cfbef46f6020b52751058325363f2e175ced59b3ba4469658585e"
+  },
+  "operating_mode": "normal-steady",
+  "facts": {
+    "fresh_feed_load_kg_s": 113.1388888888889,
+    "feed_composition": {
+      "heavy_diesel": 0.2023,
+      "kerosene": 0.0781,
+      "light_diesel": 0.0546,
+      "light_ends": 0.003,
+      "naphtha": 0.1559,
+      "residue": 0.5051,
+      "water": 0.001
+    }
+  },
+  "current_setpoints": {
+    "furnace_temperature_target_k": 628.35,
+    "tower_top_pressure_target_pa_a": 152325.0
+  },
+  "initial_state": {
+    "flash_drum": 1.0,
+    "reflux_drum": 1.0,
+    "tower_bottom": 1.0
+  },
+  "data_timestamp": "2026-06-04T09:16:00+08:00",
+  "data_quality": "weak-time-alignment",
+  "claim_scope": "engineering_simulation_only"
+}

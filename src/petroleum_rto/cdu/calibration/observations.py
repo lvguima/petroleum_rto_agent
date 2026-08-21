@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Literal, cast
 
+from ..repository import resolve_cdu_repository_path
 from .etl import file_sha256, parse_lab_value
 
 
@@ -596,12 +597,10 @@ def _verify_order_and_uniqueness(ids: list[str], *, context: str) -> None:
 
 
 def _verified_source_path(repo_root: Path, source_path: str) -> Path:
-    root = repo_root.resolve()
-    candidate = (root / PurePosixPath(source_path)).resolve()
     try:
-        candidate.relative_to(root)
-    except ValueError as exc:
-        raise ObservationContractError(f"source escapes repository root: {source_path}") from exc
+        candidate = resolve_cdu_repository_path(repo_root, source_path)
+    except (TypeError, ValueError) as exc:
+        raise ObservationContractError(str(exc)) from exc
     if not candidate.is_file():
         raise ObservationContractError(f"source does not exist: {source_path}")
     return candidate

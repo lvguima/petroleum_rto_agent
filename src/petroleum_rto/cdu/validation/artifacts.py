@@ -13,6 +13,7 @@ from types import MappingProxyType
 from typing import Final, cast
 
 from ..core.config import canonical_fingerprint
+from ..repository import resolve_cdu_repository_path
 from .basis import M6Basis, load_m6_basis
 from .config import M6ValidationConfig, load_m6_validation_config
 from .domain import assess_applicability
@@ -159,9 +160,10 @@ def _safe_output(repo_root: Path, artifact_name: str) -> Path:
         or "\\" in relative_path
     ):  # pragma: no cover - fixed constants are covered by construction tests
         raise ValueError("M6 artifact path is not repository-relative and canonical")
-    candidate = root.joinpath(*parsed.parts)
+    candidate = resolve_cdu_repository_path(root, relative_path)
+    physical_relative = candidate.relative_to(root)
     cursor = root
-    for part in parsed.parts:
+    for part in physical_relative.parts:
         cursor /= part
         if cursor.is_symlink():
             raise ValueError(f"M6 artifact path cannot traverse a symlink: {relative_path}")
@@ -177,7 +179,9 @@ def _load_frozen_sources(repo_root: Path) -> tuple[M6ValidationConfig, M6Basis]:
     root = repo_root.resolve()
     if not root.is_dir():
         raise ValueError("repo_root must be an existing directory")
-    config = load_m6_validation_config(root / _VALIDATION_CONFIG_PATH)
+    config = load_m6_validation_config(
+        resolve_cdu_repository_path(root, _VALIDATION_CONFIG_PATH)
+    )
     basis = load_m6_basis(root)
     return config, basis
 

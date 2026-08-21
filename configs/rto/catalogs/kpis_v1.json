@@ -1,0 +1,93 @@
+{
+  "schema_version": "1.0.0",
+  "catalog_version": "kpi-catalog-v1",
+  "catalog_id": "cdu-v1-kpis",
+  "claim_scope": "engineering_simulation_only",
+  "kpis": [
+    {
+      "kpi_id": "m2_evaluable",
+      "stage": "M2",
+      "unit": "1",
+      "direction": "equal",
+      "formula_id": "runtime_convergence_conservation_finite_nonnegative_v1",
+      "source_paths": [
+        "runtime_status",
+        "engine_status",
+        "summary.flowsheet.balance",
+        "summary.flowsheet.diagnostics.conservation_gate_passed"
+      ],
+      "proxy": false
+    },
+    {
+      "kpi_id": "m4_acceptance_passed",
+      "stage": "M4",
+      "unit": "1",
+      "direction": "equal",
+      "formula_id": "existing_m4_acceptance_v1",
+      "source_paths": ["summary.acceptance_passed", "summary.control_fingerprint"],
+      "proxy": false
+    },
+    {
+      "kpi_id": "quality_proxy_max_abs_relative_change",
+      "stage": "M2",
+      "unit": "1",
+      "direction": "minimize",
+      "formula_id": "max_abs_relative_change_with_small_denominator_guard_v1",
+      "source_paths": [
+        "summary.flowsheet.qualities.gasoline.density_kg_m3_proxy",
+        "summary.flowsheet.qualities.gasoline.t50_k_proxy",
+        "summary.flowsheet.qualities.kerosene.density_kg_m3_proxy",
+        "summary.flowsheet.qualities.kerosene.t50_k_proxy",
+        "summary.flowsheet.qualities.light_diesel.density_kg_m3_proxy",
+        "summary.flowsheet.qualities.light_diesel.t50_k_proxy",
+        "summary.flowsheet.qualities.heavy_diesel.density_kg_m3_proxy",
+        "summary.flowsheet.qualities.heavy_diesel.t50_k_proxy"
+      ],
+      "proxy": true
+    },
+    {
+      "kpi_id": "specific_furnace_fuel_energy_mj_per_t",
+      "stage": "M2",
+      "unit": "MJ/t",
+      "direction": "minimize",
+      "formula_id": "furnace_fuel_w_div_feed_kg_s_div_1000_v1",
+      "source_paths": [
+        "summary.flowsheet.diagnostics.furnace_fuel_duty_w",
+        "summary.flowsheet.streams.fresh_crude.mass_flow_kg_s"
+      ],
+      "proxy": true
+    },
+    {
+      "kpi_id": "specific_furnace_fuel_improvement_fraction",
+      "stage": "post_selection",
+      "unit": "1",
+      "direction": "maximize",
+      "formula_id": "paired_baseline_minus_candidate_over_baseline_v1",
+      "source_paths": ["paired.specific_furnace_fuel_energy_mj_per_t"],
+      "proxy": true
+    },
+    {
+      "kpi_id": "valuable_distillate_yield",
+      "stage": "M2",
+      "unit": "mass_fraction",
+      "direction": "maximize",
+      "formula_id": "sum_gasoline_kerosene_light_and_heavy_diesel_yields_v1",
+      "source_paths": [
+        "summary.flowsheet.diagnostics.gasoline_yield_mass_fraction",
+        "summary.flowsheet.diagnostics.kerosene_yield_mass_fraction",
+        "summary.flowsheet.diagnostics.light_diesel_yield_mass_fraction",
+        "summary.flowsheet.diagnostics.heavy_diesel_yield_mass_fraction"
+      ],
+      "proxy": true
+    },
+    {
+      "kpi_id": "valuable_distillate_yield_delta",
+      "stage": "M2",
+      "unit": "mass_fraction",
+      "direction": "maximize",
+      "formula_id": "paired_candidate_minus_baseline_v1",
+      "source_paths": ["paired.valuable_distillate_yield"],
+      "proxy": true
+    }
+  ]
+}

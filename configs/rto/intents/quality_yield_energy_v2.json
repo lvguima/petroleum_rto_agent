@@ -1,0 +1,45 @@
+{
+  "schema_version": "2.0.0",
+  "intent_version": "domain-optimization-intent-v2",
+  "intent_id": "balance-quality-yield-energy",
+  "source": {
+    "source_type": "human",
+    "producer_id": "rto-fixture",
+    "producer_version": "fixture-v2",
+    "correlation_id": "r7-policy-freeze"
+  },
+  "original_text": "在稳定性和质量、收率门禁满足的前提下，优先保持质量，其次提高有效馏分收率，并兼顾降低单位进料炉燃料热负荷代理。",
+  "objective_profile_id": "quality-yield-energy-pareto-v1",
+  "objectives": [
+    {
+      "metric_id": "quality_proxy_max_abs_relative_change",
+      "sense": "minimize",
+      "priority_tier": 1
+    },
+    {
+      "metric_id": "valuable_distillate_yield",
+      "sense": "maximize",
+      "priority_tier": 2
+    },
+    {
+      "metric_id": "specific_furnace_fuel_energy_mj_per_t",
+      "sense": "minimize",
+      "priority_tier": 3
+    }
+  ],
+  "selection": {
+    "selection_profile_id": "lexicographic-quality-yield-energy-v1",
+    "return_pareto_front": true,
+    "max_returned_candidates": 5
+  },
+  "decision_profile_id": "cdu-v1-decisions",
+  "business_constraint_profile_id": "preserve-quality-yield-v1",
+  "requested_output": "pareto-and-selected-steady-setpoint",
+  "context_policy": "feed-as-fixed-context",
+  "assumptions": [
+    "current-crude-and-equipment-mode-remain-fixed"
+  ],
+  "ambiguities": [],
+  "rationale_summary": "使用当前端到端贯通的两个高层设定值，并按质量、收率、能耗的显式顺序选择Pareto候选。",
+  "claim_scope": "engineering_simulation_only"
+}

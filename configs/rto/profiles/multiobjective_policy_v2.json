@@ -1,0 +1,43 @@
+{
+  "schema_version": "2.0.0",
+  "policy_version": "multiobjective-policy-v2",
+  "policy_id": "cdu-v2-policy",
+  "objective_catalog_id": "cdu-v2-objectives",
+  "objective_profile_id": "quality-yield-energy-pareto-v1",
+  "preference_catalog_id": "cdu-v2-preferences",
+  "selection_profile_id": "lexicographic-quality-yield-energy-v1",
+  "decision_profile_id": "cdu-v1-decisions",
+  "business_constraint_profile_id": "preserve-quality-yield-v1",
+  "constraint_profile_id": "cdu-v1-constraints",
+  "publishability_profile_id": "minimum-energy-improvement-v1",
+  "requested_output": "pareto-and-selected-steady-setpoint",
+  "context_policy": "feed-as-fixed-context",
+  "allowed_assumptions": [
+    "current-crude-and-equipment-mode-remain-fixed"
+  ],
+  "evaluation": {
+    "m2_preset_id": "steady-baseline",
+    "m4_preset_id": "closed-loop-feed-step",
+    "m4_event_time_s": 600.0,
+    "m4_duration_s": 7200.0,
+    "m4_time_step_s": 1.0,
+    "top_k": 5,
+    "feed_anchor_ratios": [
+      0.95,
+      1.0,
+      1.05
+    ]
+  },
+  "search": {
+    "algorithm_id": "deterministic-full-grid",
+    "algorithm_version": "pareto-grid-v2",
+    "grid_step_source": "decision-refine-step",
+    "points_per_dimension": 9,
+    "maximum_m2_candidates": 81,
+    "dominance_policy": "exact-directional-v1",
+    "equivalence_policy": "exact-objective-vector-v1",
+    "cache_policy": "canonical-si-vector-v1",
+    "randomness": "none"
+  },
+  "claim_scope": "engineering_simulation_only"
+}

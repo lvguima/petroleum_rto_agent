@@ -1,0 +1,108 @@
+{
+  "schema_version": "1.0.0",
+  "context_schema_id": "cdu-operating-context-schema",
+  "context_schema_version": "1.0.0",
+  "claim_scope": "engineering_simulation_only",
+  "fields": [
+    {
+      "field_id": "case_ref",
+      "json_pointer": "/case_ref",
+      "value_type": "contract-ref",
+      "unit": null,
+      "required": true,
+      "role": "identity",
+      "source_authority": "case-registry",
+      "override_policy": "reference-only"
+    },
+    {
+      "field_id": "current_setpoints",
+      "json_pointer": "/current_setpoints",
+      "value_type": "numeric-mapping",
+      "unit": null,
+      "required": true,
+      "role": "current-setpoint",
+      "source_authority": "trusted-context-provider",
+      "override_policy": "trusted-explicit-override"
+    },
+    {
+      "field_id": "data_quality",
+      "json_pointer": "/data_quality",
+      "value_type": "string",
+      "unit": null,
+      "required": true,
+      "role": "provenance",
+      "source_authority": "trusted-context-provider",
+      "override_policy": "trusted-explicit-override"
+    },
+    {
+      "field_id": "data_timestamp",
+      "json_pointer": "/data_timestamp",
+      "value_type": "string",
+      "unit": null,
+      "required": true,
+      "role": "provenance",
+      "source_authority": "trusted-context-provider",
+      "override_policy": "trusted-explicit-override"
+    },
+    {
+      "field_id": "feed_composition",
+      "json_pointer": "/facts/feed_composition",
+      "value_type": "numeric-mapping",
+      "unit": "mass_fraction",
+      "required": true,
+      "role": "operating-fact",
+      "source_authority": "case-registry",
+      "override_policy": "reference-only"
+    },
+    {
+      "field_id": "fresh_feed_load_kg_s",
+      "json_pointer": "/facts/fresh_feed_load_kg_s",
+      "value_type": "number",
+      "unit": "kg/s",
+      "required": true,
+      "role": "operating-fact",
+      "source_authority": "production-plan-or-fixture",
+      "override_policy": "trusted-explicit-override"
+    },
+    {
+      "field_id": "initial_inventory_ratios",
+      "json_pointer": "/initial_state",
+      "value_type": "numeric-mapping",
+      "unit": "1",
+      "required": true,
+      "role": "initial-state",
+      "source_authority": "trusted-context-provider",
+      "override_policy": "trusted-explicit-override"
+    },
+    {
+      "field_id": "model_ref",
+      "json_pointer": "/model_ref",
+      "value_type": "contract-ref",
+      "unit": null,
+      "required": true,
+      "role": "identity",
+      "source_authority": "model-registry",
+      "override_policy": "reference-only"
+    },
+    {
+      "field_id": "operating_mode",
+      "json_pointer": "/operating_mode",
+      "value_type": "string",
+      "unit": null,
+      "required": true,
+      "role": "operating-fact",
+      "source_authority": "trusted-context-provider",
+      "override_policy": "trusted-explicit-override"
+    },
+    {
+      "field_id": "provider_id",
+      "json_pointer": "/provider_id",
+      "value_type": "string",
+      "unit": null,
+      "required": true,
+      "role": "identity",
+      "source_authority": "trusted-context-provider",
+      "override_policy": "forbidden"
+    }
+  ]
+}

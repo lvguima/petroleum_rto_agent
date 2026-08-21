@@ -24,6 +24,7 @@ from ..dynamics.initialization import initialize_open_loop_dynamic_model
 from ..dynamics.schedule import CommandEvent, CommandSchedule
 from ..dynamics.simulation import DynamicSimulationResult, simulate_dynamic
 from ..flowsheet.recycle import RecycleSolveResult, solve_recycle
+from ..repository import resolve_cdu_repository_path
 from .basis import M6Basis, load_m6_basis
 from .config import (
     M6ValidationConfig,
@@ -1197,8 +1198,16 @@ def run_m6_validation(
     """Execute the complete source-closed M6 matrix with exact-repeat gates."""
 
     root = repo_root.resolve()
-    selected_config = root / _DEFAULT_CONFIG if config_path is None else config_path
-    selected_control = root / _DEFAULT_CONTROL if control_path is None else control_path
+    selected_config = (
+        resolve_cdu_repository_path(root, _DEFAULT_CONFIG.as_posix())
+        if config_path is None
+        else config_path
+    )
+    selected_control = (
+        resolve_cdu_repository_path(root, _DEFAULT_CONTROL.as_posix())
+        if control_path is None
+        else control_path
+    )
     completed_scenario_ids: list[str] = []
     try:
         config = load_m6_validation_config(selected_config)

@@ -1,0 +1,203 @@
+{
+  "schema_version": "1.0.0",
+  "dataset_id": "domain-communication-gold",
+  "dataset_version": "1.0.0",
+  "claim_scope": "engineering_simulation_only",
+  "cases": [
+    {
+      "case_id": "single-energy-resolved",
+      "user_text": "在当前工况下，通过允许的高层设定值降低单位进料炉燃料热负荷。",
+      "expected_status": "resolved",
+      "expected_issue_codes": [],
+      "expected_intent": {
+        "schema_id": "optimization-intent",
+        "schema_version": "1.0.0",
+        "intent_id": "gold-single-energy",
+        "objectives": [
+          {
+            "metric_id": "specific_furnace_fuel_energy_mj_per_t",
+            "sense": "minimize",
+            "priority": 1
+          }
+        ],
+        "decision_variables": [
+          "furnace_temperature_target_k",
+          "tower_top_pressure_target_pa_a"
+        ],
+        "constraints": [],
+        "preference": {
+          "method": "single-objective",
+          "objective_order": [
+            "specific_furnace_fuel_energy_mj_per_t"
+          ]
+        },
+        "result_request": {
+          "output_kind": "steady-setpoint-vector",
+          "include_alternatives": false,
+          "max_candidates": 1
+        },
+        "ambiguities": []
+      }
+    },
+    {
+      "case_id": "quality-yield-energy-resolved",
+      "user_text": "优先保持质量代理，其次提高有价值馏分收率，最后降低单位进料炉燃料热负荷，并返回备选方案。",
+      "expected_status": "resolved",
+      "expected_issue_codes": [],
+      "expected_intent": {
+        "schema_id": "optimization-intent",
+        "schema_version": "1.0.0",
+        "intent_id": "gold-quality-yield-energy",
+        "objectives": [
+          {
+            "metric_id": "quality_proxy_max_abs_relative_change",
+            "sense": "minimize",
+            "priority": 1
+          },
+          {
+            "metric_id": "valuable_distillate_yield",
+            "sense": "maximize",
+            "priority": 2
+          },
+          {
+            "metric_id": "specific_furnace_fuel_energy_mj_per_t",
+            "sense": "minimize",
+            "priority": 3
+          }
+        ],
+        "decision_variables": [
+          "furnace_temperature_target_k",
+          "tower_top_pressure_target_pa_a"
+        ],
+        "constraints": [],
+        "preference": {
+          "method": "lexicographic",
+          "objective_order": [
+            "quality_proxy_max_abs_relative_change",
+            "valuable_distillate_yield",
+            "specific_furnace_fuel_energy_mj_per_t"
+          ]
+        },
+        "result_request": {
+          "output_kind": "steady-setpoint-vector",
+          "include_alternatives": true,
+          "max_candidates": 5
+        },
+        "ambiguities": []
+      }
+    },
+    {
+      "case_id": "decision-selection-needs-clarification",
+      "user_text": "降低能耗，但我还没有决定允许系统调整哪些设定值。",
+      "expected_status": "needs_clarification",
+      "expected_issue_codes": [
+        "needs-clarification"
+      ],
+      "expected_intent": {
+        "schema_id": "optimization-intent",
+        "schema_version": "1.0.0",
+        "intent_id": "gold-decision-ambiguous",
+        "objectives": [
+          {
+            "metric_id": "specific_furnace_fuel_energy_mj_per_t",
+            "sense": "minimize",
+            "priority": 1
+          }
+        ],
+        "decision_variables": [
+          "furnace_temperature_target_k"
+        ],
+        "constraints": [],
+        "preference": {
+          "method": "single-objective",
+          "objective_order": [
+            "specific_furnace_fuel_energy_mj_per_t"
+          ]
+        },
+        "result_request": {
+          "output_kind": "steady-setpoint-vector",
+          "include_alternatives": false,
+          "max_candidates": 1
+        },
+        "ambiguities": [
+          "decision-variable-selection-ambiguous"
+        ]
+      }
+    },
+    {
+      "case_id": "deferred-reflux-unsupported",
+      "user_text": "只通过调整回流比来降低单位进料炉燃料热负荷。",
+      "expected_status": "unsupported",
+      "expected_issue_codes": [
+        "unsupported-decision-variable"
+      ],
+      "expected_intent": {
+        "schema_id": "optimization-intent",
+        "schema_version": "1.0.0",
+        "intent_id": "gold-reflux-unsupported",
+        "objectives": [
+          {
+            "metric_id": "specific_furnace_fuel_energy_mj_per_t",
+            "sense": "minimize",
+            "priority": 1
+          }
+        ],
+        "decision_variables": [
+          "reflux_ratio_target"
+        ],
+        "constraints": [],
+        "preference": {
+          "method": "single-objective",
+          "objective_order": [
+            "specific_furnace_fuel_energy_mj_per_t"
+          ]
+        },
+        "result_request": {
+          "output_kind": "steady-setpoint-vector",
+          "include_alternatives": false,
+          "max_candidates": 1
+        },
+        "ambiguities": []
+      }
+    },
+    {
+      "case_id": "unbound-business-constraint-unsupported",
+      "user_text": "满足我额外指定的稳定门禁后降低能耗。",
+      "expected_status": "unsupported",
+      "expected_issue_codes": [
+        "business-constraint-binding-unavailable"
+      ],
+      "expected_intent": {
+        "schema_id": "optimization-intent",
+        "schema_version": "1.0.0",
+        "intent_id": "gold-constraint-unsupported",
+        "objectives": [
+          {
+            "metric_id": "specific_furnace_fuel_energy_mj_per_t",
+            "sense": "minimize",
+            "priority": 1
+          }
+        ],
+        "decision_variables": [
+          "furnace_temperature_target_k",
+          "tower_top_pressure_target_pa_a"
+        ],
+        "constraints": [
+          "m2-structural-numeric"
+        ],
+        "preference": {
+          "method": "single-objective",
+          "objective_order": [
+            "specific_furnace_fuel_energy_mj_per_t"
+          ]
+        },
+        "result_request": {
+          "output_kind": "steady-setpoint-vector",
+          "include_alternatives": false,
+          "max_candidates": 1
+        },
+        "ambiguities": []
+      }
+    }
+  ]
+}

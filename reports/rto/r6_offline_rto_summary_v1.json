@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0.0",
+  "report_id": "r6-offline-rto-summary-v1",
+  "workflow_id": "offline-rto-fc174fafb89288e5",
+  "workflow_manifest_fingerprint": "751b9438e05e57ef4e36da831fd9e6e27938586fcf511f600aa8deba481b15f2",
+  "offline_result_fingerprint": "35532d5979d54aec1a3fd2e1858a0f34d2858903023a00f1b78c144f1a25208f",
+  "optimization_result_fingerprint": "446ea56cd07f3d618ba3f97783b38444b9fcaba478c8d6b9dfb8bcbdfb91dbb0",
+  "strategy_ref": {
+    "object_id": "strategy-446ea56cd07f3d61-r1",
+    "fingerprint": "15375a142004bb147d3af55e6922adb7a1a251267857bd1dae11e35a73739bdf"
+  },
+  "strategy_state": "draft",
+  "coverage_kind": "sampled_anchors",
+  "action_setpoints": {
+    "furnace_temperature_target_k": 626.35,
+    "tower_top_pressure_target_pa_a": 152325.0
+  },
+  "anchors": [
+    {
+      "feed_mass_flow_kg_s": 107.48194444444445,
+      "baseline_objective_mj_per_t": 188.9262723374638,
+      "candidate_objective_mj_per_t": 184.54035510101352,
+      "relative_improvement": 0.02321496731071942,
+      "m2_status": "feasible",
+      "m4_status": "feasible"
+    },
+    {
+      "feed_mass_flow_kg_s": 113.1388888888889,
+      "baseline_objective_mj_per_t": 188.37898479334825,
+      "candidate_objective_mj_per_t": 183.99306755689793,
+      "relative_improvement": 0.02328241253270197,
+      "m2_status": "feasible",
+      "m4_status": "feasible"
+    },
+    {
+      "feed_mass_flow_kg_s": 118.79583333333335,
+      "baseline_objective_mj_per_t": 187.88381987248178,
+      "candidate_objective_mj_per_t": 183.49790263603148,
+      "relative_improvement": 0.023343772973250455,
+      "m2_status": "feasible",
+      "m4_status": "feasible"
+    }
+  ],
+  "physical_execution_counts": {
+    "M2": 34,
+    "M4": 8
+  },
+  "repeat_run_new_execution_counts": {
+    "M2": 0,
+    "M4": 0
+  },
+  "wheel": {
+    "relative_path": "dist/r6-final/petroleum_rto_cdu_model-0.1.0-py3-none-any.whl",
+    "sha256": "187cccbb30c4a9d8192c056b84bbedc2f1a88e2ba10798d758164c7eb785cda4"
+  },
+  "execution_scope": "offline_simulation_only",
+  "control_authority": "none",
+  "field_validated": false,
+  "dcs_write_capability": false,
+  "claim_scope": "engineering_simulation_only"
+}

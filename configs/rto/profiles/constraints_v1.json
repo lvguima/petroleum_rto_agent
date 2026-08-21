@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0.0",
+  "profile_version": "constraint-profile-v1",
+  "profile_id": "cdu-v1-constraints",
+  "claim_scope": "engineering_simulation_only",
+  "rules": [
+    {
+      "constraint_id": "m2-structural-numeric",
+      "priority": 0,
+      "stage": "M2",
+      "kind": "hard",
+      "metric_id": "m2_evaluable",
+      "operator": "eq",
+      "limit": 1.0,
+      "unit": "1",
+      "normalization_scale": 1.0
+    },
+    {
+      "constraint_id": "m4-stability-acceptance",
+      "priority": 1,
+      "stage": "M4",
+      "kind": "hard",
+      "metric_id": "m4_acceptance_passed",
+      "operator": "eq",
+      "limit": 1.0,
+      "unit": "1",
+      "normalization_scale": 1.0
+    },
+    {
+      "constraint_id": "quality-proxy-preservation",
+      "priority": 2,
+      "stage": "M2",
+      "kind": "hard",
+      "metric_id": "quality_proxy_max_abs_relative_change",
+      "operator": "le",
+      "limit": 0.005,
+      "unit": "1",
+      "normalization_scale": 0.005
+    },
+    {
+      "constraint_id": "valuable-distillate-yield-preservation",
+      "priority": 3,
+      "stage": "M2",
+      "kind": "hard",
+      "metric_id": "valuable_distillate_yield_delta",
+      "operator": "ge",
+      "limit": -0.002,
+      "unit": "mass_fraction",
+      "normalization_scale": 0.002
+    },
+    {
+      "constraint_id": "minimum-publishable-energy-improvement",
+      "priority": 4,
+      "stage": "post_selection",
+      "kind": "publishability",
+      "metric_id": "specific_furnace_fuel_improvement_fraction",
+      "operator": "ge",
+      "limit": 0.005,
+      "unit": "1",
+      "normalization_scale": 0.005
+    }
+  ]
+}

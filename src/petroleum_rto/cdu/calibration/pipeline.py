@@ -25,6 +25,7 @@ from ..core.config import (
 from ..core.types import BalanceReport
 from ..flowsheet.recycle import RecycleSolveResult, solve_recycle
 from ..properties.components import ComponentCatalog
+from ..repository import cdu_resource_file_sha256, resolve_cdu_repository_path
 from .alignment import AlignmentConfig, load_alignment_config
 from .calibration import CalibrationResult, apply_calibration_parameters, run_calibration
 from .config import (
@@ -147,13 +148,10 @@ class M5PipelineError(RuntimeError):
 
 
 def _repo_path(repo_root: Path, relative_path: str) -> Path:
-    root = repo_root.resolve()
-    result = (root / relative_path).resolve()
     try:
-        result.relative_to(root)
-    except ValueError as exc:  # pragma: no cover - config already blocks traversal
-        raise ConfigurationError(f"path escapes repository root: {relative_path}") from exc
-    return result
+        return resolve_cdu_repository_path(repo_root, relative_path)
+    except (TypeError, ValueError) as exc:  # pragma: no cover - config blocks traversal
+        raise ConfigurationError(str(exc)) from exc
 
 
 def _float_parameter(values: Mapping[str, object], name: str) -> float:
@@ -877,10 +875,11 @@ def _load_inputs(repo_root: Path, alignment_path: Path) -> _LoadedInputs:
         raise M5PipelineError("source_preflight", "source manifest version drift")
     file_fingerprints = {
         "alignment_file": file_sha256(alignment_path),
-        "model_file": file_sha256(model_path),
-        "case_file": file_sha256(case_path),
-        "component_catalog_file": file_sha256(
-            _repo_path(repo_root, model.component_catalog_path)
+        "model_file": cdu_resource_file_sha256(model_path, paths.model_config),
+        "case_file": cdu_resource_file_sha256(case_path, paths.case_config),
+        "component_catalog_file": cdu_resource_file_sha256(
+            _repo_path(repo_root, model.component_catalog_path),
+            model.component_catalog_path,
         ),
         "observation_catalog_file": file_sha256(observation_path),
         "source_manifest_file": file_sha256(source_path),
@@ -1191,7 +1190,10 @@ def run_m5_pipeline(
     chosen_alignment = (
         alignment_path.resolve()
         if alignment_path is not None
-        else root / "configs/reconciliation/m5_case_20260604_v0.1.0.json"
+        else resolve_cdu_repository_path(
+            root,
+            "configs/reconciliation/m5_case_20260604_v0.1.0.json",
+        )
     )
     try:
         loaded = _load_inputs(root, chosen_alignment)

@@ -9,8 +9,16 @@ description = "Reduced-order atmospheric crude distillation simulation and valid
 requires-python = ">=3.12,<3.13"
 dependencies = []
 
+[project.optional-dependencies]
+domain-model = [
+    "httpx==0.28.1",
+]
+
 [project.scripts]
 cdu-mini = "petroleum_rto.cdu.runtime.cli:main"
+rto-offline = "petroleum_rto.rto.runtime.cli:main"
+rto-intent = "petroleum_rto.assistant.cli:main"
+rto-chat = "petroleum_rto.assistant.cli:main"
 
 [dependency-groups]
 dev = [
@@ -27,6 +35,11 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "petroleum_rto.cdu.runtime.data" = ["*.json"]
+"petroleum_rto.domain_model.data" = ["*.json"]
+"petroleum_rto.rto.data" = ["*.json"]
+
+[tool.setuptools.exclude-package-data]
+"petroleum_rto.domain_model" = ["dmx_api.json"]
 
 [tool.ruff]
 line-length = 100
@@ -39,5 +52,5 @@ mypy_path = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 addopts = "-ra --strict-config --strict-markers"

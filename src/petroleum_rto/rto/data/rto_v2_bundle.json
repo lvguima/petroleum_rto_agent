@@ -1,0 +1,128 @@
+{
+  "objective_catalog": {
+    "schema_version": "2.0.0",
+    "catalog_version": "objective-catalog-v2",
+    "catalog_id": "cdu-v2-objectives",
+    "maximum_objectives": 3,
+    "claim_scope": "engineering_simulation_only",
+    "profiles": [
+      {
+        "profile_id": "quality-yield-energy-pareto-v1",
+        "objective_ids": [
+          "quality_proxy_max_abs_relative_change",
+          "valuable_distillate_yield",
+          "specific_furnace_fuel_energy_mj_per_t"
+        ]
+      }
+    ],
+    "objectives": [
+      {
+        "metric_id": "quality_proxy_max_abs_relative_change",
+        "sense": "minimize",
+        "stage": "M2",
+        "unit": "1",
+        "kpi_formula_id": "max_abs_relative_change_with_small_denominator_guard_v1",
+        "normalization_scale": 0.005,
+        "relative_improvement_policy": "zero-baseline-null"
+      },
+      {
+        "metric_id": "valuable_distillate_yield",
+        "sense": "maximize",
+        "stage": "M2",
+        "unit": "mass_fraction",
+        "kpi_formula_id": "sum_gasoline_kerosene_light_and_heavy_diesel_yields_v1",
+        "normalization_scale": 0.002,
+        "relative_improvement_policy": "directional-relative"
+      },
+      {
+        "metric_id": "specific_furnace_fuel_energy_mj_per_t",
+        "sense": "minimize",
+        "stage": "M2",
+        "unit": "MJ/t",
+        "kpi_formula_id": "furnace_fuel_w_div_feed_kg_s_div_1000_v1",
+        "normalization_scale": 1.0,
+        "relative_improvement_policy": "directional-relative"
+      }
+    ]
+  },
+  "preference_catalog": {
+    "schema_version": "2.0.0",
+    "catalog_version": "preference-catalog-v2",
+    "catalog_id": "cdu-v2-preferences",
+    "claim_scope": "engineering_simulation_only",
+    "profiles": [
+      {
+        "profile_id": "lexicographic-quality-yield-energy-v1",
+        "method": "lexicographic",
+        "objective_order": [
+          "quality_proxy_max_abs_relative_change",
+          "valuable_distillate_yield",
+          "specific_furnace_fuel_energy_mj_per_t"
+        ],
+        "tie_breaks": [
+          "minimum-hard-constraint-margin-desc",
+          "normalized-action-l1-asc",
+          "proposal-fingerprint-asc"
+        ]
+      }
+    ]
+  },
+  "publishability_catalog": {
+    "schema_version": "2.0.0",
+    "catalog_version": "publishability-catalog-v2",
+    "catalog_id": "cdu-v2-publishability",
+    "claim_scope": "engineering_simulation_only",
+    "profiles": [
+      {
+        "profile_id": "minimum-energy-improvement-v1",
+        "metric_id": "specific_furnace_fuel_energy_mj_per_t",
+        "comparison": "relative-directional-improvement-ge",
+        "limit": 0.005,
+        "failure_status": "feasible_not_publishable"
+      }
+    ]
+  },
+  "policy": {
+    "schema_version": "2.0.0",
+    "policy_version": "multiobjective-policy-v2",
+    "policy_id": "cdu-v2-policy",
+    "objective_catalog_id": "cdu-v2-objectives",
+    "objective_profile_id": "quality-yield-energy-pareto-v1",
+    "preference_catalog_id": "cdu-v2-preferences",
+    "selection_profile_id": "lexicographic-quality-yield-energy-v1",
+    "decision_profile_id": "cdu-v1-decisions",
+    "business_constraint_profile_id": "preserve-quality-yield-v1",
+    "constraint_profile_id": "cdu-v1-constraints",
+    "publishability_profile_id": "minimum-energy-improvement-v1",
+    "requested_output": "pareto-and-selected-steady-setpoint",
+    "context_policy": "feed-as-fixed-context",
+    "allowed_assumptions": [
+      "current-crude-and-equipment-mode-remain-fixed"
+    ],
+    "evaluation": {
+      "m2_preset_id": "steady-baseline",
+      "m4_preset_id": "closed-loop-feed-step",
+      "m4_event_time_s": 600.0,
+      "m4_duration_s": 7200.0,
+      "m4_time_step_s": 1.0,
+      "top_k": 5,
+      "feed_anchor_ratios": [
+        0.95,
+        1.0,
+        1.05
+      ]
+    },
+    "search": {
+      "algorithm_id": "deterministic-full-grid",
+      "algorithm_version": "pareto-grid-v2",
+      "grid_step_source": "decision-refine-step",
+      "points_per_dimension": 9,
+      "maximum_m2_candidates": 81,
+      "dominance_policy": "exact-directional-v1",
+      "equivalence_policy": "exact-objective-vector-v1",
+      "cache_policy": "canonical-si-vector-v1",
+      "randomness": "none"
+    },
+    "claim_scope": "engineering_simulation_only"
+  }
+}

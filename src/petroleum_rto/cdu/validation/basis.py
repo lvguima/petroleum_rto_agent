@@ -23,6 +23,7 @@ from ..core.config import (
     validate_config_compatibility,
 )
 from ..properties.components import ComponentCatalog
+from ..repository import cdu_resource_file_sha256, resolve_cdu_repository_path
 
 _SCHEMA_VERSION: Final[str] = "1.0.0"
 _ANALYSIS_VERSION: Final[str] = "m6-basis-v0.1.0"
@@ -114,11 +115,9 @@ def _repo_file(repo_root: Path, relative_path: str, *, context: str) -> Path:
         or ".." in parsed.parts
     ):
         raise ValueError(f"{context} must stay inside the repository")
-    root = repo_root.resolve()
-    resolved = (root / parsed).resolve()
     try:
-        resolved.relative_to(root)
-    except ValueError as exc:
+        resolved = resolve_cdu_repository_path(repo_root, relative_path)
+    except (TypeError, ValueError) as exc:
         raise ValueError(f"{context} escapes the repository") from exc
     if not resolved.is_file():
         raise FileNotFoundError(f"{context} does not exist: {relative_path}")
@@ -553,9 +552,18 @@ def load_m6_basis(repo_root: Path) -> M6Basis:
         result.calibrated_model.component_catalog_path,
         context="M6 component catalog path",
     )
-    if file_sha256(case_path) != result.fingerprints["case_file"]:
+    if (
+        cdu_resource_file_sha256(case_path, result.alignment.paths.case_config)
+        != result.fingerprints["case_file"]
+    ):
         raise ValueError("M6 base case file hash differs from the M5 pipeline")
-    if file_sha256(catalog_path) != result.fingerprints["component_catalog_file"]:
+    if (
+        cdu_resource_file_sha256(
+            catalog_path,
+            result.calibrated_model.component_catalog_path,
+        )
+        != result.fingerprints["component_catalog_file"]
+    ):
         raise ValueError("M6 component catalog file hash differs from the M5 pipeline")
 
     base_case = load_case_config(case_path)

@@ -1,0 +1,106 @@
+{
+  "schema_version": "2.0.0",
+  "report_id": "r11-multiobjective-offline-summary-v2",
+  "workflow_id": "offline-rto-v2-c69e0e46572af52f",
+  "request_version": "external-optimization-request-v2",
+  "coverage_policy": "point",
+  "workflow_manifest_fingerprint": "662e8ee6e7dd6f7a70694f3b6ec45fa03cc553e116b341042867ad39a9b19a89",
+  "offline_result_fingerprint": "feb0b4fe24187b9d07953572f3395fecc46738ec55cf33974fcb38953a9a393f",
+  "optimization_result_fingerprint": "7018a54a2c4faa9bd28f6371d88018e521f0c6b7db2d391a9cc6d75f1cafff51",
+  "pareto_search_fingerprint": "6f949035c513d66c28d326c0304c11ccaa03fd0865b1066ac391fc94d556c7f5",
+  "preference_selection_fingerprint": "313e8812a213dc252c7550a2f14579c2837a71cd589e17f6f493bfe41c82ce44",
+  "dynamic_verification_fingerprint": "26ade7c05b0ad4c361f23df9d2194833f16b428191db0772df37b13a9507351b",
+  "strategy_ref": {
+    "object_id": "strategy-v2-7dacfe7becd2d408-r1",
+    "fingerprint": "7dacfe7becd2d408d0543724cd5c14a8c2c66898aa76f226e21457e83c5f7247"
+  },
+  "strategy_state": "draft",
+  "search": {
+    "grid_count": 81,
+    "feasible_count": 81,
+    "process_infeasible_count": 0,
+    "error_count": 0,
+    "first_pareto_front_count": 5,
+    "pareto_layer_count": 13,
+    "dynamic_shortlist_count": 5,
+    "dynamic_feasible_count": 5
+  },
+  "action_setpoints": {
+    "furnace_temperature_target_k": 626.35,
+    "tower_top_pressure_target_pa_a": 152325.0
+  },
+  "selected_objectives": [
+    {
+      "metric_id": "quality_proxy_max_abs_relative_change",
+      "sense": "minimize",
+      "unit": "1",
+      "baseline_value": 0.0,
+      "candidate_value": 0.0,
+      "directional_absolute_improvement": 0.0,
+      "relative_directional_improvement": null,
+      "relative_unavailable_reason": "zero-baseline"
+    },
+    {
+      "metric_id": "valuable_distillate_yield",
+      "sense": "maximize",
+      "unit": "mass_fraction",
+      "baseline_value": 0.49195794770327494,
+      "candidate_value": 0.49195794770327494,
+      "directional_absolute_improvement": 0.0,
+      "relative_directional_improvement": 0.0,
+      "relative_unavailable_reason": null
+    },
+    {
+      "metric_id": "specific_furnace_fuel_energy_mj_per_t",
+      "sense": "minimize",
+      "unit": "MJ/t",
+      "baseline_value": 188.37898479334825,
+      "candidate_value": 183.99306755689793,
+      "directional_absolute_improvement": 4.385917236450325,
+      "relative_directional_improvement": 0.02328241253270197,
+      "relative_unavailable_reason": null
+    }
+  ],
+  "anchor": {
+    "feed_ratio": 1.0,
+    "feed_mass_flow_kg_s": 113.13888888888889,
+    "m2_status": "feasible",
+    "m4_status": "feasible"
+  },
+  "physical_execution_counts": {
+    "M2": 81,
+    "M4": 6
+  },
+  "repeat_run_new_execution_counts": {
+    "M2": 0,
+    "M4": 0
+  },
+  "inspect_new_execution_counts": {
+    "M2": 0,
+    "M4": 0
+  },
+  "clean_install_replay": {
+    "v1_workflow_id": "offline-rto-fc174fafb89288e5",
+    "v1_success": true,
+    "v2_workflow_id": "offline-rto-v2-c69e0e46572af52f",
+    "v2_success": true,
+    "new_m2_executions": 0,
+    "new_m4_executions": 0
+  },
+  "wheel": {
+    "relative_path": "dist/r11-final/petroleum_rto_cdu_model-0.1.0-py3-none-any.whl",
+    "size_bytes": 468690,
+    "sha256": "7a68d404f9eb5e63764446b55f2d6389adf9f2c2b22fbfbd5d3a2f37849bd106"
+  },
+  "test_counts": {
+    "rto": 85,
+    "full_repository": 735,
+    "strict_mypy_source_and_script_files": 134,
+    "rto_formatted_files": 73
+  },
+  "execution_scope": "offline_simulation_only",
+  "control_authority": "none",
+  "field_validated": false,
+  "dcs_write_capability": false,
+  "claim_scope": "engineering_simulation_only"
+}
