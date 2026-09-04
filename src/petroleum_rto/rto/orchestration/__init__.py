@@ -12,6 +12,16 @@ from .models import (
     SolverExecutionArtifact,
     WorkflowEvent,
 )
+from .result import (
+    OptimizationAdjustmentSummary,
+    OptimizationAlternativeCandidateSummary,
+    OptimizationBaselineSummary,
+    OptimizationContextSummary,
+    OptimizationPredictedEffectSummary,
+    OptimizationRunSummary,
+    OptimizationTargetSummary,
+    build_optimization_run_summary,
+)
 from .service import OfflineRtoOrchestrator, OfflineRtoRunRecord, read_offline_run
 
 __all__ = [
@@ -25,7 +35,15 @@ __all__ = [
     "OfflineRtoRequest",
     "OfflineRtoResult",
     "OfflineRtoRunRecord",
+    "OptimizationAdjustmentSummary",
+    "OptimizationAlternativeCandidateSummary",
+    "OptimizationBaselineSummary",
+    "OptimizationContextSummary",
+    "OptimizationPredictedEffectSummary",
+    "OptimizationRunSummary",
+    "OptimizationTargetSummary",
     "SolverExecutionArtifact",
     "WorkflowEvent",
+    "build_optimization_run_summary",
     "read_offline_run",
 ]

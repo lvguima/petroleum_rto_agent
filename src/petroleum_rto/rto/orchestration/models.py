@@ -40,9 +40,9 @@ from ..contracts.solver_result import SolverResult
 from ..solvers.models import SolverRoutingDecision
 
 OFFLINE_WORKFLOW_SCHEMA_ID: Final[str] = "offline-rto-workflow"
-OFFLINE_WORKFLOW_SCHEMA_VERSION: Final[str] = "2.0.0"
-OFFLINE_MANIFEST_VERSION: Final[str] = "offline-rto-manifest-2.0.0"
-OfflineRunStatus = Literal["completed_draft", "completed_without_strategy", "failed"]
+OFFLINE_WORKFLOW_SCHEMA_VERSION: Final[str] = "4.0.0"
+OFFLINE_MANIFEST_VERSION: Final[str] = "offline-rto-manifest-4.0.0"
+OfflineRunStatus = Literal["completed", "failed"]
 CoveragePolicy = Literal["point", "sampled-anchors"]
 
 
@@ -840,7 +840,6 @@ class OfflineRtoResult:
     dynamic_verification_ref: ContractRef
     finalization_ref: ContractRef
     anchor_validation_ref: ContractRef | None
-    strategy_ref: ContractRef | None
     requested_anchor_count: int
     passed_anchor_count: int
     termination_reason: str
@@ -851,7 +850,7 @@ class OfflineRtoResult:
         object.__setattr__(
             self, "result_version", identifier(self.result_version, context="result_version")
         )
-        if self.status not in {"completed_draft", "completed_without_strategy", "failed"}:
+        if self.status not in {"completed", "failed"}:
             raise ValueError("unsupported offline result status")
         for name in (
             "request_ref",
@@ -864,9 +863,10 @@ class OfflineRtoResult:
         ):
             if not isinstance(getattr(self, name), ContractRef):
                 raise TypeError(f"{name} must be ContractRef")
-        for name in ("anchor_validation_ref", "strategy_ref"):
-            if getattr(self, name) is not None and not isinstance(getattr(self, name), ContractRef):
-                raise TypeError(f"{name} must be ContractRef or None")
+        if self.anchor_validation_ref is not None and not isinstance(
+            self.anchor_validation_ref, ContractRef
+        ):
+            raise TypeError("anchor_validation_ref must be ContractRef or None")
         object.__setattr__(
             self,
             "requested_anchor_count",
@@ -879,10 +879,6 @@ class OfflineRtoResult:
         )
         if self.passed_anchor_count > self.requested_anchor_count:
             raise ValueError("passed anchor count exceeds requested anchor count")
-        if self.status == "completed_draft" and self.strategy_ref is None:
-            raise ValueError("completed_draft requires a strategy ref")
-        if self.status != "completed_draft" and self.strategy_ref is not None:
-            raise ValueError("non-draft result cannot contain a strategy ref")
         object.__setattr__(
             self,
             "termination_reason",
@@ -905,7 +901,6 @@ class OfflineRtoResult:
             "anchor_validation_ref": (
                 None if self.anchor_validation_ref is None else self.anchor_validation_ref.as_dict()
             ),
-            "strategy_ref": None if self.strategy_ref is None else self.strategy_ref.as_dict(),
             "requested_anchor_count": self.requested_anchor_count,
             "passed_anchor_count": self.passed_anchor_count,
             "termination_reason": self.termination_reason,
@@ -942,7 +937,6 @@ class OfflineRtoResult:
             "dynamic_verification_ref",
             "finalization_ref",
             "anchor_validation_ref",
-            "strategy_ref",
             "requested_anchor_count",
             "passed_anchor_count",
             "termination_reason",
@@ -955,7 +949,7 @@ class OfflineRtoResult:
             context="offline RTO result",
         )
         status = value["status"]
-        if status not in {"completed_draft", "completed_without_strategy", "failed"}:
+        if status not in {"completed", "failed"}:
             raise ValueError("unsupported offline result status")
         result = cls(
             schema_id=text(value["schema_id"], context="schema_id"),
@@ -986,7 +980,6 @@ class OfflineRtoResult:
             anchor_validation_ref=_optional_ref(
                 value["anchor_validation_ref"], context="anchor_validation_ref"
             ),
-            strategy_ref=_optional_ref(value["strategy_ref"], context="strategy_ref"),
             requested_anchor_count=integer(
                 value["requested_anchor_count"], context="requested_anchor_count"
             ),

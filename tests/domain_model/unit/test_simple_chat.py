@@ -130,6 +130,9 @@ def test_failed_turn_is_not_committed_and_errors_do_not_reflect_key() -> None:
         session.ask("hello")
 
     assert key not in str(captured.value)
+    assert captured.value.code == "authentication-failed"
+    assert captured.value.retryable is False
+    assert captured.value.http_status == 401
     assert session.messages == ({"role": "system", "content": DMX_SYSTEM_PROMPT},)
     assert key not in repr(session._client.settings)
 
@@ -140,8 +143,69 @@ def test_invalid_provider_shape_returns_one_safe_error() -> None:
         http_client=FakeHttpClient([DmxChatHttpResponse(200, {"choices": []})]),
     )
 
-    with pytest.raises(DmxChatError, match="no assistant content"):
+    with pytest.raises(DmxChatError, match="no assistant content") as captured:
         client.complete([{"role": "user", "content": "hello"}])
+
+    assert captured.value.code == "invalid-response"
+    assert captured.value.retryable is False
+    assert captured.value.http_status == 200
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected_code", "expected_retryable"),
+    [
+        (401, "authentication-failed", False),
+        (403, "permission-denied", False),
+        (429, "rate-limited", True),
+        (503, "provider-server-error", True),
+        (418, "http-error", False),
+    ],
+)
+def test_http_failures_have_stable_safe_classification(
+    status_code: int,
+    expected_code: str,
+    expected_retryable: bool,
+) -> None:
+    key = "sk-secret-http-classification"
+    client = DmxChatClient(
+        DmxChatSettings(api_key=key),
+        http_client=FakeHttpClient([_response(key, status_code=status_code)]),
+    )
+
+    with pytest.raises(DmxChatError) as captured:
+        client.complete([{"role": "user", "content": "hello"}])
+
+    assert captured.value.code == expected_code
+    assert captured.value.retryable is expected_retryable
+    assert captured.value.http_status == status_code
+    assert key not in str(captured.value)
+
+
+def test_transport_failure_is_retryable_without_exposing_exception_text() -> None:
+    class _FailingHttpClient:
+        def post(
+            self,
+            _url: str,
+            *,
+            headers: Mapping[str, str],
+            payload: Mapping[str, object],
+            timeout_seconds: float,
+        ) -> DmxChatHttpResponse:
+            del headers, payload, timeout_seconds
+            raise RuntimeError("provider body and sk-secret-transport")
+
+    client = DmxChatClient(
+        DmxChatSettings(api_key="sk-test-transport"),
+        http_client=_FailingHttpClient(),
+    )
+
+    with pytest.raises(DmxChatError) as captured:
+        client.complete([{"role": "user", "content": "hello"}])
+
+    assert str(captured.value) == "DMXAPI chat request failed"
+    assert captured.value.code == "transport-connect"
+    assert captured.value.retryable is True
+    assert captured.value.http_status is None
 
 
 def test_request_history_and_response_budgets_fail_before_state_is_committed() -> None:
@@ -164,8 +228,10 @@ def test_request_history_and_response_budgets_fail_before_state_is_committed() -
         DmxChatSettings(api_key="sk-test-request-budget", model=oversized_model),
         http_client=transport,
     )
-    with pytest.raises(DmxChatError, match="request exceeds the byte limit"):
+    with pytest.raises(DmxChatError, match="request exceeds the byte limit") as request_error:
         oversized_client.complete([{"role": "user", "content": "hello"}])
+    assert request_error.value.code == "invalid-request"
+    assert request_error.value.retryable is False
     assert transport.calls == []
 
     response_transport = FakeHttpClient([_response("x" * MAX_CHAT_RESPONSE_BYTES)])
@@ -173,8 +239,11 @@ def test_request_history_and_response_budgets_fail_before_state_is_committed() -
         DmxChatSettings(api_key="sk-test-response-budget"),
         http_client=response_transport,
     )
-    with pytest.raises(DmxChatError, match="response exceeds the byte limit"):
+    with pytest.raises(DmxChatError, match="response exceeds the byte limit") as response_error:
         response_client.complete([{"role": "user", "content": "hello"}])
+    assert response_error.value.code == "invalid-response"
+    assert response_error.value.retryable is False
+    assert response_error.value.http_status == 200
 
 
 def test_active_credential_is_blocked_in_requests_and_provider_responses() -> None:
@@ -190,13 +259,42 @@ def test_active_credential_is_blocked_in_requests_and_provider_responses() -> No
     with pytest.raises(DmxChatError) as reflected:
         client.complete([{"role": "user", "content": "hello"}])
     assert key not in str(reflected.value)
+    assert reflected.value.code == "invalid-response"
+    assert reflected.value.retryable is False
+    assert reflected.value.http_status == 200
 
     encoded_transport = FakeHttpClient(
         [_response(base64.b64encode(key.encode("ascii")).decode("ascii"))]
     )
     encoded_client = DmxChatClient(DmxChatSettings(api_key=key), http_client=encoded_transport)
-    with pytest.raises(DmxChatError, match="credential material"):
+    with pytest.raises(DmxChatError, match="credential material") as encoded:
         encoded_client.complete([{"role": "user", "content": "hello"}])
+    assert encoded.value.code == "invalid-response"
+    assert encoded.value.retryable is False
+    assert encoded.value.http_status == 200
+
+
+def test_http_200_non_json_payload_preserves_status_without_exposing_payload() -> None:
+    secret = "provider-secret-payload"
+
+    class _NonJsonValue:
+        def __repr__(self) -> str:
+            return secret
+
+    client = DmxChatClient(
+        DmxChatSettings(api_key="sk-test-non-json-payload"),
+        http_client=FakeHttpClient(
+            [DmxChatHttpResponse(status_code=200, payload={"opaque": _NonJsonValue()})]
+        ),
+    )
+
+    with pytest.raises(DmxChatError, match="not finite UTF-8 JSON") as captured:
+        client.complete([{"role": "user", "content": "hello"}])
+
+    assert captured.value.code == "invalid-response"
+    assert captured.value.retryable is False
+    assert captured.value.http_status == 200
+    assert secret not in str(captured.value)
 
 
 def test_http_boundary_stops_reading_an_oversized_raw_response(
@@ -230,8 +328,71 @@ def test_http_boundary_stops_reading_an_oversized_raw_response(
     monkeypatch.setattr(chat_module, "import_module", lambda _name: SimpleNamespace(Client=_Client))
     client = DmxChatClient(DmxChatSettings(api_key="sk-test-raw-response-budget"))
 
-    with pytest.raises(DmxChatError, match="response exceeds the byte limit"):
+    with pytest.raises(DmxChatError, match="response exceeds the byte limit") as captured:
         client.complete([{"role": "user", "content": "hello"}])
+
+    assert captured.value.code == "invalid-response"
+    assert captured.value.retryable is False
+    assert captured.value.http_status == 200
+
+
+def test_http_200_malformed_raw_body_preserves_status_without_exposing_body(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "provider-secret-not-json"
+
+    class _StreamingResponse:
+        status_code = 200
+
+        def __enter__(self) -> Self:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def iter_bytes(self) -> tuple[bytes, ...]:
+            return (secret.encode("ascii"),)
+
+    class _Client:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+        def __enter__(self) -> Self:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def stream(self, *_args: object, **_kwargs: object) -> _StreamingResponse:
+            return _StreamingResponse()
+
+    monkeypatch.setattr(chat_module, "import_module", lambda _name: SimpleNamespace(Client=_Client))
+    client = DmxChatClient(DmxChatSettings(api_key="sk-test-malformed-raw-body"))
+
+    with pytest.raises(DmxChatError, match="response body is invalid") as captured:
+        client.complete([{"role": "user", "content": "hello"}])
+
+    assert captured.value.code == "invalid-response"
+    assert captured.value.retryable is False
+    assert captured.value.http_status == 200
+    assert secret not in str(captured.value)
+
+
+def test_missing_http_dependency_has_non_retryable_local_classification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_to_import(_name: str) -> object:
+        raise ImportError("local import detail")
+
+    monkeypatch.setattr(chat_module, "import_module", fail_to_import)
+    client = DmxChatClient(DmxChatSettings(api_key="sk-test-missing-httpx"))
+
+    with pytest.raises(DmxChatError, match="httpx is required") as captured:
+        client.complete([{"role": "user", "content": "hello"}])
+
+    assert captured.value.code == "local-dependency-unavailable"
+    assert captured.value.retryable is False
+    assert captured.value.http_status is None
 
 
 def test_settings_loader_uses_injected_key_loader_without_exposing_failure() -> None:
@@ -253,8 +414,21 @@ def test_from_local_config_normalizes_settings_failure(
 
     monkeypatch.setattr(chat_module, "load_dmx_chat_settings", fail_to_load)
 
-    with pytest.raises(DmxChatError, match="local configuration is unavailable"):
+    with pytest.raises(DmxChatError, match="local configuration is unavailable") as captured:
         DmxChatClient.from_local_config()
+
+    assert captured.value.code == "local-configuration-unavailable"
+    assert captured.value.retryable is False
+    assert captured.value.http_status is None
+
+
+def test_chat_error_legacy_constructor_has_safe_default_metadata() -> None:
+    error = DmxChatError("safe message")
+
+    assert str(error) == "safe message"
+    assert error.code == "dmx-chat-failed"
+    assert error.retryable is False
+    assert error.http_status is None
 
 
 @pytest.mark.parametrize(

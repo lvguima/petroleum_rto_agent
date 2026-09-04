@@ -199,6 +199,7 @@ def _entry(repo_root: Path, *, multi: bool = False) -> StrategyEntry:
         static,
         dynamic,
         artifacts,
+        coverage_ref=ContractRef("anchor-validation-test", "c" * 64),
     )
 
 
@@ -210,21 +211,35 @@ def test_unified_entry_is_vectorized_offline_and_round_trips(
 ) -> None:
     entry = _entry(repo_root, multi=multi)
 
-    assert len(entry.objective_order) == objective_count
-    assert len(entry.anchors[0].objective_summaries) == objective_count
-    assert set(entry.action_values) == {
+    assert entry.schema_version == "3.0.0"
+    assert len(entry.applicability.anchors[0].effects) == objective_count
+    assert {item.variable_id for item in entry.adjustments} == {
         "furnace_temperature_target_k",
         "tower_top_pressure_target_pa_a",
     }
-    assert entry.execution_scope == "offline_simulation_only"
-    assert entry.control_authority == "none"
-    assert not entry.field_validated
-    assert not entry.dcs_write_capability
+    assert entry.evidence.coverage_ref == ContractRef("anchor-validation-test", "c" * 64)
     assert StrategyEntry.from_mapping(entry.as_dict()) == entry
+    assert set(entry.as_dict()) == {
+        "schema_version",
+        "strategy_id",
+        "revision",
+        "supersedes",
+        "adjustments",
+        "applicability",
+        "evidence",
+        "fingerprint",
+    }
     serialized = json.dumps(entry.as_dict(), allow_nan=False)
+    assert not {
+        "claim_scope",
+        "control_authority",
+        "dcs_write_capability",
+        "field_validated",
+        "dependency_refs",
+        "solver_result_ref",
+        "static_selection_ref",
+    } & set(entry.as_dict())
     assert "timeseries" not in serialized
-    assert '"static_evaluation"' not in serialized
-    assert '"dynamic_evaluation"' not in serialized
 
     unknown = entry.as_dict()
     unknown["unknown"] = True
@@ -232,9 +247,14 @@ def test_unified_entry_is_vectorized_offline_and_round_trips(
         StrategyEntry.from_mapping(unknown)
 
     bad_identity = entry.as_dict()
-    bad_identity["strategy_ref"] = ContractRef("wrong", "f" * 64).as_dict()
-    with pytest.raises(ValueError, match="strategy_ref"):
+    bad_identity["fingerprint"] = "f" * 64
+    with pytest.raises(ValueError, match="fingerprint"):
         StrategyEntry.from_mapping(bad_identity)
+
+    legacy = entry.as_dict()
+    legacy["schema_version"] = "2.0.0"
+    with pytest.raises(ValueError, match="strategy contract"):
+        StrategyEntry.from_mapping(legacy)
 
 
 def test_builder_rejects_nonpublishable_or_incomplete_evidence(repo_root: Path) -> None:
@@ -252,6 +272,7 @@ def test_builder_rejects_nonpublishable_or_incomplete_evidence(repo_root: Path) 
             static,
             dynamic,
             artifacts,
+            coverage_ref=ContractRef("anchor-validation-test", "c" * 64),
         )
 
     context, problem, proposal, static, dynamic, artifacts = _artifacts(
@@ -270,7 +291,6 @@ def test_builder_rejects_nonpublishable_or_incomplete_evidence(repo_root: Path) 
             proposal,
             incomplete,
             dynamic,
-            finalization_result_ref=artifacts.result.ref,
         )
 
     mismatched_applicability = {
@@ -283,7 +303,6 @@ def test_builder_rejects_nonpublishable_or_incomplete_evidence(repo_root: Path) 
             proposal,
             static,
             dynamic,
-            finalization_result_ref=artifacts.result.ref,
             applicability_values=mismatched_applicability,
         )
 
@@ -308,6 +327,7 @@ def test_builder_rejects_nonpublishable_or_incomplete_evidence(repo_root: Path) 
             static,
             dynamic,
             forged_artifacts,
+            coverage_ref=ContractRef("anchor-validation-test", "c" * 64),
         )
 
     foreign_solver = ContractRef("foreign-solver-result", "e" * 64)
@@ -325,7 +345,44 @@ def test_builder_rejects_nonpublishable_or_incomplete_evidence(repo_root: Path) 
             static,
             dynamic,
             foreign_artifacts,
+            coverage_ref=ContractRef("anchor-validation-test", "c" * 64),
         )
+
+
+def test_strategy_family_identity_ignores_instant_context_and_problem_refs(
+    repo_root: Path,
+) -> None:
+    context, problem, *_ = _artifacts(repo_root, multi=False)
+    drifted_context = replace(
+        context,
+        context_id="case-20260604-small-drift",
+        current_setpoints={
+            **context.current_setpoints,
+            "furnace_temperature_target_k": (
+                context.current_setpoints["furnace_temperature_target_k"] + 0.1
+            ),
+        },
+    )
+    drifted_problem = replace(problem, context_ref=drifted_context.ref)
+
+    original = StrategyBuilder._strategy_id(
+        problem,
+        context,
+        revision=1,
+        supersedes=None,
+        strategy_id=None,
+    )
+    drifted = StrategyBuilder._strategy_id(
+        drifted_problem,
+        drifted_context,
+        revision=1,
+        supersedes=None,
+        strategy_id=None,
+    )
+
+    assert drifted_context.ref != context.ref
+    assert drifted_problem.ref != problem.ref
+    assert drifted == original
 
 
 def _sampled_entry(repo_root: Path) -> StrategyEntry:
@@ -360,7 +417,6 @@ def _sampled_entry(repo_root: Path) -> StrategyEntry:
         anchor_proposal,
         anchor_static,
         anchor_dynamic,
-        finalization_result_ref=artifacts.result.ref,
         applicability_values={
             "feed_ratio": 0.95,
             "fresh_feed_load_kg_s": central_feed * 0.95,
@@ -373,6 +429,7 @@ def _sampled_entry(repo_root: Path) -> StrategyEntry:
         static,
         dynamic,
         artifacts,
+        coverage_ref=ContractRef("anchor-validation-sampled", "d" * 64),
         additional_anchors=(sampled,),
         applicability_values={
             "feed_ratio": 1.0,
@@ -386,18 +443,15 @@ def test_sampled_helper_uses_center_finalization_and_query_never_interpolates(
     tmp_path: Path,
 ) -> None:
     entry = _sampled_entry(repo_root)
-    assert entry.coverage_kind == "sampled_anchors"
-    assert all(
-        item.finalization_result_ref == entry.finalization_result_ref for item in entry.anchors
-    )
+    assert entry.applicability.coverage == "sampled_anchors"
+    assert entry.evidence.coverage_ref == ContractRef("anchor-validation-sampled", "d" * 64)
     repository = StrategyRepository(tmp_path / "library")
     repository.create_draft(entry, actor="builder", occurred_at="2026-08-20T10:00:00+08:00")
     query = StrategyQuery(
-        case_ref=entry.case_ref,
-        operating_mode=entry.operating_mode,
-        applicability_values=dict(entry.anchors[0].applicability_values),
+        case_ref=entry.applicability.case_ref,
+        operating_mode=entry.applicability.operating_mode,
+        conditions=dict(entry.applicability.anchors[0].conditions),
         measurement_tolerances={"feed_ratio": 1e-6, "fresh_feed_load_kg_s": 1e-6},
-        required_dependency_refs=(entry.system_policy_ref,),
     )
     assert StrategyQuery.from_mapping(query.as_dict()) == query
     assert repository.query(query) == ()
@@ -405,20 +459,17 @@ def test_sampled_helper_uses_center_finalization_and_query_never_interpolates(
     repository.publish(entry.strategy_id, 1, actor="publisher")
     assert len(repository.query(query)) == 1
 
-    low, high = sorted(item.applicability_values["fresh_feed_load_kg_s"] for item in entry.anchors)
+    low, high = sorted(
+        item.conditions["fresh_feed_load_kg_s"] for item in entry.applicability.anchors
+    )
     between = replace(
         query,
-        applicability_values={
+        conditions={
             "feed_ratio": 0.975,
             "fresh_feed_load_kg_s": (low + high) / 2.0,
         },
     )
     assert repository.query(between) == ()
-    wrong_dependency = replace(
-        query,
-        required_dependency_refs=(ContractRef("unknown-dependency", "f" * 64),),
-    )
-    assert repository.query(wrong_dependency) == ()
 
 
 def test_repository_full_append_only_lifecycle_and_revision_closure(
@@ -436,6 +487,8 @@ def test_repository_full_append_only_lifecycle_and_revision_closure(
     events_path = entry_path.with_name("events.jsonl")
     entry_bytes = entry_path.read_bytes()
     created_events = events_path.read_bytes()
+    assert entry_bytes.startswith(b"{\n")
+    assert b'  "adjustments": [' in entry_bytes
     assert draft.current_state == "draft"
 
     with pytest.raises(ValueError, match="pending_revalidation"):
@@ -573,7 +626,7 @@ def test_repository_rejects_tampering_early_events_or_orphan_revisions(
         events.replace('"actor":"builder"', '"actor":"attacker"'),
         encoding="utf-8",
     )
-    with pytest.raises(ValueError, match="event_fingerprint"):
+    with pytest.raises(ValueError, match="fingerprint"):
         repository.read(entry.strategy_id, 1)
 
 

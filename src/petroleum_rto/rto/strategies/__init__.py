@@ -7,10 +7,13 @@ from .builder import (
 )
 from .models import (
     STRATEGY_SCHEMA_VERSION,
+    StrategyAdjustment,
     StrategyAnchor,
+    StrategyApplicability,
     StrategyCoverage,
     StrategyEntry,
     StrategyEventType,
+    StrategyEvidence,
     StrategyLifecycleEvent,
     StrategyObjectiveSummary,
     StrategyQuery,
@@ -22,11 +25,14 @@ from .repository import StrategyRepository, utc_now
 
 __all__ = [
     "STRATEGY_SCHEMA_VERSION",
+    "StrategyAdjustment",
     "StrategyAnchor",
+    "StrategyApplicability",
     "StrategyBuilder",
     "StrategyCoverage",
     "StrategyEntry",
     "StrategyEventType",
+    "StrategyEvidence",
     "StrategyLifecycleEvent",
     "StrategyObjectiveSummary",
     "StrategyQuery",

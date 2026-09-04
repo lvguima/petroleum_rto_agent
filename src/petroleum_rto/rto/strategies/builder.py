@@ -8,15 +8,17 @@ from collections.abc import Mapping, Sequence
 from ..contracts.candidate import CandidateEvaluation, CandidateProposal
 from ..contracts.common import canonical_fingerprint, finite, identifier, integer
 from ..contracts.context import OperatingContext
-from ..contracts.problem import ENGINEERING_CLAIM_SCOPE, OptimizationProblem
+from ..contracts.problem import OptimizationProblem
 from ..contracts.reference import ContractRef
 from ..selection import FinalizationArtifacts
 from .models import (
     STRATEGY_SCHEMA_VERSION,
+    StrategyAdjustment,
     StrategyAnchor,
+    StrategyApplicability,
     StrategyEntry,
+    StrategyEvidence,
     StrategyObjectiveSummary,
-    canonical_refs,
 )
 
 
@@ -283,7 +285,6 @@ def anchor_from_verified_candidate(
     static_evaluation: CandidateEvaluation,
     dynamic_evaluation: CandidateEvaluation,
     *,
-    finalization_result_ref: ContractRef,
     applicability_values: Mapping[str, float] | None = None,
 ) -> StrategyAnchor:
     """Build a sampled anchor after fixed-action M2/M4 verification."""
@@ -295,50 +296,20 @@ def anchor_from_verified_candidate(
         static_evaluation,
         dynamic_evaluation,
     )
-    if not isinstance(finalization_result_ref, ContractRef):
-        raise TypeError("finalization_result_ref must be ContractRef")
-    if (
-        static_evaluation.minimum_normalized_margin is None
-        or dynamic_evaluation.minimum_normalized_margin is None
-    ):
-        raise ValueError("verified strategy evaluations lack normalized margins")
-    summaries = tuple(
+    effects = tuple(
         StrategyObjectiveSummary(
             metric_id=item.metric_id,
-            sense=item.sense,
+            baseline=item.baseline_value,
+            expected=item.candidate_value,
             unit=item.unit,
-            formula_id=item.formula_id,
-            baseline_value=item.baseline_value,
-            candidate_value=item.candidate_value,
-            directional_absolute_improvement=item.directional_absolute_improvement,
-            relative_directional_improvement=item.relative_directional_improvement,
-            normalized_directional_improvement=item.normalized_directional_improvement,
+            relative_improvement=item.relative_directional_improvement,
         )
         for item in static_evaluation.objective_outcomes
     )
     return StrategyAnchor(
         context_ref=context.ref,
-        model_ref=context.model_ref,
-        case_ref=context.case_ref,
-        operating_mode=context.operating_mode,
-        applicability_values=_applicability_values(context, applicability_values),
-        action_values=proposal.decision_values,
-        problem_ref=problem.ref,
-        capability_catalog_ref=problem.capability_catalog_ref,
-        system_policy_ref=problem.system_policy_ref,
-        proposal_ref=proposal.ref,
-        static_evaluation_ref=static_evaluation.ref,
-        dynamic_evaluation_ref=dynamic_evaluation.ref,
-        finalization_result_ref=finalization_result_ref,
-        objective_summaries=summaries,
-        minimum_normalized_margin=min(
-            static_evaluation.minimum_normalized_margin,
-            dynamic_evaluation.minimum_normalized_margin,
-        ),
-        evidence_refs=canonical_refs(
-            tuple(item.ref for item in static_evaluation.evidence_refs)
-            + tuple(item.ref for item in dynamic_evaluation.evidence_refs)
-        ),
+        conditions=_applicability_values(context, applicability_values),
+        effects=effects,
     )
 
 
@@ -368,7 +339,6 @@ def anchor_from_finalization(
         proposal,
         static_evaluation,
         dynamic_evaluation,
-        finalization_result_ref=finalization.result.ref,
         applicability_values=applicability_values,
     )
 
@@ -385,6 +355,7 @@ class StrategyBuilder:
         dynamic_evaluation: CandidateEvaluation,
         finalization: FinalizationArtifacts,
         *,
+        coverage_ref: ContractRef,
         additional_anchors: Sequence[StrategyAnchor] = (),
         applicability_values: Mapping[str, float] | None = None,
         revision: int = 1,
@@ -403,6 +374,8 @@ class StrategyBuilder:
         anchors = (central, *tuple(additional_anchors))
         if any(not isinstance(item, StrategyAnchor) for item in anchors):
             raise TypeError("additional_anchors must contain StrategyAnchor values")
+        if not isinstance(coverage_ref, ContractRef):
+            raise TypeError("coverage_ref must be ContractRef")
         revision_value = integer(revision, context="revision", minimum=1)
         resolved_id = self._strategy_id(
             problem,
@@ -412,71 +385,43 @@ class StrategyBuilder:
             strategy_id=strategy_id,
         )
         domains = {item.variable_id: item for item in problem.decision_domains}
-        baseline: dict[str, float] = {}
-        for variable_id in domains:
+        adjustments: list[StrategyAdjustment] = []
+        for variable_id, domain in domains.items():
             if variable_id not in context.current_setpoints:
                 raise ValueError("context lacks a baseline for one selected decision")
-            baseline[variable_id] = context.current_setpoints[variable_id]
-        assessment = finalization.publishability
-        if assessment is None:  # pragma: no cover - anchor validation guarantees this
-            raise ValueError("publishability assessment is missing")
-        dependencies = canonical_refs(
-            (
-                context.model_ref,
-                context.case_ref,
-                problem.capability_catalog_ref,
-                problem.system_policy_ref,
-                *(ref for anchor in anchors for ref in anchor.evidence_refs),
+            adjustments.append(
+                StrategyAdjustment(
+                    variable_id=variable_id,
+                    current=context.current_setpoints[variable_id],
+                    recommended=proposal.decision_values[variable_id],
+                    unit=domain.canonical_unit,
+                )
             )
-        )
         return StrategyEntry(
             schema_version=STRATEGY_SCHEMA_VERSION,
-            entry_version="strategy-entry",
             strategy_id=resolved_id,
             revision=revision_value,
             supersedes=supersedes,
-            coverage_kind="point" if len(anchors) == 1 else "sampled_anchors",
-            central_context_ref=context.ref,
-            model_ref=context.model_ref,
-            case_ref=context.case_ref,
-            operating_mode=context.operating_mode,
-            anchors=tuple(
-                sorted(
-                    anchors,
-                    key=lambda item: (
-                        item.context_ref.object_id,
-                        item.context_ref.fingerprint,
-                    ),
-                )
+            adjustments=tuple(adjustments),
+            applicability=StrategyApplicability(
+                case_ref=context.case_ref,
+                operating_mode=context.operating_mode,
+                coverage="point" if len(anchors) == 1 else "sampled_anchors",
+                anchors=tuple(
+                    sorted(
+                        anchors,
+                        key=lambda item: (
+                            item.context_ref.object_id,
+                            item.context_ref.fingerprint,
+                        ),
+                    )
+                ),
             ),
-            action_values=proposal.decision_values,
-            action_units={key: domains[key].canonical_unit for key in domains},
-            baseline_values=baseline,
-            objective_order=tuple(item.metric_id for item in problem.objectives),
-            application_method="step-hold",
-            event_time_s=problem.evaluation_plan.m4_event_time_s,
-            hold_policy="hold-until-offline-review",
-            stop_conditions=(
-                "m4-acceptance-fails",
-                "required-data-quality-fails",
-                "strategy-context-mismatch",
+            evidence=StrategyEvidence(
+                problem_ref=problem.ref,
+                finalization_result_ref=finalization.result.ref,
+                coverage_ref=coverage_ref,
             ),
-            problem_ref=problem.ref,
-            capability_catalog_ref=problem.capability_catalog_ref,
-            system_policy_ref=problem.system_policy_ref,
-            solver_result_ref=finalization.result.solver_result_ref,
-            static_selection_ref=finalization.static_selection.ref,
-            finalization_result_ref=finalization.result.ref,
-            publishability_assessment_ref=assessment.ref,
-            selected_proposal_ref=proposal.ref,
-            selected_static_evaluation_ref=static_evaluation.ref,
-            selected_dynamic_evaluation_ref=dynamic_evaluation.ref,
-            dependency_refs=dependencies,
-            execution_scope="offline_simulation_only",
-            control_authority="none",
-            field_validated=False,
-            dcs_write_capability=False,
-            claim_scope=ENGINEERING_CLAIM_SCOPE,
         )
 
     @staticmethod
@@ -501,13 +446,11 @@ class StrategyBuilder:
         else:
             identity = canonical_fingerprint(
                 {
-                    "context_ref": context.ref.as_dict(),
-                    "problem_ref": problem.ref.as_dict(),
-                    "case_ref": context.case_ref.as_dict(),
+                    "model_id": context.model_ref.object_id,
+                    "case_id": context.case_ref.object_id,
                     "operating_mode": context.operating_mode,
-                    "objective_order": [item.metric_id for item in problem.objectives],
+                    "objective_ids": [item.metric_id for item in problem.objectives],
                     "decision_ids": [item.variable_id for item in problem.decision_domains],
-                    "claim_scope": ENGINEERING_CLAIM_SCOPE,
                 }
             )
             resolved = f"strategy-{identity[:16]}"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Literal
 
 import pytest
@@ -37,6 +38,7 @@ from petroleum_rto.rto.contracts.solver_result import (
     SolverResult,
 )
 from petroleum_rto.rto.intent import load_optimization_intent
+from petroleum_rto.rto.orchestration.result import build_optimization_run_summary
 from petroleum_rto.rto.problem import ProblemBuilder
 from petroleum_rto.rto.selection import FinalSelector
 
@@ -466,6 +468,142 @@ def test_alternative_refs_are_static_and_keep_failed_dynamic_candidates_auditabl
     assert result.returned_proposal_refs == selection.ranked_proposal_refs[:2]
     assert dynamic[result.returned_proposal_refs[0]].status == "process_infeasible"
     assert result.selected_proposal_ref == selection.ranked_proposal_refs[1]
+
+
+def test_user_result_projects_ranked_alternatives_with_actual_verification_stage(
+    repo_root: Path,
+) -> None:
+    bundle = load_capability_bundle(repo_root)
+    context = load_operating_context(repo_root / "configs/rto/contexts/case_20260604.json")
+    intent = load_optimization_intent(repo_root / "configs/rto/intents/quality_yield_energy.json")
+    intent = replace(
+        intent,
+        result_request=replace(intent.result_request, max_candidates=3),
+    )
+    base = ProblemBuilder().build(bundle, intent, context)
+    problem = replace(
+        base,
+        evaluation_plan=replace(base.evaluation_plan, dynamic_shortlist_size=2),
+    )
+    proposals = tuple(_proposal(problem, index) for index in range(3))
+    static = tuple(
+        _static_evaluation(problem, proposal, values)
+        for proposal, values in zip(
+            proposals,
+            ((0.001, 0.30, 190.0), (0.002, 0.40, 180.0), (0.003, 0.50, 170.0)),
+            strict=True,
+        )
+    )
+    solver = _solver_result(
+        problem,
+        proposals,
+        static,
+        representation="layered",
+        groups=((static[0].ref, static[1].ref, static[2].ref),),
+    )
+    selector = FinalSelector()
+    selection = selector.rank_static(problem, solver, _mapping(static))
+    dynamic = {
+        selection.shortlist_proposal_refs[0]: _dynamic_evaluation(
+            problem,
+            selection.shortlist_proposal_refs[0],
+            "process_infeasible",
+        ),
+        selection.shortlist_proposal_refs[1]: _dynamic_evaluation(
+            problem,
+            selection.shortlist_proposal_refs[1],
+            "feasible",
+        ),
+    }
+    artifacts = selector.select(problem, solver, _mapping(static), dynamic, bundle)
+    record = SimpleNamespace(
+        context=context,
+        intent=intent,
+        capability_snapshot=SimpleNamespace(bundle=bundle),
+        problem=problem,
+        solver_execution=SimpleNamespace(result=solver),
+        dynamic_verification=SimpleNamespace(evaluations=tuple(dynamic.values())),
+        finalization=SimpleNamespace(result=artifacts.result),
+    )
+
+    summary = build_optimization_run_summary(record).as_dict()
+
+    alternatives = summary["alternative_candidates"]
+    assert isinstance(alternatives, list)
+    assert [item["rank"] for item in alternatives] == [1, 3]
+    assert alternatives[0]["verification_stage"] == "M4"
+    assert alternatives[0]["verification_status"] == "process_infeasible"
+    assert alternatives[1]["verification_stage"] == "M2"
+    assert alternatives[1]["verification_status"] == "feasible"
+    assert len(alternatives[0]["adjustments"]) == 2
+    assert len(alternatives[0]["predicted_effects"]) == 3
+    assert artifacts.result.selected_proposal_ref == selection.ranked_proposal_refs[1]
+
+
+def test_user_result_total_candidate_limit_includes_selected_recommendation(
+    repo_root: Path,
+) -> None:
+    bundle = load_capability_bundle(repo_root)
+    context = load_operating_context(repo_root / "configs/rto/contexts/case_20260604.json")
+    intent = load_optimization_intent(repo_root / "configs/rto/intents/quality_yield_energy.json")
+    intent = replace(
+        intent,
+        result_request=replace(intent.result_request, max_candidates=2),
+    )
+    base = ProblemBuilder().build(bundle, intent, context)
+    problem = replace(
+        base,
+        evaluation_plan=replace(base.evaluation_plan, dynamic_shortlist_size=3),
+    )
+    proposals = tuple(_proposal(problem, index) for index in range(3))
+    static = tuple(
+        _static_evaluation(problem, proposal, values)
+        for proposal, values in zip(
+            proposals,
+            ((0.001, 0.30, 190.0), (0.002, 0.40, 180.0), (0.003, 0.50, 170.0)),
+            strict=True,
+        )
+    )
+    solver = _solver_result(
+        problem,
+        proposals,
+        static,
+        representation="layered",
+        groups=((static[0].ref, static[1].ref, static[2].ref),),
+    )
+    selector = FinalSelector()
+    selection = selector.rank_static(problem, solver, _mapping(static))
+    statuses: tuple[DynamicStatus, ...] = (
+        "process_infeasible",
+        "process_infeasible",
+        "feasible",
+    )
+    dynamic = {
+        proposal_ref: _dynamic_evaluation(problem, proposal_ref, status)
+        for proposal_ref, status in zip(
+            selection.shortlist_proposal_refs,
+            statuses,
+            strict=True,
+        )
+    }
+    artifacts = selector.select(problem, solver, _mapping(static), dynamic, bundle)
+    record = SimpleNamespace(
+        context=context,
+        intent=intent,
+        capability_snapshot=SimpleNamespace(bundle=bundle),
+        problem=problem,
+        solver_execution=SimpleNamespace(result=solver),
+        dynamic_verification=SimpleNamespace(evaluations=tuple(dynamic.values())),
+        finalization=SimpleNamespace(result=artifacts.result),
+    )
+
+    summary = build_optimization_run_summary(record).as_dict()
+
+    alternatives = summary["alternative_candidates"]
+    assert isinstance(alternatives, list)
+    assert len(alternatives) == 1
+    assert alternatives[0]["rank"] == 1
+    assert artifacts.result.selected_proposal_ref == selection.ranked_proposal_refs[2]
 
 
 def test_atomic_tie_breaks_are_applied_in_declared_order(repo_root: Path) -> None:

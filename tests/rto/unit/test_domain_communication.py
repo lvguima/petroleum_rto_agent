@@ -95,8 +95,33 @@ def _raw_intent(
     }
 
 
+def _raw_priority_intent(*, objective_count: int) -> dict[str, Any]:
+    if objective_count not in {2, 3}:
+        raise ValueError("priority test intents require two or three objectives")
+    raw = _raw_intent(
+        multi=True,
+        ambiguities=["objective-priority-ambiguous"],
+    )
+    objectives = raw["objectives"][-objective_count:]
+    for priority, objective in enumerate(objectives, start=1):
+        objective["priority"] = priority
+    raw["intent_id"] = f"domain-priority-{objective_count}"
+    raw["objectives"] = objectives
+    raw["preference"] = {
+        "method": "lexicographic",
+        "objective_order": [item["metric_id"] for item in objectives],
+    }
+    return raw
+
+
 def _service(repo_root: Path) -> IntentCommunicationService:
     return IntentCommunicationService.from_bundle(load_capability_bundle(repo_root))
+
+
+def _intent_semantics(intent: OptimizationIntent) -> dict[str, object]:
+    payload = intent.as_dict()
+    del payload["intent_id"]
+    return payload
 
 
 def _response(
@@ -497,10 +522,58 @@ def test_one_or_many_objectives_use_the_same_resolved_protocol(
     result = service.evaluate_response(request, _response(request, intent))
 
     assert result.status == "resolved"
-    assert result.resolved_intent == intent
-    assert result.candidate_intent == intent
+    assert result.resolved_intent is not None
+    assert result.candidate_intent == result.resolved_intent
+    assert _intent_semantics(result.resolved_intent) == _intent_semantics(intent)
+    assert result.resolved_intent.intent_id.startswith("intent-")
+    assert result.resolved_intent.intent_id != intent.intent_id
     assert result.issues == ()
     assert CommunicationResult.from_mapping(result.as_dict()) == result
+
+
+def test_model_intent_labels_normalize_to_one_semantic_identity_and_reference(
+    repo_root: Path,
+) -> None:
+    service = _service(repo_root)
+    request = service.start(
+        session_id="session-semantic-identity",
+        message_id="user-1",
+        user_text="帮我找个更省燃料的操作点。",
+    )
+    first_raw = _raw_intent()
+    first_raw["intent_id"] = "model-generated-left"
+    second_raw = _raw_intent()
+    second_raw["intent_id"] = "model-generated-right"
+    second_raw["decision_variables"] = list(reversed(second_raw["decision_variables"]))
+
+    first = service.evaluate_response(request, _response(request, first_raw))
+    second = service.evaluate_response(request, _response(request, second_raw))
+
+    assert first.status == second.status == "resolved"
+    assert first.resolved_intent is not None
+    assert second.resolved_intent is not None
+    assert first.resolved_intent == second.resolved_intent
+    assert first.resolved_intent.intent_id not in {
+        "model-generated-left",
+        "model-generated-right",
+    }
+    assert first.resolved_intent.fingerprint == second.resolved_intent.fingerprint
+    first_ref = ContractRef(
+        first.resolved_intent.intent_id,
+        first.resolved_intent.fingerprint,
+    )
+    second_ref = ContractRef(
+        second.resolved_intent.intent_id,
+        second.resolved_intent.fingerprint,
+    )
+    assert first_ref == second_ref
+    assert first.response_ref != second.response_ref
+
+    changed_raw = _raw_intent(decisions=["furnace_temperature_target_k"])
+    changed = service.evaluate_response(request, _response(request, changed_raw))
+    assert changed.resolved_intent is not None
+    assert changed.resolved_intent.intent_id != first.resolved_intent.intent_id
+    assert changed.resolved_intent.fingerprint != first.resolved_intent.fingerprint
 
 
 def test_explicit_unsupported_response_maps_without_a_candidate_intent(
@@ -750,6 +823,127 @@ def test_known_ambiguity_becomes_bounded_capability_backed_question(repo_root: P
     assert CommunicationResult.from_mapping(result.as_dict()) == result
 
 
+@pytest.mark.parametrize(
+    "first_priority",
+    [
+        "valuable_distillate_yield",
+        "specific_furnace_fuel_energy_mj_per_t",
+    ],
+)
+def test_two_objective_priority_question_accepts_either_first_priority(
+    repo_root: Path,
+    first_priority: str,
+) -> None:
+    service = _service(repo_root)
+    request = service.start(
+        session_id=f"session-priority-{first_priority}",
+        message_id="user-1",
+        user_text="提高收率并降低能耗，但目标优先级还未确定。",
+    )
+    intent = OptimizationIntent.from_mapping(_raw_priority_intent(objective_count=2))
+
+    result = service.evaluate_response(request, _response(request, intent))
+
+    assert result.status == "needs_clarification"
+    assert result.clarification is not None
+    question = result.clarification.questions[0]
+    assert question.answer_kind == "single-select"
+    assert question.minimum_selections == question.maximum_selections == 1
+    assert "第一优先" in question.prompt
+    assert tuple((item.value, item.label) for item in question.options) == (
+        ("valuable_distillate_yield", "提高有价值馏分收率"),
+        (
+            "specific_furnace_fuel_energy_mj_per_t",
+            "降低单位进料炉燃料热负荷代理",
+        ),
+    )
+
+    answer = ClarificationAnswer(
+        question_id=question.question_id,
+        values=(first_priority,),
+    )
+    followup = service.build_clarification_followup(
+        request,
+        result,
+        message_id="user-2",
+        user_text="选择这个目标作为第一优先。",
+        answers=(answer,),
+    )
+
+    assert followup.clarification_answers == (answer,)
+    assert followup.clarification_answers[0].values == (first_priority,)
+    assert followup.prior_intent is not None
+    assert {item.metric_id for item in followup.prior_intent.objectives} == {
+        "valuable_distillate_yield",
+        "specific_furnace_fuel_energy_mj_per_t",
+    }
+    assert DomainModelRequest.from_mapping(followup.as_dict()) == followup
+
+
+def test_three_objective_priority_question_requires_complete_business_labeled_order(
+    repo_root: Path,
+) -> None:
+    service = _service(repo_root)
+    request = service.start(
+        session_id="session-priority-three",
+        message_id="user-1",
+        user_text="请优化质量、收率和能耗，优先级需要确认。",
+    )
+    intent = OptimizationIntent.from_mapping(_raw_priority_intent(objective_count=3))
+
+    result = service.evaluate_response(request, _response(request, intent))
+
+    assert result.status == "needs_clarification"
+    assert result.clarification is not None
+    question = result.clarification.questions[0]
+    assert question.answer_kind == "ordered-select"
+    assert question.minimum_selections == question.maximum_selections == 3
+    assert "完整排列全部" in question.prompt
+    assert tuple((item.value, item.label) for item in question.options) == (
+        ("quality_proxy_max_abs_relative_change", "减小产品质量代理偏离"),
+        ("valuable_distillate_yield", "提高有价值馏分收率"),
+        (
+            "specific_furnace_fuel_energy_mj_per_t",
+            "降低单位进料炉燃料热负荷代理",
+        ),
+    )
+
+    with pytest.raises(ValueError, match="answer count"):
+        service.build_clarification_followup(
+            request,
+            result,
+            message_id="user-2",
+            user_text="先质量，再收率。",
+            answers=(
+                ClarificationAnswer(
+                    question_id=question.question_id,
+                    values=(
+                        "quality_proxy_max_abs_relative_change",
+                        "valuable_distillate_yield",
+                    ),
+                ),
+            ),
+        )
+
+    complete_answer = ClarificationAnswer(
+        question_id=question.question_id,
+        values=(
+            "specific_furnace_fuel_energy_mj_per_t",
+            "valuable_distillate_yield",
+            "quality_proxy_max_abs_relative_change",
+        ),
+    )
+    followup = service.build_clarification_followup(
+        request,
+        result,
+        message_id="user-2",
+        user_text="先能耗，再收率，最后质量。",
+        answers=(complete_answer,),
+    )
+
+    assert followup.clarification_answers == (complete_answer,)
+
+
 def test_selection_limits_and_question_count_come_from_manifest_and_policy(
     repo_root: Path,
 ) -> None:
@@ -849,7 +1043,9 @@ def test_clarification_answer_creates_new_turn_and_requires_full_replacement(
 
     assert followup.turn_index == 2
     assert followup.model_attempt == 1
-    assert followup.prior_intent == ambiguous
+    assert first_result.candidate_intent is not None
+    assert followup.prior_intent == first_result.candidate_intent
+    assert _intent_semantics(followup.prior_intent) == _intent_semantics(ambiguous)
     assert followup.prior_clarification == first_result.clarification
     assert followup.clarification_answers == answers
     assert len(followup.user_messages) == 2
@@ -858,7 +1054,8 @@ def test_clarification_answer_creates_new_turn_and_requires_full_replacement(
     replacement = OptimizationIntent.from_mapping(_raw_intent())
     resolved = service.evaluate_response(followup, _response(followup, replacement))
     assert resolved.status == "resolved"
-    assert resolved.resolved_intent == replacement
+    assert resolved.resolved_intent is not None
+    assert _intent_semantics(resolved.resolved_intent) == _intent_semantics(replacement)
 
 
 def test_clarification_answers_must_exactly_cover_declared_choices(repo_root: Path) -> None:

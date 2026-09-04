@@ -33,7 +33,7 @@ from ..strategies import (
     StrategyReleaseManifest,
     StrategyRepository,
 )
-from .chat_summary import build_chat_result_summary
+from .chat_summary import build_optimization_run_summary
 
 type OfflineRunRecord = OfflineRtoRunRecord
 
@@ -82,6 +82,17 @@ def _load_problem_inputs(
     return bundle, intent, context, problem
 
 
+def _build_problem_inputs(
+    *,
+    bundle: CapabilityBundle,
+    intent: OptimizationIntent,
+    context_file: Path,
+) -> tuple[OperatingContext, OptimizationProblem]:
+    context = load_operating_context(context_file)
+    problem = ProblemBuilder().build(bundle, intent, context)
+    return context, problem
+
+
 def validate_problem_files(
     *,
     repo_root: Path | None,
@@ -97,23 +108,15 @@ def validate_problem_files(
     )[3]
 
 
-def run_offline(
+def _run_problem(
     *,
-    repo_root: Path | None,
-    intent_file: Path,
-    context_file: Path,
+    bundle: CapabilityBundle,
+    intent: OptimizationIntent,
+    context: OperatingContext,
+    problem: OptimizationProblem,
     run_root: Path,
-    library_root: Path,
-    actor: str,
-    coverage_policy: CoveragePolicy = "point",
+    coverage_policy: CoveragePolicy,
 ) -> OfflineRtoRunRecord:
-    """Run or resume the objective-count-neutral offline workflow."""
-
-    bundle, intent, context, problem = _load_problem_inputs(
-        repo_root=repo_root,
-        intent_file=intent_file,
-        context_file=context_file,
-    )
     return OfflineRtoOrchestrator(
         CduM7RequestFactory(),
         lambda output_root: CduM7Simulator(output_root),
@@ -123,24 +126,78 @@ def run_offline(
         context,
         problem,
         run_root=run_root,
-        strategy_repository=StrategyRepository(library_root),
-        actor=actor,
         coverage_policy=coverage_policy,
     )
 
 
-def inspect_offline(
-    run_dir: Path,
+def run_confirmed_optimization(
     *,
-    library_root: Path,
+    repo_root: Path | None,
+    intent: OptimizationIntent,
+    context_file: Path,
+    run_root: Path,
+    coverage_policy: CoveragePolicy = "point",
+) -> dict[str, object]:
+    """Build from the latest trusted context and return a compact result receipt."""
+
+    bundle = load_capability_bundle(repo_root)
+    resolution = IntentResolver().resolve(intent, BundleCapabilityView(bundle))
+    if resolution.status != "resolved" or resolution.resolved_intent is None:
+        raise ValueError(
+            f"optimization intent is {resolution.status} under the current capabilities"
+        )
+    resolved_intent = resolution.resolved_intent
+    context, problem = _build_problem_inputs(
+        bundle=bundle,
+        intent=resolved_intent,
+        context_file=context_file,
+    )
+    receipt = OfflineRtoOrchestrator(
+        CduM7RequestFactory(),
+        lambda output_root: CduM7Simulator(output_root),
+    ).run_compact(
+        bundle,
+        resolved_intent,
+        context,
+        problem,
+        run_root=run_root,
+        coverage_policy=coverage_policy,
+    )
+    return receipt.as_dict()
+
+
+def run_offline(
+    *,
+    repo_root: Path | None,
+    intent_file: Path,
+    context_file: Path,
+    run_root: Path,
+    coverage_policy: CoveragePolicy = "point",
 ) -> OfflineRtoRunRecord:
+    """Run or resume the objective-count-neutral offline workflow."""
+
+    bundle, intent, context, problem = _load_problem_inputs(
+        repo_root=repo_root,
+        intent_file=intent_file,
+        context_file=context_file,
+    )
+    return _run_problem(
+        bundle=bundle,
+        intent=intent,
+        context=context,
+        problem=problem,
+        run_root=run_root,
+        coverage_policy=coverage_policy,
+    )
+
+
+def inspect_offline(run_dir: Path) -> OfflineRtoRunRecord:
     """Strictly reload a workflow and all referenced evidence."""
 
     resolved = run_dir.resolve()
     try:
         return read_offline_run(
             resolved,
-            strategy_repository=StrategyRepository(library_root),
             simulator=CduM7Simulator(resolved / "simulator"),
             request_factory=CduM7RequestFactory(),
         )
@@ -189,48 +246,7 @@ def run_summary(record: OfflineRtoRunRecord) -> dict[str, object]:
 
     if not isinstance(record, OfflineRtoRunRecord):
         raise TypeError("record must be an OfflineRtoRunRecord")
-    selected_ref = record.finalization.result.selected_static_evaluation_ref
-    selected = next(
-        (item for item in record.solver_execution.result.evaluations if item.ref == selected_ref),
-        None,
-    )
-    selected_setpoints = build_chat_result_summary(record)["selected_setpoints"]
-    return {
-        "manifest_version": record.manifest.manifest_version,
-        "workflow_id": record.request.workflow_id,
-        "intent_ref": record.request.intent_ref.as_dict(),
-        "context_ref": record.request.context_ref.as_dict(),
-        "problem_ref": record.problem.ref.as_dict(),
-        "status": record.result.status,
-        "optimization_status": record.finalization.result.status,
-        "coverage_policy": record.request.coverage_policy,
-        "objective_count": len(record.problem.objectives),
-        "decision_count": len(record.problem.decision_domains),
-        "result_mode": record.problem.result_request.mode,
-        "selected_solver_id": record.routing.selected_solver_id,
-        "static_evaluation_count": len(record.solver_execution.result.evaluations),
-        "dynamic_shortlist_count": len(record.dynamic_verification.evaluations),
-        "requested_anchor_count": record.result.requested_anchor_count,
-        "passed_anchor_count": record.result.passed_anchor_count,
-        "selected_setpoints": selected_setpoints,
-        "selected_objectives": (
-            [] if selected is None else [item.as_dict() for item in selected.objective_outcomes]
-        ),
-        "strategy_ref": (
-            None if record.result.strategy_ref is None else record.result.strategy_ref.as_dict()
-        ),
-        "strategy_state": None if record.strategy is None else "draft",
-        "run_dir": str(record.run_dir.resolve()),
-        "manifest_fingerprint": record.manifest.fingerprint,
-        "offline_result_fingerprint": record.result.fingerprint,
-        "physical_m2_executions_this_call": record.physical_m2_executions,
-        "physical_m4_executions_this_call": record.physical_m4_executions,
-        "recovered_stages": list(record.recovered_stages),
-        "execution_scope": "offline_simulation_only",
-        "control_authority": "none",
-        "field_validated": False,
-        "dcs_write_capability": False,
-    }
+    return build_optimization_run_summary(record).as_dict()
 
 
 __all__ = [
@@ -242,6 +258,7 @@ __all__ = [
     "inspect_offline",
     "publish_strategy",
     "query_strategies",
+    "run_confirmed_optimization",
     "run_offline",
     "run_summary",
     "validate_intent_file",

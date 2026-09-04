@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from .._file_lock import exclusive_file_lock
 from ..capabilities import (
@@ -28,7 +28,6 @@ from ..contracts.common import (
     JsonValue,
     as_mapping,
     canonical_json_bytes,
-    identifier,
     thaw_json,
 )
 from ..contracts.context import OperatingContext
@@ -55,7 +54,6 @@ from ..solvers import (
     SolverRouter,
     SolverRoutingDecision,
 )
-from ..strategies.models import StrategyEntry
 from .models import (
     OFFLINE_MANIFEST_VERSION,
     OFFLINE_WORKFLOW_SCHEMA_ID,
@@ -74,17 +72,14 @@ from .models import (
     WorkflowEvent,
     routing_ref,
 )
-
-if TYPE_CHECKING:
-    from ..strategies.repository import StrategyRepository
+from .result import OptimizationRunReceipt, build_optimization_run_summary
 
 SimulatorFactory = Callable[[Path], SimulatorPort]
 
 _SOFTWARE_VERSIONS = {
-    "offline_workflow": "2.0.0",
+    "offline_workflow": "4.0.0",
     "optimization_problem": "2.0.0",
     "candidate_evaluation": "2.0.0",
-    "strategy_entry": "2.0.0",
 }
 _STATIC_STAGES = (
     "inputs-ready",
@@ -107,11 +102,22 @@ _REQUIRED_MANIFEST_FILES = frozenset(
         "static_selection.json",
         "dynamic_evaluations.json",
         "finalization.json",
-        "result.json",
+        "workflow.json",
         "events.jsonl",
     }
 )
-_OPTIONAL_MANIFEST_FILES = frozenset({"anchor_validation.json", "strategy_draft.json"})
+_OPTIONAL_MANIFEST_FILES = frozenset({"anchor_validation.json"})
+_COMPACT_RESULT_FIELDS = frozenset(
+    {
+        "status",
+        "targets",
+        "operating_context",
+        "baseline_values",
+        "recommended_adjustments",
+        "predicted_effects",
+        "alternative_candidates",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -128,7 +134,6 @@ class OfflineRtoRunRecord:
     dynamic_verification: DynamicVerificationArtifact
     finalization: FinalizationArtifact
     anchor_validation: AnchorValidationResult | None
-    strategy: StrategyEntry | None
     result: OfflineRtoResult
     manifest: OfflineRtoManifest
     events: tuple[WorkflowEvent, ...]
@@ -159,19 +164,14 @@ class OfflineRtoOrchestrator:
         self._request_factory = request_factory
         self._simulator_factory = simulator_factory
 
-    def run(
+    def _request_for(
         self,
         bundle: CapabilityBundle,
         intent: OptimizationIntent,
         context: OperatingContext,
         problem: OptimizationProblem,
-        *,
-        run_root: Path,
-        strategy_repository: StrategyRepository,
-        actor: str,
-        coverage_policy: CoveragePolicy = "point",
-    ) -> OfflineRtoRunRecord:
-        actor = identifier(actor, context="actor")
+        coverage_policy: CoveragePolicy,
+    ) -> OfflineRtoRequest:
         if (
             problem.intent_ref != ContractRef(intent.intent_id, intent.fingerprint)
             or problem.context_ref != context.ref
@@ -180,7 +180,7 @@ class OfflineRtoOrchestrator:
         ):
             raise ValueError("supplied problem differs from the immutable workflow inputs")
         execution_route = BundleCapabilityView(bundle).route_by_ref(problem.execution_route_ref)
-        request = OfflineRtoRequest(
+        return OfflineRtoRequest(
             schema_id=OFFLINE_WORKFLOW_SCHEMA_ID,
             schema_version=OFFLINE_WORKFLOW_SCHEMA_VERSION,
             request_version="offline-rto-request",
@@ -193,6 +193,57 @@ class OfflineRtoOrchestrator:
             coverage_policy=coverage_policy,
             claim_scope=ENGINEERING_CLAIM_SCOPE,
         )
+
+    def run_compact(
+        self,
+        bundle: CapabilityBundle,
+        intent: OptimizationIntent,
+        context: OperatingContext,
+        problem: OptimizationProblem,
+        *,
+        run_root: Path,
+        coverage_policy: CoveragePolicy = "point",
+    ) -> OptimizationRunReceipt:
+        """Run from memory or reuse only the compact result of a completed workflow."""
+
+        request = self._request_for(bundle, intent, context, problem, coverage_policy)
+        run_dir = run_root.resolve() / request.workflow_id
+        manifest_path = run_dir / "manifest.json"
+        if manifest_path.exists():
+            if manifest_path.is_symlink() or not manifest_path.is_file():
+                raise ValueError("completed workflow marker must be a regular file")
+            result_path = run_dir / "result.json"
+            if not result_path.is_file() or result_path.is_symlink():
+                raise ValueError("completed workflow lacks a readable compact result")
+            summary = _read_compact_result(result_path)
+        else:
+            record = self.run(
+                bundle,
+                intent,
+                context,
+                problem,
+                run_root=run_root,
+                coverage_policy=coverage_policy,
+            )
+            summary = build_optimization_run_summary(record).as_dict()
+        return OptimizationRunReceipt(
+            workflow_id=request.workflow_id,
+            result_source=f"{request.workflow_id}/result.json",
+            result_summary=summary,
+        )
+
+    def run(
+        self,
+        bundle: CapabilityBundle,
+        intent: OptimizationIntent,
+        context: OperatingContext,
+        problem: OptimizationProblem,
+        *,
+        run_root: Path,
+        coverage_policy: CoveragePolicy = "point",
+    ) -> OfflineRtoRunRecord:
+        request = self._request_for(bundle, intent, context, problem, coverage_policy)
+        execution_route = BundleCapabilityView(bundle).route_by_ref(problem.execution_route_ref)
         snapshot = CapabilityBundleSnapshot(
             schema_id=OFFLINE_WORKFLOW_SCHEMA_ID,
             schema_version=OFFLINE_WORKFLOW_SCHEMA_VERSION,
@@ -207,7 +258,6 @@ class OfflineRtoOrchestrator:
             if (run_dir / "manifest.json").exists():
                 return read_offline_run(
                     run_dir,
-                    strategy_repository=strategy_repository,
                     request_factory=self._request_factory,
                     simulator=simulator,
                     expected_intent=intent,
@@ -269,6 +319,16 @@ class OfflineRtoOrchestrator:
                 _validate_solver_execution(
                     problem, routing, solver_execution, expected_route.solver
                 )
+                _replay_evaluations(
+                    solver_execution.result.evaluations,
+                    proposals=solver_execution.result.proposals,
+                    problem=problem,
+                    context=context,
+                    catalog=bundle.catalog,
+                    request_factory=self._request_factory,
+                    run_dir=run_dir,
+                    simulator=simulator,
+                )
                 recovered.append("static-solve-ready")
             else:
                 if expected_route.solver is None:
@@ -293,16 +353,6 @@ class OfflineRtoOrchestrator:
                     result=solver_result,
                     claim_scope=ENGINEERING_CLAIM_SCOPE,
                 )
-            _replay_evaluations(
-                solver_execution.result.evaluations,
-                proposals=solver_execution.result.proposals,
-                problem=problem,
-                context=context,
-                catalog=bundle.catalog,
-                request_factory=self._request_factory,
-                run_dir=run_dir,
-                simulator=simulator,
-            )
             _write_or_verify(execution_path, solver_execution.as_dict())
             _ensure_event(
                 events,
@@ -340,6 +390,16 @@ class OfflineRtoOrchestrator:
             if dynamic_path.exists():
                 dynamic = DynamicVerificationArtifact.from_mapping(_read_json(dynamic_path))
                 _validate_dynamic_artifact(problem, static_selection, dynamic)
+                _replay_evaluations(
+                    dynamic.evaluations,
+                    proposals=solver_execution.result.proposals,
+                    problem=problem,
+                    context=context,
+                    catalog=bundle.catalog,
+                    request_factory=self._request_factory,
+                    run_dir=run_dir,
+                    simulator=simulator,
+                )
                 recovered.append("dynamic-evaluations-ready")
             else:
                 dynamic_evaluations: tuple[CandidateEvaluation, ...] = ()
@@ -373,16 +433,6 @@ class OfflineRtoOrchestrator:
                     ),
                     claim_scope=ENGINEERING_CLAIM_SCOPE,
                 )
-            _replay_evaluations(
-                dynamic.evaluations,
-                proposals=solver_execution.result.proposals,
-                problem=problem,
-                context=context,
-                catalog=bundle.catalog,
-                request_factory=self._request_factory,
-                run_dir=run_dir,
-                simulator=simulator,
-            )
             _write_or_verify(dynamic_path, dynamic.as_dict())
             _ensure_event(
                 events,
@@ -444,21 +494,6 @@ class OfflineRtoOrchestrator:
             physical_m2 += anchor_m2
             physical_m4 += anchor_m4
 
-            strategy = self._strategy(
-                run_dir,
-                strategy_repository,
-                actor,
-                problem,
-                context,
-                solver_execution,
-                dynamic,
-                expected_finalization,
-                anchor_validation,
-                events,
-                request,
-                recovered,
-            )
-
             result = _offline_result(
                 request,
                 problem,
@@ -468,9 +503,8 @@ class OfflineRtoOrchestrator:
                 dynamic,
                 finalization,
                 anchor_validation,
-                strategy,
             )
-            result_path = run_dir / "result.json"
+            result_path = run_dir / "workflow.json"
             _reject_event_without_artifacts(events, "workflow-complete", (result_path,))
             if result_path.exists():
                 stored_result = OfflineRtoResult.from_mapping(_read_json(result_path))
@@ -492,23 +526,10 @@ class OfflineRtoOrchestrator:
                 dynamic=dynamic,
                 finalization=finalization,
                 anchors=anchor_validation,
-                strategy=strategy,
                 result=result,
             )
             manifest = _commit_manifest(run_dir, request, result)
-            verified = read_offline_run(
-                run_dir,
-                strategy_repository=strategy_repository,
-                request_factory=self._request_factory,
-                simulator=simulator,
-                expected_intent=intent,
-                expected_context=context,
-                expected_bundle=bundle,
-                expected_problem=problem,
-            )
-            if verified.result != result or verified.manifest != manifest:
-                raise ValueError("new workflow failed strict post-commit verification")
-            return OfflineRtoRunRecord(
+            record = OfflineRtoRunRecord(
                 run_dir=run_dir,
                 request=request,
                 intent=intent,
@@ -521,7 +542,6 @@ class OfflineRtoOrchestrator:
                 dynamic_verification=dynamic,
                 finalization=finalization,
                 anchor_validation=anchor_validation,
-                strategy=strategy,
                 result=result,
                 manifest=manifest,
                 events=tuple(events),
@@ -529,6 +549,8 @@ class OfflineRtoOrchestrator:
                 physical_m2_executions=physical_m2,
                 physical_m4_executions=physical_m4,
             )
+            _write_result(run_dir / "result.json", build_optimization_run_summary(record).as_dict())
+            return record
 
     def _anchors(
         self,
@@ -672,14 +694,6 @@ class OfflineRtoOrchestrator:
             attempts=tuple(attempts),
             claim_scope=ENGINEERING_CLAIM_SCOPE,
         )
-        for attempt in validation.attempts:
-            _replay_anchor_attempt(
-                attempt,
-                catalog=bundle.catalog,
-                request_factory=self._request_factory,
-                run_dir=run_dir,
-                simulator=simulator,
-            )
         _write_or_verify(path, validation.as_dict())
         _ensure_event(
             events,
@@ -689,98 +703,6 @@ class OfflineRtoOrchestrator:
             validation.ref,
         )
         return validation, physical_m2, physical_m4
-
-    def _strategy(
-        self,
-        run_dir: Path,
-        repository: StrategyRepository,
-        actor: str,
-        problem: OptimizationProblem,
-        context: OperatingContext,
-        solver_execution: SolverExecutionArtifact,
-        dynamic: DynamicVerificationArtifact,
-        finalization: FinalizationArtifacts,
-        anchors: AnchorValidationResult | None,
-        events: list[WorkflowEvent],
-        request: OfflineRtoRequest,
-        recovered: list[str],
-    ) -> StrategyEntry | None:
-        path = run_dir / "strategy_draft.json"
-        _reject_event_without_artifacts(events, "strategy-draft-ready", (path,))
-        if finalization.result.status != "success" or anchors is None or not anchors.passed:
-            if path.exists():
-                raise ValueError("workflow without passing anchors cannot contain a strategy")
-            return None
-        expected = _build_expected_strategy(
-            problem,
-            context,
-            solver_execution,
-            dynamic,
-            finalization,
-            anchors,
-        )
-        if path.exists():
-            strategy = StrategyEntry.from_mapping(_read_json(path))
-            if strategy != expected:
-                raise ValueError("stored strategy draft differs from deterministic reconstruction")
-            stored_record = repository.read(strategy.strategy_id, strategy.revision)
-            if stored_record.entry != strategy:
-                raise ValueError("strategy repository payload differs from workflow draft")
-            recovered.append("strategy-draft-ready")
-        else:
-            strategy = expected
-            repository.create_draft(strategy, actor=actor)
-            _write_or_verify(path, strategy.as_dict())
-        _ensure_event(
-            events,
-            run_dir,
-            request.ref,
-            "strategy-draft-ready",
-            strategy.ref,
-        )
-        return strategy
-
-
-def _build_expected_strategy(
-    problem: OptimizationProblem,
-    context: OperatingContext,
-    solver_execution: SolverExecutionArtifact,
-    dynamic: DynamicVerificationArtifact,
-    finalization: FinalizationArtifacts,
-    anchors: AnchorValidationResult,
-) -> StrategyEntry:
-    # Imported lazily to keep orchestration model loading independent of repository I/O.
-    from ..strategies import StrategyBuilder, anchor_from_verified_candidate
-
-    selected_ref = finalization.result.selected_proposal_ref
-    static_ref = finalization.result.selected_static_evaluation_ref
-    dynamic_ref = finalization.result.selected_dynamic_evaluation_ref
-    if selected_ref is None or static_ref is None or dynamic_ref is None:
-        raise ValueError("successful finalization lacks selected strategy evidence")
-    proposal = next(item for item in solver_execution.result.proposals if item.ref == selected_ref)
-    static = next(item for item in solver_execution.result.evaluations if item.ref == static_ref)
-    selected_dynamic = next(item for item in dynamic.evaluations if item.ref == dynamic_ref)
-    additional = tuple(
-        anchor_from_verified_candidate(
-            attempt.problem,
-            attempt.context,
-            attempt.proposal,
-            attempt.static_evaluation,
-            cast(CandidateEvaluation, attempt.dynamic_evaluation),
-            finalization_result_ref=finalization.result.ref,
-        )
-        for attempt in anchors.attempts
-        if attempt.context.ref != context.ref
-    )
-    return StrategyBuilder().build(
-        problem,
-        context,
-        proposal,
-        static,
-        selected_dynamic,
-        finalization,
-        additional_anchors=additional,
-    )
 
 
 def _solver_registry() -> SolverRegistry:
@@ -907,23 +829,9 @@ def _offline_result(
     dynamic: DynamicVerificationArtifact,
     finalization: FinalizationArtifact,
     anchors: AnchorValidationResult | None,
-    strategy: StrategyEntry | None,
 ) -> OfflineRtoResult:
-    if (
-        finalization.result.status == "success"
-        and anchors is not None
-        and anchors.passed
-        and strategy is None
-    ):
-        raise ValueError("successful verified finalization requires a strategy draft")
-    if strategy is not None and (
-        finalization.result.status != "success" or anchors is None or not anchors.passed
-    ):
-        raise ValueError("strategy draft requires successful finalization and anchor coverage")
-    if strategy is not None:
-        status: OfflineRunStatus = "completed_draft"
-        reason = "strategy-draft-created"
-    elif finalization.result.status in {
+    status: OfflineRunStatus
+    if finalization.result.status in {
         "invalid_request",
         "evaluation_error",
         "unsupported_problem",
@@ -931,10 +839,10 @@ def _offline_result(
         status = "failed"
         reason = finalization.result.termination_reason
     elif anchors is not None and not anchors.passed:
-        status = "completed_without_strategy"
+        status = "completed"
         reason = "anchor-validation-failed"
     else:
-        status = "completed_without_strategy"
+        status = "completed"
         reason = finalization.result.termination_reason
     return OfflineRtoResult(
         schema_id=OFFLINE_WORKFLOW_SCHEMA_ID,
@@ -949,7 +857,6 @@ def _offline_result(
         dynamic_verification_ref=dynamic.ref,
         finalization_ref=finalization.ref,
         anchor_validation_ref=None if anchors is None else anchors.ref,
-        strategy_ref=None if strategy is None else strategy.ref,
         requested_anchor_count=0 if anchors is None else len(anchors.attempts),
         passed_anchor_count=(
             0 if anchors is None else sum(item.passed for item in anchors.attempts)
@@ -962,7 +869,6 @@ def _offline_result(
 def read_offline_run(
     run_dir: Path,
     *,
-    strategy_repository: StrategyRepository,
     request_factory: ProviderRequestFactory,
     simulator: SimulatorPort,
     expected_intent: OptimizationIntent | None = None,
@@ -1120,30 +1026,7 @@ def read_offline_run(
     elif finalization.result.status == "success":
         raise ValueError("successful finalization requires explicit coverage validation")
 
-    strategy_path = run_dir / "strategy_draft.json"
-    strategy = (
-        None
-        if not strategy_path.exists()
-        else StrategyEntry.from_mapping(_read_json(strategy_path))
-    )
-    if strategy is not None:
-        if anchor_validation is None or not anchor_validation.passed:
-            raise ValueError("strategy draft exists without passing anchor coverage")
-        expected_strategy = _build_expected_strategy(
-            problem,
-            context,
-            solver_execution,
-            dynamic,
-            expected_final,
-            anchor_validation,
-        )
-        if strategy != expected_strategy:
-            raise ValueError("strategy draft differs from deterministic reconstruction")
-        stored_record = strategy_repository.read(strategy.strategy_id, strategy.revision)
-        if stored_record.entry != strategy:
-            raise ValueError("strategy repository payload differs from workflow draft")
-
-    result = OfflineRtoResult.from_mapping(_read_json(run_dir / "result.json"))
+    result = OfflineRtoResult.from_mapping(_read_json(run_dir / "workflow.json"))
     expected_result = _offline_result(
         request,
         problem,
@@ -1153,7 +1036,6 @@ def read_offline_run(
         dynamic,
         finalization,
         anchor_validation,
-        strategy,
     )
     if result != expected_result or manifest.result_ref != result.ref:
         raise ValueError("stored offline result or manifest differs from deterministic replay")
@@ -1169,7 +1051,6 @@ def read_offline_run(
         dynamic=dynamic,
         finalization=finalization,
         anchors=anchor_validation,
-        strategy=strategy,
         result=result,
     )
     return OfflineRtoRunRecord(
@@ -1185,7 +1066,6 @@ def read_offline_run(
         dynamic_verification=dynamic,
         finalization=finalization,
         anchor_validation=anchor_validation,
-        strategy=strategy,
         result=result,
         manifest=manifest,
         events=events,
@@ -1341,7 +1221,6 @@ def _validate_event_stages(
     dynamic: DynamicVerificationArtifact,
     finalization: FinalizationArtifact,
     anchors: AnchorValidationResult | None,
-    strategy: StrategyEntry | None,
     result: OfflineRtoResult,
 ) -> None:
     expected: list[tuple[str, ContractRef]] = [
@@ -1355,8 +1234,6 @@ def _validate_event_stages(
     ]
     if anchors is not None:
         expected.append(("anchor-validation-ready", anchors.ref))
-    if strategy is not None:
-        expected.append(("strategy-draft-ready", strategy.ref))
     expected.append(("workflow-complete", result.ref))
     actual = tuple((item.stage, item.object_ref) for item in events)
     if actual != tuple(expected):
@@ -1367,8 +1244,6 @@ def _expected_manifest_files(result: OfflineRtoResult) -> frozenset[str]:
     expected = set(_REQUIRED_MANIFEST_FILES)
     if result.anchor_validation_ref is not None:
         expected.add("anchor_validation.json")
-    if result.strategy_ref is not None:
-        expected.add("strategy_draft.json")
     return frozenset(expected)
 
 
@@ -1425,7 +1300,6 @@ def _commit_manifest(
         claim_scope=ENGINEERING_CLAIM_SCOPE,
     )
     _write_or_verify(path, manifest.as_dict())
-    _verify_manifest(run_dir, manifest, result=result)
     return manifest
 
 
@@ -1436,7 +1310,14 @@ def _validate_top_level_entries(
     manifest_required: bool,
 ) -> None:
     entries = {item.name: item for item in run_dir.iterdir()}
-    allowed = set(expected_files) | {"manifest.json", ".workflow.lock", "simulator"}
+    # result.json is the intentionally unhashed, human-readable projection written from the
+    # in-memory run result after the internal workflow commit.
+    allowed = set(expected_files) | {
+        "manifest.json",
+        ".workflow.lock",
+        "simulator",
+        "result.json",
+    }
     unexpected = set(entries) - allowed
     if unexpected:
         raise ValueError(f"workflow contains an unexpected top-level entry: {sorted(unexpected)!r}")
@@ -1477,6 +1358,13 @@ def _read_json(path: Path) -> dict[str, object]:
     return dict(as_mapping(value, context=path.name))
 
 
+def _read_compact_result(path: Path) -> dict[str, object]:
+    value = _read_json(path)
+    if set(value) != _COMPACT_RESULT_FIELDS:
+        raise ValueError("result.json fields differ from the compact result contract")
+    return value
+
+
 def _reject_constant(value: str) -> object:
     raise ValueError(f"workflow JSON contains non-finite constant {value!r}")
 
@@ -1498,6 +1386,34 @@ def _write_or_verify(path: Path, value: Mapping[str, object]) -> None:
         if path.read_bytes() != payload:
             raise ValueError(f"existing workflow artifact differs: {path.name}")
         return
+    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    try:
+        with temporary.open("xb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        _fsync_directory(path.parent)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def _write_result(path: Path, value: Mapping[str, object]) -> None:
+    """Atomically replace the readable result from the in-memory structure without reloading it."""
+
+    if path.is_symlink():
+        raise ValueError("result.json must not be a symbolic link")
+    payload = (
+        json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+            allow_nan=False,
+        )
+        + "\n"
+    ).encode("utf-8")
     temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}")
     try:
         with temporary.open("xb") as handle:
@@ -1563,7 +1479,6 @@ _STAGE_ORDER = {
         (
             *_STATIC_STAGES,
             "anchor-validation-ready",
-            "strategy-draft-ready",
             "workflow-complete",
         )
     )
@@ -1572,12 +1487,6 @@ _STAGE_ORDER = {
 _LEGAL_EVENT_BRANCHES = (
     (*_STATIC_STAGES, "workflow-complete"),
     (*_STATIC_STAGES, "anchor-validation-ready", "workflow-complete"),
-    (
-        *_STATIC_STAGES,
-        "anchor-validation-ready",
-        "strategy-draft-ready",
-        "workflow-complete",
-    ),
 )
 
 

@@ -15,6 +15,7 @@ from petroleum_rto.rto._file_lock import exclusive_file_lock
 from petroleum_rto.rto.adapters import CduM7RequestFactory
 from petroleum_rto.rto.capabilities import load_capability_bundle
 from petroleum_rto.rto.context import load_operating_context
+from petroleum_rto.rto.contracts.candidate import CandidateEvaluation
 from petroleum_rto.rto.contracts.common import canonical_fingerprint, canonical_json_bytes
 from petroleum_rto.rto.contracts.problem import ENGINEERING_CLAIM_SCOPE
 from petroleum_rto.rto.contracts.simulation import (
@@ -24,11 +25,11 @@ from petroleum_rto.rto.contracts.simulation import (
     SimulationRunBundle,
 )
 from petroleum_rto.rto.intent import load_optimization_intent
+from petroleum_rto.rto.orchestration import service as orchestration_service
 from petroleum_rto.rto.orchestration.models import WorkflowEvent
 from petroleum_rto.rto.orchestration.service import (
     OfflineRtoOrchestrator,
     OfflineRtoRunRecord,
-    _offline_result,
     _reload_evidence,
     _replay_evaluations,
     _validate_top_level_entries,
@@ -36,8 +37,6 @@ from petroleum_rto.rto.orchestration.service import (
 )
 from petroleum_rto.rto.problem import ProblemBuilder
 from petroleum_rto.rto.runtime import api as runtime_api
-from petroleum_rto.rto.runtime import build_chat_result_summary
-from petroleum_rto.rto.strategies import StrategyRepository
 
 
 class _PersistedSimulator:
@@ -137,7 +136,6 @@ def _run(
 ) -> tuple[
     OfflineRtoRunRecord,
     OfflineRtoOrchestrator,
-    StrategyRepository,
     _PersistedSimulator,
 ]:
     bundle = load_capability_bundle(repo_root)
@@ -159,7 +157,6 @@ def _run(
         return simulator
 
     orchestrator = OfflineRtoOrchestrator(CduM7RequestFactory(), simulator_factory)
-    repository = StrategyRepository(tmp_path / "library")
     problem = ProblemBuilder().build(bundle, intent, context)
     record = orchestrator.run(
         bundle,
@@ -167,11 +164,9 @@ def _run(
         context,
         problem,
         run_root=tmp_path / "runs",
-        strategy_repository=repository,
-        actor="workflow-test",
         coverage_policy=coverage_policy,
     )
-    return record, orchestrator, repository, simulator
+    return record, orchestrator, simulator
 
 
 @pytest.mark.parametrize("multi", [False, True])
@@ -181,15 +176,18 @@ def test_unified_single_and_multi_workflows_resume_without_new_simulation(
     make_bundle: Callable[..., SimulationRunBundle],
     multi: bool,
 ) -> None:
-    record, orchestrator, repository, simulator = _run(
+    record, orchestrator, simulator = _run(
         repo_root,
         tmp_path,
         make_bundle,
         multi=multi,
         coverage_policy="point",
     )
-    assert record.result.status == "completed_draft"
-    assert record.strategy is not None
+    assert record.result.status == "completed"
+    assert record.request.schema_version == "4.0.0"
+    assert record.manifest.schema_version == "4.0.0"
+    assert record.manifest.manifest_version == "offline-rto-manifest-4.0.0"
+    assert record.manifest.software_versions["offline_workflow"] == "4.0.0"
     assert record.anchor_validation is not None
     assert len(record.anchor_validation.attempts) == 1
     assert record.anchor_validation.passed
@@ -205,13 +203,10 @@ def test_unified_single_and_multi_workflows_resume_without_new_simulation(
         record.context,
         record.problem,
         run_root=tmp_path / "runs",
-        strategy_repository=repository,
-        actor="workflow-test",
         coverage_policy="point",
     )
     inspected = read_offline_run(
         record.run_dir,
-        strategy_repository=repository,
         request_factory=CduM7RequestFactory(),
         simulator=simulator,
     )
@@ -221,7 +216,117 @@ def test_unified_single_and_multi_workflows_resume_without_new_simulation(
     assert inspected.physical_m2_executions == inspected.physical_m4_executions == 0
     assert repeated.result == inspected.result == record.result
     assert repeated.manifest.fingerprint == inspected.manifest.fingerprint
-    assert repository.read(record.strategy.strategy_id, 1).current_state == "draft"
+    assert (record.run_dir / "workflow.json").is_file()
+    assert (record.run_dir / "result.json").is_file()
+    assert "workflow.json" in record.manifest.files
+    assert "result.json" not in record.manifest.files
+
+
+def test_new_run_returns_from_memory_without_strict_reload(
+    repo_root: Path,
+    tmp_path: Path,
+    make_bundle: Callable[..., SimulationRunBundle],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unexpected_read(*_args: object, **_kwargs: object) -> OfflineRtoRunRecord:
+        raise AssertionError("a fresh run must not call read_offline_run before returning")
+
+    monkeypatch.setattr(orchestration_service, "read_offline_run", unexpected_read)
+    bundle = load_capability_bundle(repo_root)
+    context = load_operating_context(repo_root / "configs/rto/contexts/case_20260604.json")
+    intent = load_optimization_intent(
+        repo_root / "configs/rto/intents/minimize_specific_furnace_energy.json"
+    )
+    simulator = _PersistedSimulator(
+        tmp_path / "runs" / "placeholder" / "simulator",
+        context.model_ref.fingerprint,
+        context.case_ref.fingerprint,
+        make_bundle,
+    )
+
+    def simulator_factory(output_root: Path) -> _PersistedSimulator:
+        simulator._output_root = output_root
+        return simulator
+
+    orchestrator = OfflineRtoOrchestrator(CduM7RequestFactory(), simulator_factory)
+    problem = ProblemBuilder().build(bundle, intent, context)
+    fresh = orchestrator.run_compact(
+        bundle,
+        intent,
+        context,
+        problem,
+        run_root=tmp_path / "runs",
+        coverage_policy="point",
+    )
+
+    run_dir = tmp_path / "runs" / fresh.workflow_id
+    assert (run_dir / "manifest.json").is_file()
+    assert (run_dir / "result.json").is_file()
+    expected = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
+    calls_after_fresh_run = simulator.evaluate_calls
+    cached = orchestrator.run_compact(
+        bundle,
+        intent,
+        context,
+        problem,
+        run_root=tmp_path / "runs",
+        coverage_policy="point",
+    )
+
+    assert simulator.evaluate_calls == calls_after_fresh_run
+    assert (
+        fresh.as_dict()
+        == cached.as_dict()
+        == {
+            "workflow_id": fresh.workflow_id,
+            "result_source": f"{fresh.workflow_id}/result.json",
+            "result_summary": expected,
+        }
+    )
+    assert set(expected) == {
+        "status",
+        "targets",
+        "operating_context",
+        "baseline_values",
+        "recommended_adjustments",
+        "predicted_effects",
+        "alternative_candidates",
+    }
+
+
+def test_readable_result_is_not_part_of_strict_workflow_evidence(
+    repo_root: Path,
+    tmp_path: Path,
+    make_bundle: Callable[..., SimulationRunBundle],
+) -> None:
+    record, orchestrator, simulator = _run(
+        repo_root,
+        tmp_path,
+        make_bundle,
+        multi=False,
+        coverage_policy="point",
+    )
+    readable_path = record.run_dir / "result.json"
+    readable_path.write_text('{"display_only":true}\n', encoding="utf-8")
+
+    inspected = read_offline_run(
+        record.run_dir,
+        request_factory=CduM7RequestFactory(),
+        simulator=simulator,
+    )
+
+    assert inspected.result == record.result
+    assert "result.json" not in inspected.manifest.files
+    assert "workflow.json" in inspected.manifest.files
+    with pytest.raises(ValueError, match="compact result contract"):
+        orchestrator.run_compact(
+            record.capability_snapshot.bundle,
+            record.intent,
+            record.context,
+            record.problem,
+            run_root=record.run_dir.parent,
+            coverage_policy="point",
+        )
 
 
 def test_runtime_inspect_strictly_replays_a_unified_run(
@@ -230,7 +335,7 @@ def test_runtime_inspect_strictly_replays_a_unified_run(
     make_bundle: Callable[..., SimulationRunBundle],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    record, _, _, simulator = _run(
+    record, _, simulator = _run(
         repo_root,
         tmp_path,
         make_bundle,
@@ -240,60 +345,32 @@ def test_runtime_inspect_strictly_replays_a_unified_run(
     calls_before = simulator.evaluate_calls
     monkeypatch.setattr(runtime_api, "CduM7Simulator", lambda _: simulator)
 
-    inspected = runtime_api.inspect_offline(
-        record.run_dir,
-        library_root=tmp_path / "library",
-    )
+    inspected = runtime_api.inspect_offline(record.run_dir)
     summary = runtime_api.run_summary(inspected)
-    chat_summary = build_chat_result_summary(inspected)
+    readable = json.loads((record.run_dir / "result.json").read_text(encoding="utf-8"))
 
     assert inspected.result == record.result
     assert inspected.manifest.fingerprint == record.manifest.fingerprint
     assert simulator.evaluate_calls == calls_before
-    assert "workflow_kind" not in summary
-    assert summary["objective_count"] == 3
-    assert summary["control_authority"] == "none"
-    assert summary["selected_setpoints"] == chat_summary["selected_setpoints"]
-    assert chat_summary["status"] == "success"
-    assert not {"claim_scope", "field_validated", "control_authority"} & set(chat_summary)
-    assert {item["unit"] for item in chat_summary["selected_setpoints"]} == {
-        "K",
-        "Pa(a)",
+    assert summary == readable
+    assert set(summary) == {
+        "status",
+        "targets",
+        "operating_context",
+        "baseline_values",
+        "recommended_adjustments",
+        "predicted_effects",
+        "alternative_candidates",
     }
-    assert len(chat_summary["objectives"]) == 3
-    assert all(item["passed"] is True for item in chat_summary["constraints"])
-    assert not {
-        "context",
-        "solver",
-        "formula_id",
-        "refs",
-        "fingerprints",
-        "paths",
-        "evidence",
-        "strategy",
-    } & set(chat_summary)
-
-    unselected_result = replace(
-        inspected.finalization.result,
-        status="no_verified_candidate",
-        selected_proposal_ref=None,
-        selected_static_evaluation_ref=None,
-        selected_dynamic_evaluation_ref=None,
-        publishability_assessment_ref=None,
-        publishable=False,
-        termination_reason="all-dynamic-candidates-rejected",
-    )
-    unselected = replace(
-        inspected,
-        finalization=replace(
-            inspected.finalization,
-            publishability=None,
-            result=unselected_result,
-        ),
-    )
-    assert build_chat_result_summary(unselected)["selected_setpoints"] == []
-    assert build_chat_result_summary(unselected)["objectives"] == []
-    assert build_chat_result_summary(unselected)["constraints"] == []
+    assert summary["status"] == "success"
+    targets = summary["targets"]
+    adjustments = summary["recommended_adjustments"]
+    effects = summary["predicted_effects"]
+    alternatives = summary["alternative_candidates"]
+    assert isinstance(targets, list) and len(targets) == 3
+    assert isinstance(adjustments, list) and len(adjustments) == 2
+    assert isinstance(effects, list) and len(effects) == 3
+    assert isinstance(alternatives, list)
 
 
 def test_sampled_anchor_workflow_is_discrete_and_strictly_relocatable(
@@ -301,7 +378,7 @@ def test_sampled_anchor_workflow_is_discrete_and_strictly_relocatable(
     tmp_path: Path,
     make_bundle: Callable[..., SimulationRunBundle],
 ) -> None:
-    record, _, repository, _ = _run(
+    record, _, _ = _run(
         repo_root,
         tmp_path,
         make_bundle,
@@ -311,8 +388,9 @@ def test_sampled_anchor_workflow_is_discrete_and_strictly_relocatable(
     assert record.anchor_validation is not None
     assert tuple(item.ratio for item in record.anchor_validation.attempts) == (0.95, 1.0, 1.05)
     assert record.anchor_validation.passed
-    assert record.strategy is not None
-    assert record.strategy.coverage_kind == "sampled_anchors"
+    assert record.result.status == "completed"
+    assert record.result.requested_anchor_count == 3
+    assert record.result.passed_anchor_count == 3
     relocated = tmp_path / "relocated" / record.run_dir.name
     shutil.copytree(record.run_dir, relocated)
     simulator = _PersistedSimulator(
@@ -324,7 +402,6 @@ def test_sampled_anchor_workflow_is_discrete_and_strictly_relocatable(
 
     inspected = read_offline_run(
         relocated,
-        strategy_repository=repository,
         request_factory=CduM7RequestFactory(),
         simulator=simulator,
     )
@@ -339,7 +416,7 @@ def test_manifest_and_relative_evidence_are_both_enforced(
     tmp_path: Path,
     make_bundle: Callable[..., SimulationRunBundle],
 ) -> None:
-    record, _, repository, simulator = _run(
+    record, _, simulator = _run(
         repo_root,
         tmp_path,
         make_bundle,
@@ -368,7 +445,6 @@ def test_manifest_and_relative_evidence_are_both_enforced(
     with pytest.raises(ValueError, match="relative"):
         read_offline_run(
             record.run_dir,
-            strategy_repository=repository,
             request_factory=CduM7RequestFactory(),
             simulator=simulator,
         )
@@ -379,7 +455,7 @@ def test_strict_replay_rejects_a_manifest_consistent_route_ref_tamper(
     tmp_path: Path,
     make_bundle: Callable[..., SimulationRunBundle],
 ) -> None:
-    record, _, repository, simulator = _run(
+    record, _, simulator = _run(
         repo_root,
         tmp_path,
         make_bundle,
@@ -406,7 +482,6 @@ def test_strict_replay_rejects_a_manifest_consistent_route_ref_tamper(
     with pytest.raises(ValueError, match="stored solver route differs from deterministic routing"):
         read_offline_run(
             record.run_dir,
-            strategy_repository=repository,
             request_factory=CduM7RequestFactory(),
             simulator=simulator,
         )
@@ -423,8 +498,7 @@ def test_strict_replay_rejects_a_manifest_consistent_route_ref_tamper(
         ("dynamic-evaluations-ready", "dynamic_evaluations.json"),
         ("finalization-ready", "finalization.json"),
         ("anchor-validation-ready", "anchor_validation.json"),
-        ("strategy-draft-ready", "strategy_draft.json"),
-        ("workflow-complete", "result.json"),
+        ("workflow-complete", "workflow.json"),
     ],
 )
 def test_committed_event_without_artifact_never_reexecutes(
@@ -434,7 +508,7 @@ def test_committed_event_without_artifact_never_reexecutes(
     stage: str,
     artifact_name: str,
 ) -> None:
-    record, orchestrator, repository, simulator = _run(
+    record, orchestrator, simulator = _run(
         repo_root,
         tmp_path,
         make_bundle,
@@ -455,8 +529,6 @@ def test_committed_event_without_artifact_never_reexecutes(
             record.context,
             record.problem,
             run_root=corrupt_root,
-            strategy_repository=repository,
-            actor="workflow-test",
             coverage_policy="point",
         )
 
@@ -468,7 +540,7 @@ def test_noncontiguous_event_branch_is_rejected_before_missing_stage_reexecutes(
     tmp_path: Path,
     make_bundle: Callable[..., SimulationRunBundle],
 ) -> None:
-    record, orchestrator, repository, simulator = _run(
+    record, orchestrator, simulator = _run(
         repo_root,
         tmp_path,
         make_bundle,
@@ -503,8 +575,6 @@ def test_noncontiguous_event_branch_is_rejected_before_missing_stage_reexecutes(
             record.context,
             record.problem,
             run_root=corrupt_root,
-            strategy_repository=repository,
-            actor="workflow-test",
             coverage_policy="point",
         )
 
@@ -517,7 +587,7 @@ def test_strict_replay_recomputes_evaluation_from_immutable_evidence(
     tmp_path: Path,
     make_bundle: Callable[..., SimulationRunBundle],
 ) -> None:
-    record, _, _, simulator = _run(
+    record, _, simulator = _run(
         repo_root,
         tmp_path,
         make_bundle,
@@ -549,7 +619,7 @@ def test_strict_reload_checks_manifest_audit_identity_outside_semantic_identity(
     tmp_path: Path,
     make_bundle: Callable[..., SimulationRunBundle],
 ) -> None:
-    record, _, _, simulator = _run(
+    record, _, simulator = _run(
         repo_root,
         tmp_path,
         make_bundle,
@@ -560,7 +630,7 @@ def test_strict_reload_checks_manifest_audit_identity_outside_semantic_identity(
     tampered = replace(evidence, manifest_fingerprint="0" * 64)
     assert tampered.fingerprint == evidence.fingerprint
 
-    def with_changed_audit(evaluation):
+    def with_changed_audit(evaluation: CandidateEvaluation) -> CandidateEvaluation:
         return replace(
             evaluation,
             evidence_refs=tuple(
@@ -617,7 +687,7 @@ def test_strict_reload_checks_manifest_audit_identity_outside_semantic_identity(
         ("M4", "dynamic_evaluations.json", "dynamic-evaluations-ready"),
     ],
 )
-def test_infrastructure_interruption_does_not_commit_unreplayable_stage(
+def test_infrastructure_failure_returns_in_memory_but_strict_read_rejects_unreplayable_evidence(
     repo_root: Path,
     tmp_path: Path,
     make_bundle: Callable[..., SimulationRunBundle],
@@ -644,28 +714,32 @@ def test_infrastructure_interruption_does_not_commit_unreplayable_stage(
 
     run_root = tmp_path / "interrupted-runs"
     orchestrator = OfflineRtoOrchestrator(CduM7RequestFactory(), simulator_factory)
-    with pytest.raises(ValueError, match="replayable paired evidence"):
-        orchestrator.run(
-            bundle,
-            intent,
-            context,
-            ProblemBuilder().build(bundle, intent, context),
-            run_root=run_root,
-            strategy_repository=StrategyRepository(tmp_path / "interrupted-library"),
-            actor="workflow-test",
-            coverage_policy="point",
-        )
+    record = orchestrator.run(
+        bundle,
+        intent,
+        context,
+        ProblemBuilder().build(bundle, intent, context),
+        run_root=run_root,
+        coverage_policy="point",
+    )
 
     run_dirs = tuple(run_root.iterdir())
     assert len(run_dirs) == 1
     run_dir = run_dirs[0]
-    assert not (run_dir / artifact_name).exists()
-    assert not (run_dir / "manifest.json").exists()
+    assert record.result.status == "failed"
+    assert (run_dir / artifact_name).is_file()
+    assert (run_dir / "manifest.json").is_file()
     stages = tuple(
         json.loads(line)["stage"]
         for line in (run_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
     )
-    assert event_stage not in stages
+    assert event_stage in stages
+    with pytest.raises(ValueError, match="replayable paired evidence"):
+        read_offline_run(
+            run_dir,
+            request_factory=CduM7RequestFactory(),
+            simulator=simulator,
+        )
     if fail_stage == "M2":
         assert simulator.evaluate_calls == 0
 
@@ -686,7 +760,7 @@ def test_manifest_rejects_every_uncommitted_top_level_entry(
     make_bundle: Callable[..., SimulationRunBundle],
     extra_kind: str,
 ) -> None:
-    record, _, repository, simulator = _run(
+    record, _, simulator = _run(
         repo_root,
         tmp_path,
         make_bundle,
@@ -706,7 +780,6 @@ def test_manifest_rejects_every_uncommitted_top_level_entry(
     with pytest.raises(ValueError, match="symbolic link|unexpected top-level"):
         read_offline_run(
             record.run_dir,
-            strategy_repository=repository,
             request_factory=CduM7RequestFactory(),
             simulator=simulator,
         )
@@ -717,7 +790,7 @@ def test_manifest_preflight_rejects_unknown_directory_without_half_commit(
     tmp_path: Path,
     make_bundle: Callable[..., SimulationRunBundle],
 ) -> None:
-    record, orchestrator, repository, simulator = _run(
+    record, orchestrator, simulator = _run(
         repo_root,
         tmp_path,
         make_bundle,
@@ -736,8 +809,6 @@ def test_manifest_preflight_rejects_unknown_directory_without_half_commit(
             record.context,
             record.problem,
             run_root=record.run_dir.parent,
-            strategy_repository=repository,
-            actor="workflow-test",
             coverage_policy="point",
         )
 
@@ -780,7 +851,7 @@ def test_manifest_requires_its_self_fingerprint(
     tmp_path: Path,
     make_bundle: Callable[..., SimulationRunBundle],
 ) -> None:
-    record, _, repository, simulator = _run(
+    record, _, simulator = _run(
         repo_root,
         tmp_path,
         make_bundle,
@@ -795,7 +866,6 @@ def test_manifest_requires_its_self_fingerprint(
     with pytest.raises(ValueError, match="manifest_fingerprint"):
         read_offline_run(
             record.run_dir,
-            strategy_repository=repository,
             request_factory=CduM7RequestFactory(),
             simulator=simulator,
         )
@@ -806,7 +876,7 @@ def test_unknown_manifest_version_and_incomplete_event_line_are_rejected(
     tmp_path: Path,
     make_bundle: Callable[..., SimulationRunBundle],
 ) -> None:
-    record, orchestrator, repository, simulator = _run(
+    record, orchestrator, simulator = _run(
         repo_root,
         tmp_path,
         make_bundle,
@@ -820,7 +890,6 @@ def test_unknown_manifest_version_and_incomplete_event_line_are_rejected(
     with pytest.raises(ValueError, match="manifest_version"):
         read_offline_run(
             record.run_dir,
-            strategy_repository=repository,
             request_factory=CduM7RequestFactory(),
             simulator=simulator,
         )
@@ -836,8 +905,6 @@ def test_unknown_manifest_version_and_incomplete_event_line_are_rejected(
             record.context,
             record.problem,
             run_root=record.run_dir.parent,
-            strategy_repository=repository,
-            actor="workflow-test",
             coverage_policy="point",
         )
     assert simulator.evaluate_calls == calls
@@ -848,7 +915,7 @@ def test_unowned_workflow_lock_file_does_not_block_strict_resume(
     tmp_path: Path,
     make_bundle: Callable[..., SimulationRunBundle],
 ) -> None:
-    record, orchestrator, repository, simulator = _run(
+    record, orchestrator, simulator = _run(
         repo_root,
         tmp_path,
         make_bundle,
@@ -865,8 +932,6 @@ def test_unowned_workflow_lock_file_does_not_block_strict_resume(
         record.context,
         record.problem,
         run_root=record.run_dir.parent,
-        strategy_repository=repository,
-        actor="workflow-test",
         coverage_policy="point",
     )
 
@@ -881,7 +946,7 @@ def test_active_workflow_kernel_lock_rejects_second_writer_without_simulation(
     tmp_path: Path,
     make_bundle: Callable[..., SimulationRunBundle],
 ) -> None:
-    record, orchestrator, repository, simulator = _run(
+    record, orchestrator, simulator = _run(
         repo_root,
         tmp_path,
         make_bundle,
@@ -899,8 +964,6 @@ def test_active_workflow_kernel_lock_rejects_second_writer_without_simulation(
             record.context,
             record.problem,
             run_root=record.run_dir.parent,
-            strategy_repository=repository,
-            actor="workflow-test",
             coverage_policy="point",
         )
 
@@ -912,8 +975,6 @@ def test_active_workflow_kernel_lock_rejects_second_writer_without_simulation(
             record.context,
             record.problem,
             run_root=record.run_dir.parent,
-            strategy_repository=repository,
-            actor="workflow-test",
             coverage_policy="point",
         ).result
         == record.result
@@ -925,7 +986,7 @@ def test_valid_artifact_without_event_is_recovered_without_simulation(
     tmp_path: Path,
     make_bundle: Callable[..., SimulationRunBundle],
 ) -> None:
-    record, orchestrator, repository, simulator = _run(
+    record, orchestrator, simulator = _run(
         repo_root,
         tmp_path,
         make_bundle,
@@ -945,92 +1006,9 @@ def test_valid_artifact_without_event_is_recovered_without_simulation(
         record.context,
         record.problem,
         run_root=record.run_dir.parent,
-        strategy_repository=repository,
-        actor="workflow-test",
         coverage_policy="point",
     )
 
     assert resumed.result == record.result
     assert "workflow-complete" in resumed.recovered_stages
     assert simulator.evaluate_calls == calls
-
-
-def test_verified_success_cannot_drop_strategy_and_repository_stale_lock_recovers(
-    repo_root: Path,
-    tmp_path: Path,
-    make_bundle: Callable[..., SimulationRunBundle],
-) -> None:
-    record, _, repository, _ = _run(
-        repo_root,
-        tmp_path,
-        make_bundle,
-        multi=False,
-        coverage_policy="point",
-    )
-    assert record.anchor_validation is not None and record.anchor_validation.passed
-    with pytest.raises(ValueError, match="requires a strategy draft"):
-        _offline_result(
-            record.request,
-            record.problem,
-            record.routing,
-            record.solver_execution,
-            record.static_selection,
-            record.dynamic_verification,
-            record.finalization,
-            record.anchor_validation,
-            None,
-        )
-
-    lock_path = repository.root / ".strategy-repository.lock"
-    lock_path.write_text("2147483647", encoding="ascii")
-    approved = repository.approve(
-        record.strategy.strategy_id if record.strategy is not None else "missing-strategy",
-        1,
-        actor="workflow-test",
-    )
-    assert approved.current_state == "approved"
-    assert lock_path.is_file()
-    assert lock_path.read_text(encoding="ascii") == f"pid={os.getpid()}\n"
-
-
-def test_strategy_repository_mismatch_stops_before_manifest_commit(
-    repo_root: Path,
-    tmp_path: Path,
-    make_bundle: Callable[..., SimulationRunBundle],
-) -> None:
-    record, orchestrator, repository, simulator = _run(
-        repo_root,
-        tmp_path,
-        make_bundle,
-        multi=False,
-        coverage_policy="point",
-    )
-    strategy = record.strategy
-    assert strategy is not None
-    stored = repository.read(strategy.strategy_id, strategy.revision)
-    assert len(stored.events) == 1
-    tampered_entry = replace(strategy, hold_policy="tampered-hold")
-    tampered_event = replace(stored.events[0], strategy_ref=tampered_entry.ref)
-    entry_path = repository.entries_root / strategy.strategy_id / "r1" / "entry.json"
-    entry_path.write_bytes(canonical_json_bytes(tampered_entry.as_dict()))
-    entry_path.with_name("events.jsonl").write_bytes(
-        canonical_json_bytes(tampered_event.as_dict()) + b"\n"
-    )
-    manifest_path = record.run_dir / "manifest.json"
-    manifest_path.unlink()
-    calls = simulator.evaluate_calls
-
-    with pytest.raises(ValueError, match="repository payload differs"):
-        orchestrator.run(
-            record.capability_snapshot.bundle,
-            record.intent,
-            record.context,
-            record.problem,
-            run_root=record.run_dir.parent,
-            strategy_repository=repository,
-            actor="workflow-test",
-            coverage_policy="point",
-        )
-
-    assert simulator.evaluate_calls == calls
-    assert not manifest_path.exists()

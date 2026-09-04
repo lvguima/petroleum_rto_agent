@@ -11,7 +11,7 @@ from ..capabilities import (
     PublicCapabilityManifest,
     build_public_capability_manifest,
 )
-from ..contracts.common import JsonValue
+from ..contracts.common import JsonValue, canonical_fingerprint
 from ..contracts.reference import ContractRef
 from ..intent import CapabilityView, IntentResolutionIssue, IntentResolver
 from ..intent.models import OptimizationIntent
@@ -189,8 +189,9 @@ class IntentCommunicationService:
                 issues=(issue,),
             )
 
-        intent = response.intent
-        assert intent is not None
+        model_intent = response.intent
+        assert model_intent is not None
+        intent = self._normalize_intent_identity(model_intent)
         if intent.constraints:
             issue = ProtocolIssue(
                 code="business-constraint-binding-unavailable",
@@ -380,6 +381,22 @@ class IntentCommunicationService:
             raise ValueError("request references another intent communication policy")
 
     @staticmethod
+    def _normalize_intent_identity(intent: OptimizationIntent) -> OptimizationIntent:
+        """Replace the model-chosen label with a deterministic semantic identity."""
+
+        semantic_payload = intent.as_dict()
+        del semantic_payload["intent_id"]
+        semantic_payload["decision_variables"] = sorted(intent.decision_variables)
+        semantic_payload["constraints"] = sorted(intent.constraints)
+        semantic_fingerprint = canonical_fingerprint(semantic_payload)
+        return OptimizationIntent.from_mapping(
+            {
+                **semantic_payload,
+                "intent_id": f"intent-{semantic_fingerprint}",
+            }
+        )
+
+    @staticmethod
     def _request_id(session_id: str, *, turn_index: int, model_attempt: int) -> str:
         return f"intent-request-{session_id}-t{turn_index}-a{model_attempt}"
 
@@ -552,15 +569,33 @@ class IntentCommunicationService:
                 maximum_selections=len(options),
             )
         if ambiguity_code == "objective-priority-ambiguous":
-            options = tuple(
-                ClarificationOption(value=item.metric_id, label=item.metric_id)
-                for item in intent.objectives
-            )
+            manifest_options = {
+                option.value: option
+                for option in self._manifest_options(
+                    self._manifest.objectives,
+                    value_key="metric_id",
+                )
+            }
+            try:
+                options = tuple(manifest_options[item.metric_id] for item in intent.objectives)
+            except KeyError as exc:
+                raise ValueError("priority ambiguity references an unavailable objective") from exc
+            if len(options) == 2:
+                return ClarificationQuestion(
+                    question_id=question_id,
+                    ambiguity_code=ambiguity_code,
+                    json_pointer=pointer,
+                    prompt="请选择第一优先的优化目标；另一目标将自动作为第二优先。",
+                    answer_kind="single-select",
+                    options=options,
+                    minimum_selections=1,
+                    maximum_selections=1,
+                )
             return ClarificationQuestion(
                 question_id=question_id,
                 ambiguity_code=ambiguity_code,
                 json_pointer=pointer,
-                prompt="请按从高到低的顺序排列优化目标。",
+                prompt="请按从高到低的顺序完整排列全部优化目标。",
                 answer_kind="ordered-select",
                 options=options,
                 minimum_selections=len(options),

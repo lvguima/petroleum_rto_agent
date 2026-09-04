@@ -26,11 +26,6 @@ def _repo_root(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--repo-root", type=Path)
 
 
-def _common_paths(parser: argparse.ArgumentParser) -> None:
-    _repo_root(parser)
-    parser.add_argument("--library-root", type=Path)
-
-
 def _intent_and_context(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--intent-file", type=Path, required=True)
     parser.add_argument("--context-file", type=Path, required=True)
@@ -58,16 +53,14 @@ def _parser() -> argparse.ArgumentParser:
     _intent_and_context(validate_problem)
 
     run_parser = commands.add_parser("run", help="run or resume one workflow")
-    _common_paths(run_parser)
+    _repo_root(run_parser)
     _intent_and_context(run_parser)
     run_parser.add_argument("--run-root", type=Path)
-    run_parser.add_argument("--actor", required=True)
     run_parser.add_argument(
         "--coverage-policy", choices=("point", "sampled-anchors"), default="point"
     )
 
     inspect_parser = commands.add_parser("inspect", help="strictly reload one workflow")
-    inspect_parser.add_argument("--library-root", type=Path)
     inspect_parser.add_argument("--run-dir", type=Path, required=True)
 
     for name in ("approve", "publish"):
@@ -80,7 +73,7 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _roots(args: argparse.Namespace) -> tuple[Path | None, Path, Path]:
+def _run_roots(args: argparse.Namespace) -> tuple[Path | None, Path]:
     repo_root = None if args.repo_root is None else args.repo_root.resolve()
     workspace = Path.cwd().resolve() if repo_root is None else repo_root
     run_root = (
@@ -88,12 +81,7 @@ def _roots(args: argparse.Namespace) -> tuple[Path | None, Path, Path]:
         if getattr(args, "run_root", None) is None
         else args.run_root.resolve()
     )
-    library_root = (
-        workspace / "runs" / "rto" / "strategy-library"
-        if args.library_root is None
-        else args.library_root.resolve()
-    )
-    return repo_root, run_root, library_root
+    return repo_root, run_root
 
 
 def _problem_summary(problem: OptimizationProblem) -> dict[str, object]:
@@ -155,25 +143,18 @@ def _execute(args: argparse.Namespace) -> int:
             )
         )
     elif args.command == "run":
-        repo_root, run_root, library_root = _roots(args)
+        repo_root, run_root = _run_roots(args)
         value = run_summary(
             run_offline(
                 repo_root=repo_root,
                 intent_file=args.intent_file.resolve(),
                 context_file=args.context_file.resolve(),
                 run_root=run_root,
-                library_root=library_root,
-                actor=args.actor,
                 coverage_policy=args.coverage_policy,
             )
         )
     elif args.command == "inspect":
-        library_root = (
-            Path.cwd().resolve() / "runs" / "rto" / "strategy-library"
-            if args.library_root is None
-            else args.library_root.resolve()
-        )
-        value = run_summary(inspect_offline(args.run_dir.resolve(), library_root=library_root))
+        value = run_summary(inspect_offline(args.run_dir.resolve()))
     elif args.command == "approve":
         value = _lifecycle_value(args, publish=False)
     else:

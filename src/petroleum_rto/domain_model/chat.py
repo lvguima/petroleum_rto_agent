@@ -7,7 +7,7 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from importlib import import_module
-from typing import Final, Protocol
+from typing import Final, Literal, Protocol
 from urllib.parse import quote
 
 from .chat_settings import DmxChatSettings, DmxChatSettingsError, load_dmx_chat_settings
@@ -17,9 +17,36 @@ MAX_CHAT_HISTORY_BYTES: Final[int] = 128 * 1024
 MAX_CHAT_REQUEST_BYTES: Final[int] = 256 * 1024
 MAX_CHAT_RESPONSE_BYTES: Final[int] = 128 * 1024
 
+DmxChatErrorCode = Literal[
+    "dmx-chat-failed",
+    "local-configuration-unavailable",
+    "local-dependency-unavailable",
+    "invalid-request",
+    "authentication-failed",
+    "permission-denied",
+    "rate-limited",
+    "provider-server-error",
+    "http-error",
+    "transport-connect",
+    "invalid-response",
+]
+
 
 class DmxChatError(RuntimeError):
-    """Safe chat failure whose message never includes credentials or response bodies."""
+    """Safe categorized failure without credentials or provider response bodies."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: DmxChatErrorCode = "dmx-chat-failed",
+        retryable: bool = False,
+        http_status: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.retryable = retryable
+        self.http_status = http_status
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +83,15 @@ class _HttpxChatClient:
     ) -> DmxChatHttpResponse:
         try:
             httpx = import_module("httpx")
+        except ImportError:
+            raise DmxChatError(
+                "httpx is required for DMXAPI chat",
+                code="local-dependency-unavailable",
+            ) from None
+
+        response_started = False
+        received_status: int | None = None
+        try:
             client_type = httpx.Client
             with (
                 client_type(
@@ -71,27 +107,67 @@ class _HttpxChatClient:
                     json=dict(payload),
                 ) as response,
             ):
+                response_started = True
                 status_code = getattr(response, "status_code", None)
-                if not isinstance(status_code, int):
-                    raise TypeError("invalid HTTP response")
+                if (
+                    isinstance(status_code, bool)
+                    or not isinstance(status_code, int)
+                    or not 100 <= status_code <= 599
+                ):
+                    raise DmxChatError(
+                        "DMXAPI chat response is invalid",
+                        code="invalid-response",
+                    )
+                received_status = status_code
                 if status_code != 200:
                     return DmxChatHttpResponse(status_code=status_code, payload=None)
                 body = bytearray()
                 for chunk in response.iter_bytes():
                     if not isinstance(chunk, bytes):
-                        raise TypeError("invalid HTTP response body")
+                        raise DmxChatError(
+                            "DMXAPI chat response body is invalid",
+                            code="invalid-response",
+                            http_status=200,
+                        )
                     body.extend(chunk)
                     if len(body) > MAX_CHAT_RESPONSE_BYTES:
-                        raise DmxChatError("DMXAPI chat response exceeds the byte limit")
+                        raise DmxChatError(
+                            "DMXAPI chat response exceeds the byte limit",
+                            code="invalid-response",
+                            http_status=200,
+                        )
                 if not body:
-                    raise TypeError("empty HTTP response body")
-                response_payload = json.loads(body)
-        except ImportError:
-            raise DmxChatError("httpx is required for DMXAPI chat") from None
+                    raise DmxChatError(
+                        "DMXAPI chat response body is invalid",
+                        code="invalid-response",
+                        http_status=200,
+                    )
+                try:
+                    response_payload = json.loads(body)
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    raise DmxChatError(
+                        "DMXAPI chat response body is invalid",
+                        code="invalid-response",
+                        http_status=200,
+                    ) from None
         except DmxChatError:
             raise
-        except Exception:  # noqa: BLE001 - never expose headers, key, or response body
-            raise DmxChatError("DMXAPI chat request failed") from None
+        except Exception as exc:  # noqa: BLE001 - never expose provider exception details
+            request_error_type = getattr(httpx, "RequestError", None)
+            is_transport_error = isinstance(request_error_type, type) and isinstance(
+                exc, request_error_type
+            )
+            if is_transport_error or not response_started:
+                raise DmxChatError(
+                    "DMXAPI chat request failed",
+                    code="transport-connect",
+                    retryable=True,
+                ) from None
+            raise DmxChatError(
+                "DMXAPI chat response body is invalid",
+                code="invalid-response",
+                http_status=received_status,
+            ) from None
         return DmxChatHttpResponse(status_code=status_code, payload=response_payload)
 
 
@@ -124,7 +200,10 @@ class DmxChatClient:
         try:
             settings = load_dmx_chat_settings()
         except DmxChatSettingsError:
-            raise DmxChatError("DMXAPI local configuration is unavailable") from None
+            raise DmxChatError(
+                "DMXAPI local configuration is unavailable",
+                code="local-configuration-unavailable",
+            ) from None
         return cls(settings)
 
     @property
@@ -140,9 +219,15 @@ class DmxChatClient:
             "messages": normalized,
         }
         if _contains_credential(request_payload, self._settings.api_key):
-            raise DmxChatError("DMXAPI chat request contains credential material")
+            raise DmxChatError(
+                "DMXAPI chat request contains credential material",
+                code="invalid-request",
+            )
         if _json_size(request_payload) > MAX_CHAT_REQUEST_BYTES:
-            raise DmxChatError("DMXAPI chat request exceeds the byte limit")
+            raise DmxChatError(
+                "DMXAPI chat request exceeds the byte limit",
+                code="invalid-request",
+            )
         headers = {
             "Authorization": self._settings.api_key,
             "Content-Type": "application/json",
@@ -157,13 +242,47 @@ class DmxChatClient:
         except DmxChatError:
             raise
         except Exception:  # noqa: BLE001 - injected clients are also an untrusted boundary
-            raise DmxChatError("DMXAPI chat request failed") from None
-        if response.status_code != 200:
-            raise DmxChatError(f"DMXAPI chat returned HTTP {response.status_code}")
-        if _json_size(response.payload) > MAX_CHAT_RESPONSE_BYTES:
-            raise DmxChatError("DMXAPI chat response exceeds the byte limit")
+            raise DmxChatError(
+                "DMXAPI chat request failed",
+                code="transport-connect",
+                retryable=True,
+            ) from None
+        if not isinstance(response, DmxChatHttpResponse):
+            raise DmxChatError(
+                "DMXAPI chat response is invalid",
+                code="invalid-response",
+            )
+        status_code = response.status_code
+        if (
+            isinstance(status_code, bool)
+            or not isinstance(status_code, int)
+            or not 100 <= status_code <= 599
+        ):
+            raise DmxChatError(
+                "DMXAPI chat response is invalid",
+                code="invalid-response",
+            )
+        if status_code != 200:
+            raise _http_status_error(status_code)
+        if (
+            _json_size(
+                response.payload,
+                error_code="invalid-response",
+                http_status=200,
+            )
+            > MAX_CHAT_RESPONSE_BYTES
+        ):
+            raise DmxChatError(
+                "DMXAPI chat response exceeds the byte limit",
+                code="invalid-response",
+                http_status=200,
+            )
         if _contains_credential(response.payload, self._settings.api_key):
-            raise DmxChatError("DMXAPI chat response contained credential material")
+            raise DmxChatError(
+                "DMXAPI chat response contained credential material",
+                code="invalid-response",
+                http_status=200,
+            )
         return _response_content(response.payload)
 
 
@@ -222,7 +341,12 @@ def _normalize_messages(messages: Sequence[Mapping[str, str]]) -> list[dict[str,
     return normalized
 
 
-def _json_size(value: object) -> int:
+def _json_size(
+    value: object,
+    *,
+    error_code: DmxChatErrorCode = "invalid-request",
+    http_status: int | None = None,
+) -> int:
     try:
         encoded = json.dumps(
             value,
@@ -231,8 +355,35 @@ def _json_size(value: object) -> int:
             allow_nan=False,
         ).encode("utf-8")
     except (TypeError, ValueError, UnicodeEncodeError):
-        raise DmxChatError("DMXAPI chat payload is not finite UTF-8 JSON") from None
+        raise DmxChatError(
+            "DMXAPI chat payload is not finite UTF-8 JSON",
+            code=error_code,
+            http_status=http_status,
+        ) from None
     return len(encoded)
+
+
+def _http_status_error(status_code: int) -> DmxChatError:
+    code: DmxChatErrorCode
+    retryable = False
+    if status_code == 401:
+        code = "authentication-failed"
+    elif status_code == 403:
+        code = "permission-denied"
+    elif status_code == 429:
+        code = "rate-limited"
+        retryable = True
+    elif 500 <= status_code <= 599:
+        code = "provider-server-error"
+        retryable = True
+    else:
+        code = "http-error"
+    return DmxChatError(
+        f"DMXAPI chat returned HTTP {status_code}",
+        code=code,
+        retryable=retryable,
+        http_status=status_code,
+    )
 
 
 def _credential_variants(credential: str) -> frozenset[str]:
@@ -282,7 +433,11 @@ def _response_content(payload: object) -> str:
         if not isinstance(content, str) or not content.strip():
             raise TypeError
     except (KeyError, IndexError, TypeError):
-        raise DmxChatError("DMXAPI chat response has no assistant content") from None
+        raise DmxChatError(
+            "DMXAPI chat response has no assistant content",
+            code="invalid-response",
+            http_status=200,
+        ) from None
     return content
 
 
@@ -293,6 +448,7 @@ __all__ = [
     "MAX_CHAT_RESPONSE_BYTES",
     "DmxChatClient",
     "DmxChatError",
+    "DmxChatErrorCode",
     "DmxChatHttpClient",
     "DmxChatHttpResponse",
     "DmxChatSession",

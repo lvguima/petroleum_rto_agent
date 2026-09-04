@@ -14,7 +14,6 @@ from typing import Final, cast
 
 from .._file_lock import exclusive_file_lock
 from ..contracts.common import canonical_json_bytes, identifier, integer
-from ..contracts.problem import ENGINEERING_CLAIM_SCOPE
 from ..contracts.reference import ContractRef
 from .models import (
     STRATEGY_SCHEMA_VERSION,
@@ -55,6 +54,19 @@ def _loads(payload: str, *, context: str) -> dict[str, object]:
     return cast(dict[str, object], value)
 
 
+def _pretty_json_bytes(value: object) -> bytes:
+    return (
+        json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+            allow_nan=False,
+        )
+        + "\n"
+    ).encode("utf-8")
+
+
 class StrategyRepository:
     """Local single-writer repository with immutable payloads and hash-chained events."""
 
@@ -93,7 +105,6 @@ class StrategyRepository:
                     )
             event = StrategyLifecycleEvent(
                 schema_version=STRATEGY_SCHEMA_VERSION,
-                event_version="strategy-lifecycle-event",
                 strategy_ref=entry.ref,
                 sequence=0,
                 event_type="created",
@@ -105,7 +116,6 @@ class StrategyRepository:
                 release_ref=None,
                 related_strategy_ref=None,
                 previous_event_fingerprint=None,
-                claim_scope=ENGINEERING_CLAIM_SCOPE,
             )
             self._write_draft_atomically(path.parent, entry, event)
         return self.read(entry.strategy_id, entry.revision)
@@ -158,14 +168,10 @@ class StrategyRepository:
                 instant = occurred_at or utc_now()
                 release = StrategyReleaseManifest(
                     schema_version=STRATEGY_SCHEMA_VERSION,
-                    release_version="strategy-library-release",
                     release_id=release_id,
                     entry_refs=(record.entry.ref,),
                     created_by=actor,
                     created_at=instant,
-                    review_scope="offline-human-review",
-                    execution_scope="offline_simulation_only",
-                    claim_scope=ENGINEERING_CLAIM_SCOPE,
                 )
             event = self._next_event(
                 record,
@@ -178,7 +184,7 @@ class StrategyRepository:
             )
             self._write_immutable(
                 release_path,
-                canonical_json_bytes(release.as_dict()),
+                _pretty_json_bytes(release.as_dict()),
             )
             self._append_event(self._events_path(strategy_id, revision), event)
         verified = self.read(strategy_id, revision)
@@ -338,16 +344,18 @@ class StrategyRepository:
 
     @staticmethod
     def _matches(query: StrategyQuery, entry: StrategyEntry) -> bool:
-        if query.case_ref != entry.case_ref or query.operating_mode != entry.operating_mode:
+        applicability = entry.applicability
+        if (
+            query.case_ref != applicability.case_ref
+            or query.operating_mode != applicability.operating_mode
+        ):
             return False
-        if not set(query.required_dependency_refs).issubset(entry.dependency_refs):
-            return False
-        for anchor in entry.anchors:
-            if set(anchor.applicability_values) != set(query.applicability_values):
+        for anchor in applicability.anchors:
+            if set(anchor.conditions) != set(query.conditions):
                 continue
             if all(
-                abs(anchor.applicability_values[key] - value) <= query.measurement_tolerances[key]
-                for key, value in query.applicability_values.items()
+                abs(anchor.conditions[key] - value) <= query.measurement_tolerances[key]
+                for key, value in query.conditions.items()
             ):
                 return True
         return False
@@ -401,7 +409,6 @@ class StrategyRepository:
     ) -> StrategyLifecycleEvent:
         event = StrategyLifecycleEvent(
             schema_version=STRATEGY_SCHEMA_VERSION,
-            event_version="strategy-lifecycle-event",
             strategy_ref=record.entry.ref,
             sequence=len(record.events),
             event_type=event_type,
@@ -413,7 +420,6 @@ class StrategyRepository:
             release_ref=release_ref,
             related_strategy_ref=related_strategy_ref,
             previous_event_fingerprint=record.events[-1].fingerprint,
-            claim_scope=ENGINEERING_CLAIM_SCOPE,
         )
         StrategyRecord(entry=record.entry, events=(*record.events, event))
         return event
@@ -524,7 +530,7 @@ class StrategyRepository:
         events_path = temporary / "events.jsonl"
         try:
             for path, payload in (
-                (entry_path, canonical_json_bytes(entry.as_dict())),
+                (entry_path, _pretty_json_bytes(entry.as_dict())),
                 (events_path, canonical_json_bytes(event.as_dict()) + b"\n"),
             ):
                 with path.open("xb") as stream:

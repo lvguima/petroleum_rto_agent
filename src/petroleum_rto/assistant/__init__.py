@@ -1,1 +1,1 @@
-"""Small human-facing composition layer for DMX chat and RTO result explanation."""
+"""Minimal confirmation-gated agent composition for local engineering use."""

@@ -1,4 +1,4 @@
-"""Allow ``python -m petroleum_rto.domain_model`` to run the minimal chat CLI."""
+"""Allow ``python -m petroleum_rto.domain_model`` to run the local agent CLI."""
 
 from __future__ import annotations
 
