@@ -49,7 +49,7 @@ M2静态阶段完成不是最终推荐。不得编造设定值；没有天气/�
 )
 
 HELP = (
-    """/model：查看模型；/model <编号或完整ID>：切换模型
+    """/model：打开模型选择，随后回复编号或完整ID；/model <编号或完整ID>：直接切换
 /thinking [default|on|off] [强度]：查看或调整当前模型的思考设置
 切换模型时：Flash仅使用非思考模式，其他模型默认开启思考。
 /capabilities：查看装置能力
@@ -94,6 +94,7 @@ class ReactAgent:
         self.messages: list[BaseMessage] = []
         self._segment_start = 0
         self._busy = False
+        self._awaiting_model_choice = False
         self._recursion_limit = 4 * max_model_calls + 8
         self.context = ConversationContext(model, tools.state, max_calls=max_model_calls)
         self._reported_summaries = 0
@@ -221,6 +222,11 @@ class ReactAgent:
                 str(profile.context_tokens) if profile.context_tokens else "待核实，暂不可请求"
             )
             lines.append(f"{index}. {profile.label} — {profile.model_id}；容量：{capacity}")
+        if self._awaiting_model_choice:
+            lines.append("切换模型：直接回复编号（例如 1）或完整模型ID，也可输入 /model 1。")
+            lines.append("输入 0 退出选择；输入其他内容继续聊天。")
+        else:
+            lines.append("切换方式：/model <编号或完整ID>；也可输入/model后回复编号。")
         return "\n".join(lines)
 
     def _command(self, text: str) -> AgentTurn:
@@ -228,17 +234,21 @@ class ReactAgent:
         command, args = parts[0], parts[1:]
         if command == "/model":
             if not args:
+                self._awaiting_model_choice = True
                 return AgentTurn(outputs=(self._model_menu(),))
             if len(args) != 1:
                 raise ValueError("用法：/model <编号或完整ID>")
             value = args[0]
-            if value.isascii() and value.isdigit() and 1 <= int(value) <= len(MODELS):
+            if value.isascii() and value.isdigit():
+                if not 1 <= int(value) <= len(MODELS):
+                    return AgentTurn(errors=(f"模型编号无效，请选择1–{len(MODELS)}。",))
                 value = MODELS[int(value) - 1].model_id
             selection = ModelSelection(model_profile(value))
             if selection.profile.model_id != self.model.selection.profile.model_id:
                 self._segment_start = len(self.messages)
                 self.model.selection = selection
-            return AgentTurn(outputs=(self._model_menu(),))
+            self._awaiting_model_choice = False
+            return AgentTurn(outputs=("模型选择已生效。\n" + self._model_menu(),))
         if command == "/thinking":
             if not args:
                 return AgentTurn(outputs=(self._model_menu(),))
@@ -334,6 +344,16 @@ class ReactAgent:
             return AgentTurn()
         if self._busy:
             return AgentTurn(errors=("当前轮尚未结束，请等待或中止后再操作。",))
+        if self._awaiting_model_choice:
+            if text == "0":
+                self._awaiting_model_choice = False
+                return AgentTurn(outputs=("已退出模型选择，当前模型保持不变。",))
+            if (text.isascii() and text.isdigit()) or any(
+                text == profile.model_id for profile in MODELS
+            ):
+                text = f"/model {text}"
+            elif text.split()[0] != "/model":
+                self._awaiting_model_choice = False
         if text.startswith("/"):
             try:
                 return self._command(text)

@@ -85,7 +85,7 @@ def test_model_menu_switch_keeps_context_without_replaying_foreign_reasoning(
     runtime.handle("查工况，不要调整压力")
     snapshot = dict(runtime.domain.snapshots)
     assert "kimi-k3" in runtime.handle("/model").outputs[0]
-    assert not runtime.handle("/model 2").errors
+    assert not runtime.handle("2").errors
     assert runtime.model.selection.profile.model_id == "kimi-k3"
     assert len(wire.requests) == 2  # selection does not make an API call
     assert runtime.domain.snapshots == snapshot
@@ -139,7 +139,7 @@ def test_model_switch_resets_to_flash_off_and_other_models_on(repo_root: Path) -
     assert not wire.requests
 
 
-def test_model_switch_not_a_modal_menu_and_busy_switch_is_rejected(repo_root: Path) -> None:
+def test_model_menu_allows_chat_and_busy_switch_is_rejected(repo_root: Path) -> None:
     runtime, wire = agent(repo_root, [chat("可以聊工艺")])
     runtime.handle("/model")
     assert not runtime.handle("先聊聊工艺").errors
@@ -147,6 +147,80 @@ def test_model_switch_not_a_modal_menu_and_busy_switch_is_rejected(repo_root: Pa
     runtime._busy = True
     assert runtime.handle("/model kimi-k3").errors
     assert runtime.model.selection.profile.model_id == DEFAULT_MODEL_ID
+
+
+@pytest.mark.parametrize(
+    ("choice", "model_id"),
+    [
+        ("1", "qwen3.8-max-0902"),
+        ("2", "kimi-k3"),
+        ("3", "gpt-5.6-sol-cdx"),
+        ("4", "deepseek-v4-pro-0813"),
+        ("5", DEFAULT_MODEL_ID),
+        ("qwen3.8-max-0902", "qwen3.8-max-0902"),
+    ],
+)
+def test_model_menu_selection_is_local_and_explains_usage(
+    repo_root: Path, choice: str, model_id: str
+) -> None:
+    runtime, wire = agent(repo_root, [])
+    menu = runtime.handle("/model").outputs[0]
+    assert "直接回复编号" in menu and "/model 1" in menu and "输入 0" in menu
+    turn = runtime.handle(f"  {choice}\n")
+    assert not turn.errors and "模型选择已生效" in turn.outputs[0]
+    assert runtime.model.selection.profile.model_id == model_id
+    assert runtime.model.selection.thinking_enabled == (model_id != DEFAULT_MODEL_ID)
+    assert not wire.requests and not runtime.messages and runtime.domain.turn_id == 0
+
+
+def test_model_menu_invalid_choice_blank_line_and_busy_retry(repo_root: Path) -> None:
+    runtime, wire = agent(repo_root, [])
+    original = runtime.model.selection
+    runtime.handle("/model")
+    runtime._busy = True
+    assert runtime.handle("1").errors
+    runtime._busy = False
+    for choice in ("99", "/model unknown-id"):
+        assert runtime.handle(choice).errors
+        assert runtime.model.selection == original
+        assert not runtime.messages and not wire.requests
+    assert not runtime.handle(" \n").errors
+    assert not runtime.handle("1").errors
+    assert runtime.model.selection.profile.model_id == "qwen3.8-max-0902"
+    assert not wire.requests
+
+
+@pytest.mark.parametrize("command", [None, "/thinking", "/model 1"])
+def test_number_is_chat_without_an_open_model_menu(repo_root: Path, command: str | None) -> None:
+    runtime, wire = agent(repo_root, [chat("收到数字")])
+    if command:
+        assert not runtime.handle(command).errors
+    selected = runtime.model.selection
+    assert not runtime.handle("1").errors
+    assert runtime.model.selection == selected
+    assert len(wire.requests) == 1
+    assert wire.requests[0]["messages"][-1]["content"] == "1"
+
+
+@pytest.mark.parametrize("command", ["/help", "/thinking", "/clear", "/cancel", "/unknown"])
+def test_other_commands_leave_model_selection(repo_root: Path, command: str) -> None:
+    runtime, wire = agent(repo_root, [chat("收到数字")])
+    runtime.handle("/model")
+    turn = runtime.handle(command)
+    assert bool(turn.errors) == (command == "/unknown")
+    assert not runtime.handle("1").errors
+    assert runtime.model.selection.profile.model_id == DEFAULT_MODEL_ID
+    assert len(wire.requests) == 1 and wire.requests[0]["messages"][-1]["content"] == "1"
+
+
+def test_chat_leaves_model_selection_and_following_number_stays_chat(repo_root: Path) -> None:
+    runtime, wire = agent(repo_root, [chat("可以聊工艺"), chat("收到数字")])
+    runtime.handle("/model")
+    assert not runtime.handle("先聊聊工艺").errors
+    assert not runtime.handle("1").errors
+    assert runtime.model.selection.profile.model_id == DEFAULT_MODEL_ID
+    assert len(wire.requests) == 2
+    assert wire.requests[1]["messages"][-1]["content"] == "1"
 
 
 def test_completed_tool_survives_followup_transport_failure(repo_root: Path) -> None:
@@ -285,13 +359,18 @@ def test_new_runtime_is_the_real_cli_composition(
     output, error = io.StringIO(), io.StringIO()
     assert (
         cli._run_repl(
-            runtime, input_stream=io.StringIO("/model\n你好\n/exit\n"), output=output, error=error
+            runtime,
+            input_stream=io.StringIO("/model\n1\n你好\n/exit\n"),
+            output=output,
+            error=error,
         )
         == 0
     )
     assert "自由问答" in output.getvalue() and not error.getvalue()
     assert len(wire.requests) == 1
-    assert all(p["model"] == DEFAULT_MODEL_ID for p in wire.requests)
+    assert wire.requests[0]["model"] == "qwen3.8-max-0902"
+    assert wire.requests[0]["enable_thinking"] is True
+    assert wire.requests[0]["messages"][-1]["content"] == "你好"
 
 
 def test_forty_turns_do_not_duplicate_history_or_drop_received_answer(repo_root: Path) -> None:

@@ -296,12 +296,36 @@ def test_pending_query_keep_and_model_switch_preserve_plan(repo_root: Path) -> N
         ]
     )
     runtime = ReactAgent(wire.model(), domain)
-    assert not runtime.handle("/model 4").errors
+    turn_id = domain.turn_id
+    assert plan.eligible
+    for text in ("/model", "99", "/model invalid-id", "4"):
+        turn = runtime.handle(text)
+        assert bool(turn.errors) == (text in ("99", "/model invalid-id"))
+        assert domain.pending is plan and plan.eligible
+        assert domain.turn_id == turn_id
+        assert not runtime.messages and not wire.requests
+    assert runtime.model.selection.profile.model_id == "deepseek-v4-pro-0813"
     assert not runtime.handle("/thinking off").errors
     assert runtime.domain.pending is plan
     assert not runtime.handle("这是什么装置？").errors
     assert domain.pending.eligible
     assert "confirmation_available" in json.dumps(wire.requests[0])
+
+
+def test_leaving_model_selection_preserves_plan_but_cancel_still_cancels(repo_root: Path) -> None:
+    domain = prepared(repo_root)
+    plan = domain.pending
+    wire = Wire([])
+    runtime = ReactAgent(wire.model(), domain)
+    turn_id = domain.turn_id
+    runtime.handle("/model")
+    closed = runtime.handle("0")
+    assert not closed.errors and "已退出模型选择" in closed.outputs[0]
+    assert domain.pending is plan and plan.eligible
+    assert domain.turn_id == turn_id and not runtime.messages
+    runtime.handle("/model")
+    assert not runtime.handle("/cancel").errors
+    assert domain.pending is None and not wire.requests
 
 
 def test_unresolved_pending_turn_and_transport_failure_suspend(repo_root: Path) -> None:
