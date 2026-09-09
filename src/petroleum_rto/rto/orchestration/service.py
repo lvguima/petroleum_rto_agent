@@ -142,6 +142,18 @@ class OfflineRtoRunRecord:
     physical_m4_executions: int
 
 
+@dataclass(frozen=True)
+class StaticRtoRunRecord:
+    """Validated M2 checkpoint; never a final recommendation."""
+
+    run_dir: Path
+    request: OfflineRtoRequest
+    problem: OptimizationProblem
+    solver_execution: SolverExecutionArtifact
+    static_selection: StaticPreferenceSelection
+    physical_m2_executions: int
+
+
 class _ReplayEvaluator:
     def __init__(self, evaluations: tuple[CandidateEvaluation, ...]) -> None:
         self._evaluations = {item.proposal_ref: item for item in evaluations}
@@ -232,6 +244,30 @@ class OfflineRtoOrchestrator:
             result_summary=summary,
         )
 
+    def solve_static(
+        self,
+        bundle: CapabilityBundle,
+        intent: OptimizationIntent,
+        context: OperatingContext,
+        problem: OptimizationProblem,
+        *,
+        run_root: Path,
+    ) -> StaticRtoRunRecord:
+        """Execute/replay M2 and ranking, stopping before any M4 evaluation."""
+        record = self._run(
+            bundle, intent, context, problem, run_root=run_root, stop_after_static=True
+        )
+        if isinstance(record, StaticRtoRunRecord):
+            return record
+        return StaticRtoRunRecord(
+            record.run_dir,
+            record.request,
+            record.problem,
+            record.solver_execution,
+            record.static_selection,
+            0,
+        )
+
     def run(
         self,
         bundle: CapabilityBundle,
@@ -242,6 +278,23 @@ class OfflineRtoOrchestrator:
         run_root: Path,
         coverage_policy: CoveragePolicy = "point",
     ) -> OfflineRtoRunRecord:
+        record = self._run(
+            bundle, intent, context, problem, run_root=run_root, coverage_policy=coverage_policy
+        )
+        assert isinstance(record, OfflineRtoRunRecord)
+        return record
+
+    def _run(
+        self,
+        bundle: CapabilityBundle,
+        intent: OptimizationIntent,
+        context: OperatingContext,
+        problem: OptimizationProblem,
+        *,
+        run_root: Path,
+        coverage_policy: CoveragePolicy = "point",
+        stop_after_static: bool = False,
+    ) -> OfflineRtoRunRecord | StaticRtoRunRecord:
         request = self._request_for(bundle, intent, context, problem, coverage_policy)
         execution_route = BundleCapabilityView(bundle).route_by_ref(problem.execution_route_ref)
         snapshot = CapabilityBundleSnapshot(
@@ -384,6 +437,11 @@ class OfflineRtoOrchestrator:
                 "static-selection-ready",
                 static_selection.ref,
             )
+
+            if stop_after_static:
+                return StaticRtoRunRecord(
+                    run_dir, request, problem, solver_execution, static_selection, physical_m2
+                )
 
             dynamic_path = run_dir / "dynamic_evaluations.json"
             _reject_event_without_artifacts(events, "dynamic-evaluations-ready", (dynamic_path,))

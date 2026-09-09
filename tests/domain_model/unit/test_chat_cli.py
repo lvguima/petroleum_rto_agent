@@ -5,7 +5,8 @@ import io
 import pytest
 
 from petroleum_rto.assistant import cli
-from petroleum_rto.assistant.runtime import HELP, AgentTurn
+from petroleum_rto.assistant.react import HELP
+from petroleum_rto.assistant.turn import AgentTurn
 
 
 class _FakeSession:
@@ -67,7 +68,9 @@ def test_cli_keeps_ordinary_chat_help_clear_and_exit_behavior(
     assert "/confirm" in captured.out
     assert "preview-ref" not in captured.out
     assert "/cancel" in captured.out
-    assert "/result <结果编号|目录|result.json>" in captured.out
+    assert "/result [结果编号]" in captured.out
+    assert "/model" in captured.out
+    assert "/thinking" in captured.out
     assert "/status" not in captured.out
     assert captured.err == ""
 

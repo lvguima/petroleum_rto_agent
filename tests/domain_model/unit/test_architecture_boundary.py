@@ -29,7 +29,7 @@ def test_domain_model_source_cannot_import_solver_simulator_or_trusted_context(
     assert violations == []
 
 
-def test_domain_model_package_root_only_imports_active_chat_modules(repo_root: Path) -> None:
+def test_domain_model_package_root_only_imports_lightweight_configuration(repo_root: Path) -> None:
     source = repo_root / "src/petroleum_rto/domain_model/__init__.py"
     tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
     imported = {
@@ -38,41 +38,24 @@ def test_domain_model_package_root_only_imports_active_chat_modules(repo_root: P
         if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module is not None
     }
 
-    assert imported == {"chat", "chat_settings"}
+    assert imported == {"chat_settings"}
 
 
 def test_assistant_can_only_import_approved_agent_rto_boundaries(repo_root: Path) -> None:
     source_root = repo_root / "src/petroleum_rto/assistant"
     allowed = {
         "petroleum_rto.rto": {"load_operating_context"},
-        "petroleum_rto.rto.communication": {
-            "COMMUNICATION_SCHEMA_VERSION",
-            "DOMAIN_MODEL_INVOCATION_RESULT_SCHEMA_ID",
-            "DOMAIN_MODEL_RESPONSE_SCHEMA_ID",
-            "DOMAIN_MODEL_RESPONSE_SCHEMA_VERSION",
-            "DOMAIN_MODEL_UNSUPPORTED_SCHEMA_ID",
-            "DOMAIN_MODEL_UNSUPPORTED_SCHEMA_VERSION",
-            "UNSUPPORTED_SAFE_MESSAGES",
-            "ClarificationAnswer",
-            "ClarificationQuestion",
-            "ClarificationRequest",
-            "CommunicationResult",
-            "ContractRef",
-            "DomainModelInvocationResult",
-            "DomainModelPort",
-            "DomainModelRequest",
-            "IntentCommunicationService",
-            "OptimizationIntent",
-            "ProviderAttempt",
-            "ProviderError",
-            "ProviderErrorCategory",
-            "decode_domain_model_response",
-        },
         "petroleum_rto.rto.runtime": {
             "build_chat_operating_status",
-            "build_intent_communication_service",
             "capabilities",
-            "run_confirmed_optimization",
+            "OfflineInspectionError",
+            "build_optimization_run_summary",
+            "inspect_offline",
+            "PreparedOptimization",
+            "prepare_optimization",
+            "render_confirmation",
+            "solve_prepared_optimization",
+            "verify_prepared_optimization",
         },
     }
     violations: list[str] = []

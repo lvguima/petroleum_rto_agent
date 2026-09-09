@@ -1,4 +1,4 @@
-"""Minimal local settings for the DMXAPI Chat Completions client."""
+"""Local credentials, API endpoint and startup defaults for the native Agent."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ class DmxChatSettingsError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class DmxChatSettings:
-    """The four values needed by the minimal DMXAPI chat client."""
+    """Local transport and initial model configuration."""
 
     api_key: str = field(repr=False)
     url: str = DMX_CHAT_URL

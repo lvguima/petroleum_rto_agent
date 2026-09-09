@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import stat
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Final
+from urllib.parse import quote
 
 LOCAL_DMX_API_CREDENTIAL_FILE: Final[Path] = Path(__file__).with_name("dmx_api.json")
 
@@ -94,8 +97,39 @@ def _reject_json_constant(value: str) -> object:
     raise ValueError(f"unsupported credential JSON constant: {value}")
 
 
+def _credential_variants(credential: str) -> frozenset[str]:
+    encoded = base64.b64encode(credential.encode("ascii")).decode("ascii")
+    urlsafe = base64.urlsafe_b64encode(credential.encode("ascii")).decode("ascii")
+    return frozenset(
+        {
+            credential,
+            encoded,
+            encoded.rstrip("="),
+            urlsafe,
+            urlsafe.rstrip("="),
+            quote(credential, safe=""),
+        }
+    )
+
+
+def contains_credential(value: object, credential: str) -> bool:
+    variants = _credential_variants(credential)
+
+    def contains(item: object) -> bool:
+        if isinstance(item, str):
+            return any(variant and variant in item for variant in variants)
+        if isinstance(item, Mapping):
+            return any(contains(key) or contains(nested) for key, nested in item.items())
+        if isinstance(item, Sequence) and not isinstance(item, (str, bytes, bytearray)):
+            return any(contains(nested) for nested in item)
+        return False
+
+    return contains(value)
+
+
 __all__ = [
     "LOCAL_DMX_API_CREDENTIAL_FILE",
     "LocalCredentialError",
+    "contains_credential",
     "load_local_dmx_api_key",
 ]

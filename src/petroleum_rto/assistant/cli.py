@@ -1,30 +1,42 @@
-"""Terminal interface for the minimal confirmation-gated engineering agent."""
+"""Terminal interface for the unified native-tool engineering agent."""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import TextIO
+from typing import Protocol, TextIO
 
-from petroleum_rto.rto.runtime import build_intent_communication_service
-
-from .dmx_intent_adapter import DmxIntentAdapter
-from .runtime import AgentRuntime
-from .tools import AgentTools
+from .turn import AgentTurn
 
 
-def _new_runtime() -> AgentRuntime:
-    """Compose one process-local Agent around a shared stateless DMX client."""
+class TerminalRuntime(Protocol):
+    def handle(self, message: str) -> AgentTurn: ...
 
-    from petroleum_rto.domain_model.chat import DmxChatClient, DmxChatSession
+
+def _new_runtime() -> TerminalRuntime:
+    """Load optional framework dependencies only when starting the Agent."""
+
+    from petroleum_rto.domain_model.chat_settings import load_dmx_chat_settings
+    from petroleum_rto.domain_model.models import ModelSelection, model_profile
+    from petroleum_rto.domain_model.native import DmxNativeModel, NativeTransport
+
+    from .native_tools import AgentDomainTools
+    from .react import SYSTEM_PROMPT, ReactAgent
 
     workspace = Path.cwd().resolve()
-    client = DmxChatClient.from_local_config()
-    return AgentRuntime(
-        DmxChatSession(client),
-        AgentTools(workspace),
-        build_intent_communication_service(repo_root=workspace),
-        DmxIntentAdapter(client),
+    settings = load_dmx_chat_settings()
+    if not settings.url.endswith("/chat/completions"):
+        raise ValueError("DMX配置应包含标准Chat端点，用于确定共享API根地址。")
+    model = DmxNativeModel(
+        transport=NativeTransport(
+            settings.api_key, base_url=settings.url.removesuffix("/chat/completions")
+        ),
+        selection=ModelSelection(model_profile(settings.model)),
+    )
+    return ReactAgent(
+        model,
+        AgentDomainTools(workspace),
+        system_prompt=SYSTEM_PROMPT + "\n" + (settings.system_prompt or ""),
     )
 
 
@@ -33,7 +45,7 @@ def _write_safe_error(stream: TextIO, message: str) -> None:
 
 
 def _run_repl(
-    runtime: AgentRuntime,
+    runtime: TerminalRuntime,
     *,
     input_stream: TextIO,
     output: TextIO,
@@ -75,6 +87,10 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         print(file=sys.stdout)
         return 0
+    finally:
+        close = getattr(runtime, "close", None)
+        if callable(close):
+            close()
 
 
 if __name__ == "__main__":  # pragma: no cover

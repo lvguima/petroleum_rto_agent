@@ -1,1 +1,1 @@
-"""Minimal confirmation-gated agent composition for local engineering use."""
+"""Unified native-tool agent composition for local engineering use."""
