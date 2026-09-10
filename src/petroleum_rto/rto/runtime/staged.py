@@ -22,6 +22,14 @@ from ..problem import ProblemBuilder
 from .chat_summary import build_chat_operating_status, build_optimization_run_summary
 
 
+class OptimizationPreparationError(ValueError):
+    """Safe, structured business-field failures for the public preparation boundary."""
+
+    def __init__(self, issues: list[dict[str, object]]) -> None:
+        super().__init__("optimization preparation rejected")
+        self.issues = issues
+
+
 @dataclass(frozen=True)
 class PreparedOptimization:
     bundle: CapabilityBundle
@@ -55,6 +63,16 @@ def prepare_optimization(
     max_candidates: int = 1,
 ) -> PreparedOptimization:
     """Resolve business fields and construct a problem without simulation."""
+    if constraints:
+        raise OptimizationPreparationError(
+            [
+                {
+                    "code": "unsupported-business-constraints",
+                    "json_pointer": "/constraints",
+                    "message": "系统约束自动加入；当前不支持额外业务约束，不能通过删掉用户要求来绕过。",
+                }
+            ]
+        )
     fields = {
         "objectives": [dict(item, priority=index) for index, item in enumerate(objectives, 1)],
         "decision_variables": list(decision_variables),
@@ -82,9 +100,22 @@ def prepare_optimization(
         }
     )
     bundle = load_capability_bundle(repo_root)
+    route = BundleCapabilityView(bundle).route_for_objective_count(len(intent.objectives))
+    if route is not None and max_candidates > route.top_k:
+        raise OptimizationPreparationError(
+            [
+                {
+                    "code": "result-count-out-of-range",
+                    "json_pointer": "/max_candidates",
+                    "message": "max_candidates是返回方案总数，不是M2搜索预算；保留目标与变量，仅修正返回数量。",
+                    "minimum": 1,
+                    "maximum": route.top_k,
+                }
+            ]
+        )
     resolution = IntentResolver().resolve(intent, BundleCapabilityView(bundle))
     if resolution.status != "resolved" or resolution.resolved_intent is None:
-        raise ValueError("business requirements cannot be resolved against current capabilities")
+        raise OptimizationPreparationError([issue.as_dict() for issue in resolution.issues])
     intent = resolution.resolved_intent
     return PreparedOptimization(
         bundle, intent, context, ProblemBuilder().build(bundle, intent, context)

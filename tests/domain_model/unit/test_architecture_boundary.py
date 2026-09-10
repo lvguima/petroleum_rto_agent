@@ -52,6 +52,7 @@ def test_assistant_can_only_import_approved_agent_rto_boundaries(repo_root: Path
             "build_optimization_run_summary",
             "inspect_offline",
             "PreparedOptimization",
+            "OptimizationPreparationError",
             "prepare_optimization",
             "render_confirmation",
             "solve_prepared_optimization",

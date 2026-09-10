@@ -51,10 +51,30 @@ def _run_repl(
     output: TextIO,
     error: TextIO,
 ) -> int:
+    interactive = (
+        input_stream is sys.stdin
+        and output is sys.stdout
+        and input_stream.isatty()
+        and output.isatty()
+    )
+    if interactive:
+        try:
+            # Importing readline enables native editing for input(), not TextIO.readline().
+            import readline  # noqa: F401
+        except ImportError:
+            _write_safe_error(error, "当前Python环境缺少终端行编辑支持，请使用包含readline的环境。")
+            return 1
     print("输入 /help 查看命令。", file=output)
     while True:
-        print("你> ", end="", file=output, flush=True)
-        line = input_stream.readline()
+        if interactive:
+            try:
+                # Keep the existing runtime contract: a blank line is "\n", EOF is "".
+                line = input("你> ") + "\n"
+            except EOFError:
+                line = ""
+        else:
+            print("你> ", end="", file=output, flush=True)
+            line = input_stream.readline()
         if line == "":
             print(file=output)
             return 0

@@ -91,8 +91,6 @@ class ConversationContext(AgentMiddleware[AgentState[Any], None]):
 
     def _budget(self) -> int:
         window = self.model.selection.profile.context_tokens
-        if window is None:
-            raise NativeModelError("unknown-model-capacity")
         return window - self.model.selection.output_tokens
 
     def _store(self, content: str) -> dict[str, Any]:

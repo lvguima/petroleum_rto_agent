@@ -444,10 +444,7 @@ def test_responses_two_tool_rounds_use_real_native_payloads(repo_root: Path) -> 
         repo_root,
         [response("get_plant_info", 1), response("read_operating_context", 2), response(None, 3)],
     )
-    runtime.model.selection = replace(
-        selection("gpt-5.6-sol-cdx"),
-        profile=replace(model_profile("gpt-5.6-sol-cdx"), context_tokens=100_000),
-    )
+    assert not runtime.handle("/model 3").errors
     assert runtime.handle("查看身份和工况").outputs == ("模型> 完成",)
     assert wire.paths == ["/v1/responses"] * 3
     assert all("name" in t and "function" not in t for t in wire.requests[0]["tools"])

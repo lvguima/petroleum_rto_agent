@@ -123,20 +123,13 @@ def test_summary_call_budget_is_bounded_and_successful_prefix_remains_committed(
     assert len(raw) == 31
 
 
-def test_current_user_text_and_unknown_capacity_are_never_silently_truncated() -> None:
+def test_current_user_text_is_never_silently_truncated() -> None:
     manager, wire = fixture([])
     raw = [HumanMessage(content="很长的用户原文" * 1_000)]
     manager.begin_turn(raw[-1])
     with pytest.raises(NativeModelError, match="context-overflow"):
         manager.prepare(raw, system=[], tools=[])
     assert not wire.requests and raw[0].text == "很长的用户原文" * 1_000
-    manager.model.selection = replace(
-        manager.model.selection,
-        profile=replace(manager.model.selection.profile, context_tokens=None),
-    )
-    with pytest.raises(NativeModelError, match="unknown-model-capacity"):
-        manager.prepare(raw, system=[], tools=[])
-    assert not wire.requests
 
 
 def test_large_tool_result_is_paged_exactly_with_unicode_and_no_reexecution() -> None:

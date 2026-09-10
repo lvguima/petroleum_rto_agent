@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import sys
 
 import pytest
 
@@ -132,3 +133,61 @@ def test_cli_rejects_arguments_and_eof_does_not_call_model(
     captured = capsys.readouterr()
     assert session.messages == []
     assert captured.err == ""
+
+
+class _TTYStringIO(io.StringIO):
+    def isatty(self) -> bool:
+        return True
+
+
+@pytest.mark.parametrize(
+    ("stdin_tty", "stdout_tty"), [(False, False), (True, False), (False, True)]
+)
+def test_redirected_streams_keep_line_input(
+    monkeypatch: pytest.MonkeyPatch, stdin_tty: bool, stdout_tty: bool
+) -> None:
+    source = (_TTYStringIO if stdin_tty else io.StringIO)("第一问\n第二问\n/exit\n")
+    output = (_TTYStringIO if stdout_tty else io.StringIO)()
+    error = io.StringIO()
+    session = _FakeSession()
+    monkeypatch.setattr(sys, "stdin", source)
+    monkeypatch.setattr(sys, "stdout", output)
+    # Non-interactive use must not require the optional platform readline module.
+    monkeypatch.setitem(sys.modules, "readline", None)
+
+    assert (
+        cli._run_repl(_FakeRuntime(session), input_stream=source, output=output, error=error) == 0
+    )
+
+    assert session.messages == ["第一问", "第二问"]
+    assert output.getvalue().count("你> ") == 3
+    assert error.getvalue() == ""
+
+
+def test_missing_terminal_editor_stops_before_reading_input_and_closes_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = _FakeSession()
+
+    class Runtime(_FakeRuntime):
+        closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    runtime = Runtime(session)
+    source = _TTYStringIO("不应提交\n")
+    output = _TTYStringIO()
+    error = io.StringIO()
+    monkeypatch.setattr(cli, "_new_runtime", lambda: runtime)
+    monkeypatch.setattr(sys, "stdin", source)
+    monkeypatch.setattr(sys, "stdout", output)
+    monkeypatch.setattr(sys, "stderr", error)
+    monkeypatch.setitem(sys.modules, "readline", None)
+
+    assert cli.main([]) == 1
+
+    assert session.messages == []
+    assert source.tell() == 0
+    assert runtime.closed
+    assert "缺少终端行编辑支持" in error.getvalue()

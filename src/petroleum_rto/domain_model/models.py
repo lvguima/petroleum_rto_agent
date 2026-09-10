@@ -16,12 +16,15 @@ class ModelProfile:
     thinking_parameter: Literal["enable_thinking", "thinking", "always", "reasoning"]
     default_thinking: bool
     efforts: tuple[str, ...]
-    context_tokens: int | None
+    context_tokens: int
     limits_source: str
 
+    def __post_init__(self) -> None:
+        if type(self.context_tokens) is not int or self.context_tokens <= 0:
+            raise ValueError("上下文预算必须是正整数。")
 
-# Capacity is the original provider's documented window, pending DMX verification.
-# None is deliberate: a similarly named model is not evidence for the CDX suffix.
+
+# Application context budgets: provider-documented windows unless explicitly set by the user.
 MODELS: tuple[ModelProfile, ...] = (
     ModelProfile(
         "qwen3.8-max-0902",
@@ -50,8 +53,8 @@ MODELS: tuple[ModelProfile, ...] = (
         "reasoning",
         True,
         ("low", "medium", "high", "xhigh", "max"),
-        None,
-        "精确CDX型号容量和协议待核实；Responses仅为候选",
+        256_000,
+        "用户指定的256K应用上下文预算（256,000 tokens）",
     ),
     ModelProfile(
         "deepseek-v4-pro-0813",
@@ -105,10 +108,7 @@ class ModelSelection:
             raise ValueError("当前模型或模式不支持这个思考强度。")
         if type(self.output_tokens) is not int or self.output_tokens <= 0:
             raise ValueError("生成预算必须是正整数。")
-        if (
-            self.profile.context_tokens is not None
-            and self.output_tokens >= self.profile.context_tokens
-        ):
+        if self.output_tokens >= self.profile.context_tokens:
             raise ValueError("生成预算必须小于上下文容量。")
 
     @property

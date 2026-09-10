@@ -35,6 +35,7 @@ __all__ = [
     "OptimizationBaselineSummary",
     "OptimizationContextSummary",
     "OptimizationPredictedEffectSummary",
+    "OptimizationPreparationError",
     "OptimizationRunSummary",
     "OptimizationTargetSummary",
     "PreparedOptimization",
@@ -58,6 +59,7 @@ __all__ = [
 ]
 
 from .staged import (
+    OptimizationPreparationError,
     PreparedOptimization,
     prepare_optimization,
     render_confirmation,

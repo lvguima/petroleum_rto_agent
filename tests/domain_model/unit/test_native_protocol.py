@@ -148,10 +148,16 @@ def test_capacity_and_credentials_checked_before_network_and_no_64_message_limit
     assert len(wire.requests) == 1
 
 
-def test_unknown_cdx_capacity_does_not_guess_or_change_id() -> None:
+def test_cdx_budget_accepts_request_and_reserves_output_without_changing_id() -> None:
     wire = Wire([])
-    with pytest.raises(NativeModelError, match="unknown-model-capacity"):
-        wire.model(selection("gpt-5.6-sol-cdx")).invoke("hi")
+    selected = selection("gpt-5.6-sol-cdx")
+    payload = request_payload(selected, [HumanMessage("hi")], [], stream=False)
+    assert selected.profile.context_tokens == 256_000
+    assert payload["model"] == "gpt-5.6-sol-cdx"
+    assert payload["max_output_tokens"] == selected.output_tokens
+    assert "input" in payload and "messages" not in payload
+    with pytest.raises(NativeModelError, match="context-overflow"):
+        wire.model(selected).invoke("x" * (256_000 - selected.output_tokens))
     assert not wire.requests
 
 
@@ -240,11 +246,7 @@ def test_chat_sse_cut_off_before_finish_is_not_a_call(end: bytes) -> None:
 
 
 def test_responses_sse_preserves_opaque_output_and_call_id() -> None:
-    # Synthetic capacity is a TEST fixture, not a claim about the unresolved CDX ID.
-    configured = replace(
-        selection("gpt-5.6-sol-cdx"),
-        profile=replace(model_profile("gpt-5.6-sol-cdx"), context_tokens=100_000),
-    )
+    configured = selection("gpt-5.6-sol-cdx")
     output = [
         {"id": "rs1", "type": "reasoning", "encrypted_content": "opaque-state", "summary": []},
         {
@@ -316,10 +318,7 @@ def test_flash_thinking_is_rejected_before_constructing_a_request() -> None:
 
 
 def test_responses_incomplete_event_never_becomes_executable_output() -> None:
-    configured = replace(
-        selection("gpt-5.6-sol-cdx"),
-        profile=replace(model_profile("gpt-5.6-sol-cdx"), context_tokens=100_000),
-    )
+    configured = selection("gpt-5.6-sol-cdx")
     wire = Wire(
         [
             sse(
@@ -387,10 +386,7 @@ def responses_stream_events(output: list[dict[str, Any]]) -> list[dict[str, Any]
 def test_responses_sse_done_items_survive_empty_terminal_and_round_trip(
     terminal_has_output: bool,
 ) -> None:
-    configured = replace(
-        selection("gpt-5.6-sol-cdx"),
-        profile=replace(model_profile("gpt-5.6-sol-cdx"), context_tokens=100_000),
-    )  # Synthetic test capacity; the production profile stays unresolved.
+    configured = selection("gpt-5.6-sol-cdx")
     output = responses_output()
     events = responses_stream_events(output)
     if terminal_has_output:

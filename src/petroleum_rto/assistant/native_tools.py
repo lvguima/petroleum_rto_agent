@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from petroleum_rto.rto import load_operating_context
 from petroleum_rto.rto.runtime import (
     OfflineInspectionError,
+    OptimizationPreparationError,
     PreparedOptimization,
     build_chat_operating_status,
     build_optimization_run_summary,
@@ -26,6 +27,7 @@ from petroleum_rto.rto.runtime import (
 )
 
 CONFIRMATION_INPUTS = ("/confirm", "确认", "确认执行")
+TOOL_CONTRACT_VERSION = "2.0.0"
 CONFIRMATION_RULE = (
     "仅整条输入为"
     + "、".join(f"“{text}”" for text in CONFIRMATION_INPUTS)
@@ -51,11 +53,18 @@ class ObjectiveArguments(NoArguments):
 
 
 class PrepareArguments(NoArguments):
-    snapshot_ref: str
+    snapshot_ref: str = Field(
+        description="read_operating_context返回的snapshot_ref，不是context_id。"
+    )
     objectives: list[ObjectiveArguments] = Field(min_length=1)
-    decision_variables: list[str] = Field(min_length=1)
-    constraints: list[str] = Field(default_factory=list)
-    max_candidates: int = Field(default=1, ge=1)
+    decision_variables: list[str] = Field(
+        min_length=1, description="全部允许调整的available变量；可选子集，不能加入deferred变量。"
+    )
+    max_candidates: int = Field(
+        default=1,
+        ge=1,
+        description="返回方案总数（含推荐），默认1；上限见get_plant_info的preparation规则，不是搜索预算。",
+    )
     previous_plan_ref: str | None = None
 
 
@@ -164,6 +173,7 @@ class AgentDomainTools:
 
     def state(self) -> dict[str, Any]:
         return {
+            "tool_contract_version": TOOL_CONTRACT_VERSION,
             "confirmation_contract": {"version": "2.1.0", "accepted_inputs": CONFIRMATION_INPUTS},
             "user_turn_id": self.turn_id,
             "user_message": self.user_message,
@@ -183,13 +193,20 @@ class AgentDomainTools:
 
     def plant_info(self) -> dict[str, Any]:
         context = load_operating_context(self.workspace / "configs/rto/contexts/case_20260604.json")
+        manifest = capabilities(repo_root=self.workspace)
         return {
             "status": "ok",
+            "tool_contract_version": TOOL_CONTRACT_VERSION,
             "provider_id": context.provider_id,
             "process_type": "常压蒸馏（CDU）" if context.provider_id == "cdu-m7" else "未知",
             "model_id": context.model_ref.object_id,
             "claim_scope": context.claim_scope,
-            "capabilities": capabilities(repo_root=self.workspace),
+            "capabilities": manifest,
+            "preparation": {
+                "constraints": "系统硬约束与发布改善门禁自动加入；prepare不接受constraints参数。额外业务约束尚不支持，应告知用户，不可静默忽略。",
+                "decision_variables": "只选择available变量的非空子集；不要求填写所有登记变量，deferred变量不可加入。",
+                "max_candidates": "最终返回方案总数，默认1；对应execution_routes的top_k为上限，maximum_m2_candidates是内部搜索预算。",
+            },
             "available_execution": "读取工况、准备方案、确认后完整静态搜索和动态复核",
         }
 
@@ -208,15 +225,40 @@ class AgentDomainTools:
         self.revision_attempt()
         args = PrepareArguments.model_validate(kwargs)
         if self.pending and args.previous_plan_ref != self.pending.ref:
-            raise ValueError("revision must name the current plan")
+            raise OptimizationPreparationError(
+                [
+                    {
+                        "code": "stale-plan-reference",
+                        "json_pointer": "/previous_plan_ref",
+                        "message": "修改必须引用当前方案；请inspect_optimization读取当前plan_ref。",
+                    }
+                ]
+            )
         if not self.pending and args.previous_plan_ref is not None:
-            raise ValueError("unknown previous plan")
+            raise OptimizationPreparationError(
+                [
+                    {
+                        "code": "unexpected-plan-reference",
+                        "json_pointer": "/previous_plan_ref",
+                        "message": "当前没有旧方案，新建时省略previous_plan_ref。",
+                    }
+                ]
+            )
+        if args.snapshot_ref not in self.snapshots:
+            raise OptimizationPreparationError(
+                [
+                    {
+                        "code": "unknown-snapshot-reference",
+                        "json_pointer": "/snapshot_ref",
+                        "message": "先read_operating_context，使用其snapshot_ref；不能使用context_id或自己编造引用。",
+                    }
+                ]
+            )
         prepared = prepare_optimization(
             repo_root=self.workspace,
             context=self.snapshots[args.snapshot_ref],
             objectives=[item.model_dump() for item in args.objectives],
             decision_variables=args.decision_variables,
-            constraints=args.constraints,
             max_candidates=args.max_candidates,
         )
         self._version += 1
@@ -350,7 +392,7 @@ class AgentDomainTools:
                 "prepare_optimization",
                 self.prepare,
                 PrepareArguments,
-                "按目标优先级排列objectives，指定全部允许变量及能力中已有约束ID。必须先读取工况。只构造问题不仿真；修改须带previous_plan_ref，撤销旧确认资格。不能在准备的同一用户轮确认。",
+                "按目标优先级排列objectives，只指定用户允许的available变量。系统约束自动加入，不接受constraints；额外业务约束尚不支持，不可忽略用户要求。max_candidates是返回方案数，默认1，上限为能力中对应路线top_k，不是maximum_m2_candidates。必须使用工况工具返回的snapshot_ref。只构造问题不仿真；修改须带previous_plan_ref，撤销旧确认资格，下一用户轮才能确认。",
             ),
             (
                 "manage_optimization",

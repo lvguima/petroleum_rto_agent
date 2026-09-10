@@ -150,8 +150,6 @@ def request_payload(
     if not tools:
         payload.pop("tools")
     window = profile.context_tokens
-    if window is None:
-        raise NativeModelError("unknown-model-capacity")
     # Conservative text-only estimate: one UTF-8 byte per token, plus per-record
     # framing allowance. This is not a vendor tokenizer or a claimed token count.
     # Includes schemas and opaque reasoning, runs again after every tool result.

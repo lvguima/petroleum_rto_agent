@@ -12,6 +12,9 @@ from test_native_protocol import Wire, call, chat
 from petroleum_rto.assistant import native_tools
 from petroleum_rto.assistant.native_tools import AgentDomainTools, ConfirmationInputError
 from petroleum_rto.assistant.react import ReactAgent
+from petroleum_rto.domain_model.models import DEFAULT_MODEL_ID, ModelSelection, model_profile
+from petroleum_rto.domain_model.native import DmxNativeModel, NativeTransport
+from petroleum_rto.rto.runtime import OptimizationPreparationError
 
 
 def arguments(domain: AgentDomainTools, *, pressure: bool = True) -> dict[str, Any]:
@@ -23,6 +26,191 @@ def arguments(domain: AgentDomainTools, *, pressure: bool = True) -> dict[str, A
         + (["tower_top_pressure_target_pa_a"] if pressure else []),
         "previous_plan_ref": domain.pending.ref if domain.pending else None,
     }
+
+
+def test_capability_to_prepare_repairs_fields_without_changing_user_goal(
+    repo_root: Path,
+    stages: list[Any],
+) -> None:
+    domain = AgentDomainTools(repo_root)
+    step = 0
+    expected_args: dict[str, Any] = {}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal step, expected_args
+        payload = json.loads(request.content)
+        messages = payload["messages"]
+        tool_results = [json.loads(m["content"]) for m in messages if m["role"] == "tool"]
+        if step == 0:
+            schema = next(
+                t["function"]
+                for t in payload["tools"]
+                if t["function"]["name"] == "prepare_optimization"
+            )
+            assert "constraints" not in schema["parameters"]["properties"]
+            reply = chat(None, calls=[call("get_plant_info", call_id="c1")])
+        elif step == 1:
+            info = tool_results[-1]
+            assert info["tool_contract_version"] == "2.0.0"
+            assert "自动" in info["preparation"]["constraints"]
+            expected_args = {
+                "objectives": [
+                    {"metric_id": "specific_furnace_fuel_energy_mj_per_t", "sense": "minimize"}
+                ],
+                "decision_variables": [
+                    d["decision_id"]
+                    for d in info["capabilities"]["decisions"]
+                    if d["availability"] == "available"
+                ],
+            }
+            reply = chat(None, calls=[call("read_operating_context", call_id="c2")])
+        elif step == 2:
+            expected_args["snapshot_ref"] = tool_results[-1]["snapshot_ref"]
+            reply = chat(
+                None,
+                calls=[
+                    call(
+                        "prepare_optimization",
+                        json.dumps(expected_args | {"constraints": ["quality-proxy-preservation"]}),
+                        "c3",
+                    )
+                ],
+            )
+        elif step == 3:
+            issue = tool_results[-1]["issues"][0]
+            assert issue["json_pointer"] == "/constraints" and "自动保留" in issue["message"]
+            reply = chat(
+                None,
+                calls=[
+                    call(
+                        "prepare_optimization",
+                        json.dumps(expected_args | {"max_candidates": 33}),
+                        "c4",
+                    )
+                ],
+            )
+        elif step == 4:
+            issue = tool_results[-1]["issues"][0]
+            assert issue["code"] == "result-count-out-of-range"
+            assert issue["json_pointer"] == "/max_candidates" and issue["maximum"] == 3
+            reply = chat(
+                None,
+                calls=[
+                    call(
+                        "prepare_optimization",
+                        json.dumps(expected_args | {"max_candidates": 1}),
+                        "c5",
+                    )
+                ],
+            )
+        else:
+            assert step == 5 and tool_results[-1]["status"] == "prepared"
+            reply = chat("方案已准备，请审阅程序摘要。")
+        step += 1
+        return httpx.Response(200, json=reply)
+
+    transport = NativeTransport("fake-private-api-key", http_transport=httpx.MockTransport(handle))
+    runtime = ReactAgent(
+        DmxNativeModel(
+            transport=transport,
+            selection=ModelSelection(model_profile(DEFAULT_MODEL_ID)),
+            use_stream=False,
+        ),
+        domain,
+    )
+    turn = runtime.handle(
+        "降低单位进料炉燃料热负荷，允许调炉温和压力，保住现有质量和收率门禁。可以，开始吧。"
+    )
+    assert not turn.errors and step == 6
+    assert domain.pending is not None and domain.pending.eligible and not domain.pending.authorized
+    prepared_plan = domain.pending.prepared
+    assert (
+        prepared_plan.intent.objectives[0].metric_id == expected_args["objectives"][0]["metric_id"]
+    )
+    assert set(prepared_plan.intent.decision_variables) == set(expected_args["decision_variables"])
+    assert len(prepared_plan.problem.hard_constraints) == 4
+    assert len(prepared_plan.problem.publishability_constraints) == 1
+    assert not stages
+    runtime.close()
+
+
+@pytest.mark.parametrize("count,maximum", [(1, 3), (2, 5), (3, 5)])
+def test_prepare_result_count_uses_current_route_limit(
+    repo_root: Path, count: int, maximum: int
+) -> None:
+    domain = AgentDomainTools(repo_root)
+    domain.begin_turn("准备方案")
+    args = arguments(domain)
+    args["objectives"] = [
+        {"metric_id": "specific_furnace_fuel_energy_mj_per_t", "sense": "minimize"},
+        {"metric_id": "quality_proxy_max_abs_relative_change", "sense": "minimize"},
+        {"metric_id": "valuable_distillate_yield", "sense": "maximize"},
+    ][:count]
+    with pytest.raises(OptimizationPreparationError) as failure:
+        domain.prepare(**(args | {"max_candidates": maximum + 1}))
+    assert failure.value.issues[0]["maximum"] == maximum
+    assert domain.pending is None
+    assert domain.prepare(**(args | {"max_candidates": maximum}))["status"] == "prepared"
+
+
+@pytest.mark.parametrize(
+    "bad,code,pointer",
+    [
+        ({"snapshot_ref": "case-20260604-nominal"}, "unknown-snapshot-reference", "/snapshot_ref"),
+        (
+            {"decision_variables": ["reflux_ratio_target"]},
+            "unsupported-decision-variable",
+            "/decision_variables/0",
+        ),
+        (
+            {"objectives": [{"metric_id": "valuable_distillate_yield", "sense": "minimize"}]},
+            "objective-sense-mismatch",
+            "/objectives/0/sense",
+        ),
+    ],
+)
+def test_prepare_reports_specific_business_field_and_suspends_old_plan(
+    repo_root: Path,
+    bad: dict[str, Any],
+    code: str,
+    pointer: str,
+) -> None:
+    domain = prepared(repo_root)
+    old = domain.pending
+    domain.begin_turn("修改方案")
+    with pytest.raises(OptimizationPreparationError) as failure:
+        domain.prepare(**(arguments(domain) | bad))
+    assert failure.value.issues[0]["code"] == code
+    assert failure.value.issues[0]["json_pointer"] == pointer
+    assert domain.pending is old and old is not None and not old.eligible
+
+
+def test_schema_error_does_not_reflect_untrusted_values(repo_root: Path) -> None:
+    wire = Wire(
+        [
+            chat(
+                None,
+                calls=[
+                    call(
+                        "prepare_optimization",
+                        json.dumps(
+                            {
+                                "snapshot_ref": "sensitive-value",
+                                "objectives": "sensitive-value",
+                                "secret-field": "sensitive-value",
+                            }
+                        ),
+                    )
+                ],
+            ),
+            chat("参数错误"),
+        ]
+    )
+    runtime = ReactAgent(wire.model(), AgentDomainTools(repo_root))
+    runtime.handle("准备方案")
+    result = next(m for m in runtime.messages if isinstance(m, ToolMessage))
+    assert "sensitive-value" not in result.content and "secret-field" not in result.content
+    assert json.loads(result.content)["code"] == "invalid-tool-arguments"
 
 
 def prepared(repo_root: Path) -> AgentDomainTools:
