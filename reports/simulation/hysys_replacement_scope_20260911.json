@@ -1,0 +1,1331 @@
+{
+  "schema_id": "hysys-steady-replacement-scope",
+  "schema_version": "1.0.0",
+  "audited_at": "2026-09-11T09:01:38.341881+00:00",
+  "scope": "planning_only_no_implementation_or_model_deletion",
+  "file_count_basis": "git tracked plus nonignored untracked files at audit time; excludes ignored raw sources and caches",
+  "legacy_roots": {
+    "src/petroleum_rto/cdu/": [
+      "src/petroleum_rto/cdu/__init__.py",
+      "src/petroleum_rto/cdu/calibration/__init__.py",
+      "src/petroleum_rto/cdu/calibration/alignment.py",
+      "src/petroleum_rto/cdu/calibration/artifacts.py",
+      "src/petroleum_rto/cdu/calibration/calibration.py",
+      "src/petroleum_rto/cdu/calibration/config.py",
+      "src/petroleum_rto/cdu/calibration/etl.py",
+      "src/petroleum_rto/cdu/calibration/observations.py",
+      "src/petroleum_rto/cdu/calibration/pipeline.py",
+      "src/petroleum_rto/cdu/calibration/reconciliation.py",
+      "src/petroleum_rto/cdu/control/__init__.py",
+      "src/petroleum_rto/cdu/control/config.py",
+      "src/petroleum_rto/cdu/control/controllers.py",
+      "src/petroleum_rto/cdu/control/loops.py",
+      "src/petroleum_rto/cdu/control/metrics.py",
+      "src/petroleum_rto/cdu/control/results.py",
+      "src/petroleum_rto/cdu/control/runner.py",
+      "src/petroleum_rto/cdu/control/scenario.py",
+      "src/petroleum_rto/cdu/control/simulation.py",
+      "src/petroleum_rto/cdu/core/__init__.py",
+      "src/petroleum_rto/cdu/core/config.py",
+      "src/petroleum_rto/cdu/core/conservation.py",
+      "src/petroleum_rto/cdu/core/math_utils.py",
+      "src/petroleum_rto/cdu/core/types.py",
+      "src/petroleum_rto/cdu/core/units.py",
+      "src/petroleum_rto/cdu/core/versions.py",
+      "src/petroleum_rto/cdu/dynamics/__init__.py",
+      "src/petroleum_rto/cdu/dynamics/actuators.py",
+      "src/petroleum_rto/cdu/dynamics/equations.py",
+      "src/petroleum_rto/cdu/dynamics/initialization.py",
+      "src/petroleum_rto/cdu/dynamics/runner.py",
+      "src/petroleum_rto/cdu/dynamics/schedule.py",
+      "src/petroleum_rto/cdu/dynamics/sensors.py",
+      "src/petroleum_rto/cdu/dynamics/simulation.py",
+      "src/petroleum_rto/cdu/dynamics/state.py",
+      "src/petroleum_rto/cdu/equipment/__init__.py",
+      "src/petroleum_rto/cdu/equipment/heat_transfer.py",
+      "src/petroleum_rto/cdu/equipment/quality.py",
+      "src/petroleum_rto/cdu/equipment/separation.py",
+      "src/petroleum_rto/cdu/flowsheet/__init__.py",
+      "src/petroleum_rto/cdu/flowsheet/open_loop.py",
+      "src/petroleum_rto/cdu/flowsheet/recycle.py",
+      "src/petroleum_rto/cdu/flowsheet/results.py",
+      "src/petroleum_rto/cdu/io/__init__.py",
+      "src/petroleum_rto/cdu/properties/__init__.py",
+      "src/petroleum_rto/cdu/properties/components.py",
+      "src/petroleum_rto/cdu/properties/thermo.py",
+      "src/petroleum_rto/cdu/repository.py",
+      "src/petroleum_rto/cdu/runtime/__init__.py",
+      "src/petroleum_rto/cdu/runtime/__main__.py",
+      "src/petroleum_rto/cdu/runtime/adapters.py",
+      "src/petroleum_rto/cdu/runtime/api.py",
+      "src/petroleum_rto/cdu/runtime/artifacts.py",
+      "src/petroleum_rto/cdu/runtime/batch.py",
+      "src/petroleum_rto/cdu/runtime/cli.py",
+      "src/petroleum_rto/cdu/runtime/contracts.py",
+      "src/petroleum_rto/cdu/runtime/custom_inputs.py",
+      "src/petroleum_rto/cdu/runtime/data/__init__.py",
+      "src/petroleum_rto/cdu/runtime/data/case_base.json",
+      "src/petroleum_rto/cdu/runtime/data/catalog_components.json",
+      "src/petroleum_rto/cdu/runtime/data/control_pi.json",
+      "src/petroleum_rto/cdu/runtime/data/model_base.json",
+      "src/petroleum_rto/cdu/runtime/data/overlay_m5.json",
+      "src/petroleum_rto/cdu/runtime/data/scenario_closed_loop_baseline.json",
+      "src/petroleum_rto/cdu/runtime/data/scenario_closed_loop_feed_step.json",
+      "src/petroleum_rto/cdu/runtime/data/scenario_open_loop_baseline.json",
+      "src/petroleum_rto/cdu/runtime/data/scenario_open_loop_feed_step.json",
+      "src/petroleum_rto/cdu/runtime/data/validation_m6.json",
+      "src/petroleum_rto/cdu/runtime/data/validation_m6_manifest.json",
+      "src/petroleum_rto/cdu/runtime/executor.py",
+      "src/petroleum_rto/cdu/runtime/presentation.py",
+      "src/petroleum_rto/cdu/runtime/presets.py",
+      "src/petroleum_rto/cdu/runtime/provenance.py",
+      "src/petroleum_rto/cdu/runtime/resources.py",
+      "src/petroleum_rto/cdu/validation/__init__.py",
+      "src/petroleum_rto/cdu/validation/artifacts.py",
+      "src/petroleum_rto/cdu/validation/basis.py",
+      "src/petroleum_rto/cdu/validation/config.py",
+      "src/petroleum_rto/cdu/validation/domain.py",
+      "src/petroleum_rto/cdu/validation/metrics.py",
+      "src/petroleum_rto/cdu/validation/protection.py",
+      "src/petroleum_rto/cdu/validation/results.py",
+      "src/petroleum_rto/cdu/validation/runner.py",
+      "src/petroleum_rto/cdu/validation/scenarios.py",
+      "src/petroleum_rto/cdu/validation/tracking.py",
+      "src/petroleum_rto/cdu/validation/uncertainty.py"
+    ],
+    "configs/cdu/": [
+      "configs/cdu/calibration/m5_case_20260604_v0.1.0.json",
+      "configs/cdu/cases/case_20260604.json",
+      "configs/cdu/controllers/cdu_pi_v0.1.0.json",
+      "configs/cdu/models/cdu_mini_v0.1.0.json",
+      "configs/cdu/models/components_v0.1.0.json",
+      "configs/cdu/parameters/cdu_parameters_m5_case20260604_v0.1.0.json",
+      "configs/cdu/reconciliation/m5_case_20260604_v0.1.0.json",
+      "configs/cdu/runtime/closed_loop_comprehensive_disturbance_v0.1.0.json",
+      "configs/cdu/runtime/m5_runtime_overlay_v0.1.0.json",
+      "configs/cdu/scenarios/closed_loop_baseline_v0.1.0.json",
+      "configs/cdu/scenarios/closed_loop_feed_step_v0.1.0.json",
+      "configs/cdu/scenarios/open_loop_baseline_v0.1.0.json",
+      "configs/cdu/scenarios/open_loop_feed_step_v0.1.0.json",
+      "configs/cdu/validation/m6_validation_v0.1.0.json"
+    ],
+    "data/cdu/": [
+      "data/cdu/catalog/cdu_observations_v0.1.0.jsonl",
+      "data/cdu/catalog/cdu_sources_v0.1.0.jsonl",
+      "data/cdu/gold/case_20260604_reconciled_v0.1.0.json",
+      "data/cdu/gold/m6_validation_evidence_v0.1.0.json"
+    ],
+    "scripts/cdu/": [
+      "scripts/cdu/__init__.py",
+      "scripts/cdu/benchmark_m7.py",
+      "scripts/cdu/benchmark_m7_artifacts.py"
+    ],
+    "reports/cdu/": [
+      "reports/cdu/M5_case_20260604_artifact_manifest_v0.1.0.json",
+      "reports/cdu/M5_case_20260604_calibration_v0.1.0.json",
+      "reports/cdu/M5_case_20260604_calibration_v0.1.0.md",
+      "reports/cdu/M6_VALIDATION_REPORT.md",
+      "reports/cdu/M7_ARTIFACT_IO_BASELINE.md",
+      "reports/cdu/M7_PERFORMANCE_BASELINE.md",
+      "reports/cdu/m6_validation_manifest_v0.1.0.json",
+      "reports/cdu/m6_validation_report_v0.1.0.json",
+      "reports/cdu/m7_artifact_io_baseline_v0.1.0.json",
+      "reports/cdu/m7_performance_baseline_v0.1.0.json"
+    ],
+    "docs/cdu/": [
+      "docs/cdu/01_CDU_Mini_Loop机理模型综合说明.md",
+      "docs/cdu/01_常压蒸馏工艺及数据分析.md",
+      "docs/cdu/archive/01_CDU_Mini_Loop实施方案.md",
+      "docs/cdu/archive/02_M3_动态模型假设与验收口径.md",
+      "docs/cdu/archive/03_M4_PI控制假设与验收口径.md",
+      "docs/cdu/archive/04_M5_数据协调与基准校正口径.md",
+      "docs/cdu/archive/05_M6_验证不确定度与适用域口径.md",
+      "docs/cdu/archive/06_M7_封装与可复现交付口径.md",
+      "docs/cdu/archive/M7_DATA_DICTIONARY.md",
+      "docs/cdu/archive/M7_MODEL_CARD.md",
+      "docs/cdu/archive/M7_RELEASE_CHECKLIST.md",
+      "docs/cdu/archive/M7_USAGE.md",
+      "docs/cdu/archive/README.md"
+    ],
+    "tests/cdu/": [
+      "tests/cdu/integration/test_case_construction.py",
+      "tests/cdu/integration/test_closed_loop.py",
+      "tests/cdu/integration/test_dynamic_acceptance.py",
+      "tests/cdu/integration/test_dynamic_model.py",
+      "tests/cdu/integration/test_dynamic_runner.py",
+      "tests/cdu/integration/test_dynamic_simulation.py",
+      "tests/cdu/integration/test_m5_delivered_artifacts.py",
+      "tests/cdu/integration/test_m5_pipeline.py",
+      "tests/cdu/integration/test_m6_validation.py",
+      "tests/cdu/integration/test_m7_runtime.py",
+      "tests/cdu/integration/test_open_loop.py",
+      "tests/cdu/integration/test_recycle.py",
+      "tests/cdu/regression/test_input_fingerprint.py",
+      "tests/cdu/unit/test_alignment_config.py",
+      "tests/cdu/unit/test_calibration_config.py",
+      "tests/cdu/unit/test_calibration_core.py",
+      "tests/cdu/unit/test_calibration_etl.py",
+      "tests/cdu/unit/test_calibration_public_api.py",
+      "tests/cdu/unit/test_closed_loop_scenario.py",
+      "tests/cdu/unit/test_component_catalog.py",
+      "tests/cdu/unit/test_config_validation.py",
+      "tests/cdu/unit/test_conservation.py",
+      "tests/cdu/unit/test_control_config.py",
+      "tests/cdu/unit/test_control_loops.py",
+      "tests/cdu/unit/test_control_metrics.py",
+      "tests/cdu/unit/test_control_public_api.py",
+      "tests/cdu/unit/test_control_results.py",
+      "tests/cdu/unit/test_core_results.py",
+      "tests/cdu/unit/test_dynamic_public_api.py",
+      "tests/cdu/unit/test_dynamic_signals.py",
+      "tests/cdu/unit/test_dynamic_state.py",
+      "tests/cdu/unit/test_flowsheet_results.py",
+      "tests/cdu/unit/test_heat_transfer.py",
+      "tests/cdu/unit/test_m5_artifacts.py",
+      "tests/cdu/unit/test_m6_artifacts.py",
+      "tests/cdu/unit/test_m6_basis.py",
+      "tests/cdu/unit/test_m6_config.py",
+      "tests/cdu/unit/test_m6_domain.py",
+      "tests/cdu/unit/test_m6_metrics.py",
+      "tests/cdu/unit/test_m6_protection.py",
+      "tests/cdu/unit/test_m6_public_api.py",
+      "tests/cdu/unit/test_m6_results.py",
+      "tests/cdu/unit/test_m6_scenarios.py",
+      "tests/cdu/unit/test_m6_tracking.py",
+      "tests/cdu/unit/test_m6_uncertainty.py",
+      "tests/cdu/unit/test_m7_api.py",
+      "tests/cdu/unit/test_m7_artifact_benchmark.py",
+      "tests/cdu/unit/test_m7_artifacts.py",
+      "tests/cdu/unit/test_m7_batch.py",
+      "tests/cdu/unit/test_m7_benchmark.py",
+      "tests/cdu/unit/test_m7_cli.py",
+      "tests/cdu/unit/test_m7_contracts.py",
+      "tests/cdu/unit/test_m7_custom_inputs.py",
+      "tests/cdu/unit/test_m7_executor.py",
+      "tests/cdu/unit/test_m7_presentation.py",
+      "tests/cdu/unit/test_m7_presets.py",
+      "tests/cdu/unit/test_m7_provenance.py",
+      "tests/cdu/unit/test_m7_resources.py",
+      "tests/cdu/unit/test_material_stream.py",
+      "tests/cdu/unit/test_math_utils.py",
+      "tests/cdu/unit/test_observations.py",
+      "tests/cdu/unit/test_pi_controller.py",
+      "tests/cdu/unit/test_reconciliation.py",
+      "tests/cdu/unit/test_repository_paths.py",
+      "tests/cdu/unit/test_separation.py",
+      "tests/cdu/unit/test_stream_mixing.py",
+      "tests/cdu/unit/test_thermo.py",
+      "tests/cdu/unit/test_units.py"
+    ]
+  },
+  "cross_module_references": [
+    {
+      "path": "configs/rto/capabilities/catalog.json",
+      "matching_line_numbers": [
+        8,
+        10,
+        25,
+        27,
+        42,
+        63,
+        92,
+        109,
+        160,
+        161,
+        174,
+        175,
+        188,
+        189,
+        198,
+        199,
+        210,
+        211,
+        235,
+        247
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "configs/rto/capabilities/system_policy.json",
+      "matching_line_numbers": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        41,
+        42,
+        43,
+        44,
+        45
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "configs/rto/contexts/case_20260604.json",
+      "matching_line_numbers": [
+        6
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/assistant/native_tools.py",
+      "matching_line_numbers": [
+        99,
+        105,
+        118
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/assistant/presentation.py",
+      "matching_line_numbers": [
+        156,
+        160
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/assistant/react.py",
+      "matching_line_numbers": [
+        1,
+        87
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/adapters/cdu_m7.py",
+      "matching_line_numbers": [
+        1,
+        37,
+        41,
+        45,
+        49,
+        75,
+        78,
+        83,
+        85,
+        165,
+        185,
+        192,
+        193,
+        211,
+        248
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/capabilities/models.py",
+      "matching_line_numbers": [
+        244,
+        245,
+        257,
+        269,
+        271,
+        288,
+        289,
+        307,
+        308,
+        310,
+        325,
+        326,
+        618,
+        619,
+        620,
+        621,
+        622,
+        633,
+        634,
+        648,
+        653,
+        654,
+        684,
+        685,
+        686,
+        687,
+        688,
+        713,
+        714,
+        715,
+        716,
+        717,
+        735,
+        736,
+        737,
+        738,
+        739
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/compilation/compiler.py",
+      "matching_line_numbers": [
+        81,
+        83,
+        85,
+        134,
+        143,
+        144,
+        145,
+        151,
+        152,
+        153,
+        188,
+        233,
+        234,
+        235,
+        239,
+        241,
+        242,
+        244,
+        247,
+        249,
+        250,
+        251,
+        255,
+        257,
+        265,
+        267,
+        270,
+        273,
+        274,
+        275,
+        279,
+        285,
+        293,
+        296,
+        314,
+        320,
+        324,
+        325,
+        326,
+        329,
+        332,
+        336
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/contracts/candidate.py",
+      "matching_line_numbers": [
+        332,
+        333,
+        412,
+        413,
+        414,
+        415,
+        416,
+        417
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/contracts/finalization.py",
+      "matching_line_numbers": [
+        507,
+        508,
+        511,
+        560,
+        561,
+        566,
+        567,
+        575,
+        576,
+        586,
+        588,
+        593,
+        594,
+        599,
+        613,
+        615,
+        616,
+        636,
+        640,
+        670,
+        671,
+        674,
+        713,
+        714,
+        717,
+        775,
+        776,
+        778,
+        779,
+        788,
+        789,
+        790
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/contracts/problem.py",
+      "matching_line_numbers": [
+        369,
+        370,
+        371,
+        372,
+        373,
+        374,
+        375,
+        376,
+        384,
+        387,
+        390,
+        392,
+        395,
+        396,
+        397,
+        399,
+        402,
+        404,
+        405,
+        410,
+        411,
+        426,
+        427,
+        428,
+        429,
+        430,
+        431,
+        432,
+        433,
+        440,
+        441,
+        442,
+        443,
+        444,
+        445,
+        446,
+        447,
+        448,
+        450,
+        451,
+        452,
+        466,
+        467,
+        468,
+        469,
+        470,
+        471,
+        472,
+        473
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/contracts/simulation.py",
+      "matching_line_numbers": [
+        28,
+        62,
+        148
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/contracts/solver_result.py",
+      "matching_line_numbers": [
+        138,
+        139
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/data/capability_bundle.json",
+      "matching_line_numbers": [
+        9,
+        11,
+        26,
+        28,
+        43,
+        64,
+        93,
+        110,
+        161,
+        162,
+        175,
+        176,
+        189,
+        190,
+        199,
+        200,
+        211,
+        212,
+        236,
+        248,
+        293,
+        294,
+        295,
+        296,
+        297,
+        318,
+        319,
+        320,
+        321,
+        322
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/evaluation/__init__.py",
+      "matching_line_numbers": [
+        1
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/evaluation/formulas.py",
+      "matching_line_numbers": [
+        1,
+        280,
+        281,
+        290,
+        293,
+        294
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/evaluation/m2.py",
+      "matching_line_numbers": [
+        1,
+        38,
+        52,
+        53,
+        55,
+        57,
+        60,
+        68,
+        70,
+        71,
+        77,
+        82,
+        86,
+        120,
+        121,
+        198,
+        257,
+        320,
+        394
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/evaluation/m4.py",
+      "matching_line_numbers": [
+        1,
+        68,
+        71,
+        74,
+        79,
+        83,
+        85,
+        89,
+        91,
+        97,
+        103,
+        118,
+        141,
+        142,
+        145,
+        148,
+        149,
+        150,
+        155,
+        164,
+        165,
+        166,
+        169,
+        170,
+        172,
+        173,
+        174,
+        183,
+        193,
+        207,
+        208,
+        213,
+        221,
+        238,
+        239,
+        271,
+        272,
+        310,
+        339,
+        357,
+        402,
+        477
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/orchestration/models.py",
+      "matching_line_numbers": [
+        300,
+        386,
+        411,
+        419,
+        613,
+        633,
+        634,
+        635,
+        636,
+        637,
+        640,
+        641,
+        647,
+        648,
+        659,
+        661,
+        662,
+        670,
+        671,
+        686,
+        690,
+        703,
+        705,
+        707,
+        840,
+        861,
+        899,
+        937,
+        974,
+        975
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/orchestration/result.py",
+      "matching_line_numbers": [
+        63,
+        170,
+        192,
+        193,
+        202,
+        203,
+        299,
+        313,
+        314,
+        322,
+        325,
+        361,
+        362,
+        448,
+        451,
+        455,
+        459,
+        460,
+        464,
+        465,
+        474,
+        475,
+        476,
+        552,
+        561,
+        570
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/orchestration/service.py",
+      "matching_line_numbers": [
+        105,
+        136,
+        149,
+        303,
+        356,
+        454,
+        615,
+        616,
+        617,
+        618,
+        619,
+        632,
+        647,
+        658,
+        659,
+        662,
+        667,
+        773,
+        816,
+        817,
+        826,
+        874,
+        892,
+        900,
+        901,
+        904,
+        913,
+        915,
+        923,
+        989,
+        1095,
+        1206,
+        1208,
+        1304,
+        1386,
+        1416,
+        1418
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/problem/builder.py",
+      "matching_line_numbers": [
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/progress.py",
+      "matching_line_numbers": [
+        12,
+        14
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/runtime/staged.py",
+      "matching_line_numbers": [
+        1,
+        59,
+        258,
+        278,
+        329,
+        330,
+        347
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/selection/selector.py",
+      "matching_line_numbers": [
+        191,
+        202,
+        205,
+        221,
+        238,
+        239,
+        242,
+        243,
+        245,
+        246,
+        257,
+        335,
+        341,
+        345,
+        347,
+        359,
+        377,
+        439,
+        448,
+        467,
+        483,
+        489,
+        492,
+        495,
+        500,
+        502,
+        507,
+        509,
+        511,
+        517,
+        519,
+        558,
+        559,
+        566
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "src/petroleum_rto/rto/strategies/builder.py",
+      "matching_line_numbers": [
+        118,
+        127,
+        139,
+        141,
+        143,
+        145,
+        147,
+        149,
+        152,
+        185,
+        196,
+        201,
+        209,
+        217,
+        248,
+        286,
+        290,
+        297,
+        321,
+        333,
+        341,
+        355,
+        370
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/domain_model/integration/test_checkpointed_workflow.py",
+      "matching_line_numbers": [
+        1,
+        170,
+        200
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/domain_model/unit/test_agent_progress.py",
+      "matching_line_numbers": [
+        178,
+        221
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/domain_model/unit/test_optimization_tools.py",
+      "matching_line_numbers": [
+        64,
+        68,
+        207,
+        258,
+        474,
+        491,
+        496,
+        520,
+        526,
+        530
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/domain_model/unit/test_persisted_agent.py",
+      "matching_line_numbers": [
+        48,
+        64,
+        99,
+        242
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/domain_model/unit/test_react_recovery_edges.py",
+      "matching_line_numbers": [
+        140,
+        144,
+        163,
+        183,
+        198
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/domain_model/unit/test_result_explanation.py",
+      "matching_line_numbers": [
+        89,
+        93,
+        169,
+        208,
+        219,
+        243,
+        271,
+        284,
+        290
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/domain_model/unit/test_result_presentation.py",
+      "matching_line_numbers": [
+        60,
+        67,
+        186,
+        187,
+        188,
+        189,
+        190
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/conftest.py",
+      "matching_line_numbers": [
+        87,
+        90,
+        96,
+        102,
+        103
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/integration/test_prepared_persistence.py",
+      "matching_line_numbers": [
+        35,
+        137
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/integration/test_staged_runtime.py",
+      "matching_line_numbers": [
+        22,
+        54,
+        72,
+        101,
+        129,
+        138,
+        159,
+        167,
+        206,
+        211,
+        230,
+        264,
+        266,
+        267,
+        268,
+        269,
+        270,
+        273
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/integration/test_unified_cdu_m2.py",
+      "matching_line_numbers": [
+        25
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/integration/test_unified_cdu_m4.py",
+      "matching_line_numbers": [
+        9
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/integration/test_unified_offline_workflow.py",
+      "matching_line_numbers": [
+        79,
+        82,
+        90,
+        113,
+        142,
+        236,
+        498,
+        652,
+        654,
+        657,
+        658,
+        667,
+        669,
+        670,
+        686,
+        687,
+        694,
+        699,
+        743
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/unit/test_chat_operating_status.py",
+      "matching_line_numbers": [
+        12
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/unit/test_rto_runtime_cli.py",
+      "matching_line_numbers": [
+        32,
+        64,
+        104,
+        301
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/unit/test_solver_router.py",
+      "matching_line_numbers": [
+        77,
+        78,
+        79,
+        80,
+        81
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/unit/test_unified_capabilities.py",
+      "matching_line_numbers": [
+        124,
+        125,
+        130,
+        131
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/unit/test_unified_context.py",
+      "matching_line_numbers": [
+        23,
+        51
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/unit/test_unified_contract_recovery.py",
+      "matching_line_numbers": [
+        21,
+        153,
+        154,
+        170,
+        200,
+        204
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/unit/test_unified_finalization.py",
+      "matching_line_numbers": [
+        60,
+        145,
+        156,
+        178,
+        195,
+        212,
+        219,
+        223,
+        296,
+        341,
+        381,
+        392,
+        420,
+        430,
+        462,
+        477,
+        486,
+        507,
+        512,
+        525,
+        534,
+        536,
+        547,
+        556,
+        582,
+        596,
+        640,
+        674,
+        681,
+        688,
+        703,
+        714,
+        730,
+        736,
+        760,
+        787,
+        814,
+        842
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/unit/test_unified_m2_evaluation.py",
+      "matching_line_numbers": [
+        58,
+        106,
+        130,
+        135,
+        180,
+        185,
+        234,
+        239,
+        266,
+        339,
+        368,
+        392,
+        452,
+        460,
+        461,
+        483,
+        493
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/unit/test_unified_m4_evaluation.py",
+      "matching_line_numbers": [
+        55,
+        96,
+        97,
+        130,
+        131,
+        141,
+        144,
+        158,
+        159,
+        162,
+        167,
+        180,
+        247,
+        333,
+        342,
+        354,
+        355,
+        356,
+        357,
+        358,
+        359,
+        361,
+        362,
+        363,
+        364,
+        365
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/unit/test_unified_problem_builder.py",
+      "matching_line_numbers": [
+        33
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/unit/test_unified_problem_contract.py",
+      "matching_line_numbers": [
+        65,
+        66,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        122,
+        192
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/unit/test_unified_solver_plugins.py",
+      "matching_line_numbers": [
+        70,
+        81
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    },
+    {
+      "path": "tests/rto/unit/test_unified_strategy_repository.py",
+      "matching_line_numbers": [
+        31,
+        98,
+        124,
+        128,
+        170
+      ],
+      "interpretation": "requires_semantic_review_not_blanket_deletion"
+    }
+  ],
+  "direct_cdu_imports_outside_cdu_roots": {
+    "scripts/cdu/benchmark_m7.py": [
+      {
+        "line": 23,
+        "module": "petroleum_rto.cdu.core.config"
+      },
+      {
+        "line": 24,
+        "module": "petroleum_rto.cdu.runtime.contracts"
+      },
+      {
+        "line": 25,
+        "module": "petroleum_rto.cdu.runtime.executor"
+      },
+      {
+        "line": 26,
+        "module": "petroleum_rto.cdu.runtime.presets"
+      },
+      {
+        "line": 27,
+        "module": "petroleum_rto.cdu.runtime.provenance"
+      }
+    ],
+    "scripts/cdu/benchmark_m7_artifacts.py": [
+      {
+        "line": 28,
+        "module": "petroleum_rto.cdu.core.config"
+      },
+      {
+        "line": 29,
+        "module": "petroleum_rto.cdu.runtime.api"
+      },
+      {
+        "line": 30,
+        "module": "petroleum_rto.cdu.runtime.artifacts"
+      },
+      {
+        "line": 31,
+        "module": "petroleum_rto.cdu.runtime.contracts"
+      },
+      {
+        "line": 37,
+        "module": "petroleum_rto.cdu.runtime.executor"
+      },
+      {
+        "line": 38,
+        "module": "petroleum_rto.cdu.runtime.presets"
+      },
+      {
+        "line": 39,
+        "module": "petroleum_rto.cdu.runtime.provenance"
+      },
+      {
+        "line": 43,
+        "module": "petroleum_rto.cdu.runtime.resources"
+      }
+    ],
+    "src/petroleum_rto/rto/adapters/cdu_m7.py": [
+      {
+        "line": 11,
+        "module": "petroleum_rto.cdu.runtime"
+      }
+    ]
+  },
+  "preserve_sources": [
+    "data/cdu/raw",
+    "docs/project/1322建设方案0802.docx",
+    "/Users/idc/Desktop/hysys_moni"
+  ],
+  "windows_blockers": [
+    {
+      "path": "src/petroleum_rto/assistant/session.py",
+      "issue": "fcntl import and POSIX-specific file ownership/open handling"
+    },
+    {
+      "path": "src/petroleum_rto/rto/_file_lock.py",
+      "issue": "explicitly rejects non-POSIX lock backend"
+    },
+    {
+      "path": "src/petroleum_rto/assistant/cli.py",
+      "issue": "interactive startup exits if readline unavailable"
+    },
+    {
+      "path": "pyproject.toml",
+      "issue": "requires Python >=3.12,<3.13 while supplied HYSYS README reports Python 3.11"
+    }
+  ],
+  "inspection_failure_and_resolution": "Initial source AST scan with system Python 3.9 rejected Python 3.12 syntax in a benchmark; rerun with project Python 3.12.14 succeeded. No project test was run."
+}

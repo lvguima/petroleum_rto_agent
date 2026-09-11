@@ -1,0 +1,26 @@
+{
+  "synthetic": true,
+  "status": "passed",
+  "requested_model": "gpt-5.6-sol-cdx",
+  "protocol": "responses",
+  "model_logical_calls": 1,
+  "http_attempts": 1,
+  "response_models": [
+    "gpt-5.6-sol"
+  ],
+  "domain_calls": 0,
+  "returned_tool_calls": 0,
+  "output_text": [
+    "推荐方案将合成示例炉温由 **650.00 K（376.85 ℃）** 下调至 **648.00 K（374.85 ℃）**，调整幅度为 **2.00 K**。在同工况基准下，预测单位进料能耗由 **190.00 MJ/t** 降至 **186.00 MJ/t**，改善 **4.00 MJ/t**，相对改善 **2.11%**。该方案已通过静态与动态核验；报告未提供备选方案。以上仅为仿真建议，不是已发布的控制策略。"
+  ],
+  "error_codes": [],
+  "_sourcehash": {
+    "petroleum_rto.assistant.react": "07622c90d25864185eda15f207f7b05e32ce7f301ad61bf561b18a35647b0cc5",
+    "petroleum_rto.assistant.context": "d3ea88f0ff659bc29c963f9edb624d9309387ebdb5c71d0d4c32d38f5a7917c2",
+    "petroleum_rto.assistant.presentation": "d2c2f9118c72d851eb81abe40cc9eff3de6191d0edf8ab3918520b72ec4bbe8f",
+    "petroleum_rto.domain_model.native": "f265c9599254979af2133e6045dc3925be3110b267232e7748d7398d8f272314",
+    "petroleum_rto.domain_model.models": "e64f7b258a7774fdff1dc4fa849c177b209649c8b7acd7738a5ecdafb7c5dbfe",
+    "petroleum_rto.domain_model.chat_settings": "815815702e32f068cfef5c2aa551a2a3589f61d3da4caa65f260755c368d1c99",
+    "probe.py": "e6d058a2da8a9ac93d0e7bc81150b0e7cda7fced1f8ac223bbeeb0d8abd513d0"
+  }
+}

@@ -24,9 +24,12 @@ import termios
 _PROMPT = "你> ".encode()
 _TURN_MARKER = b"__CLI_TURN_COMPLETE__"
 _RESULT_MARKER = b"__CLI_RESULT__"
+_PROGRESS_MARKER = "M2搜索：已评价候选1。".encode()
+_TEXT_MARKER = "先到的中文🙂".encode()
 _CHILD = r"""
 import fcntl
 import json
+import os
 import sys
 import termios
 
@@ -35,13 +38,39 @@ sys.path.insert(0, sys.argv[1])
 from petroleum_rto.assistant import cli
 from petroleum_rto.assistant.turn import AgentTurn
 
+progress_fd = int(sys.argv[2]) if len(sys.argv) > 2 else None
+text_mode = sys.argv[3] if len(sys.argv) > 3 else None
+if progress_fd is not None:
+    # Require explicit callback flushing, even though stdout is a terminal.
+    sys.stdout.reconfigure(line_buffering=False, write_through=False)
+
 class Recorder:
     def __init__(self):
         self.messages = []
         self.closed = False
 
-    def handle(self, message):
+    def handle(self, message, *, on_progress=None, on_text=None):
         self.messages.append(message)
+        assert on_progress is not None
+        assert on_text is not None
+        if text_mode:
+            on_text("先到的中文🙂")
+            os.read(progress_fd, 1)
+            if text_mode == "failure":
+                return AgentTurn(
+                    outputs=("受信结果仍保留。", "__CLI_TURN_COMPLETE__"),
+                    errors=("模型调用失败。",),
+                    text_streamed=True,
+                )
+            on_progress("M2搜索：已评价候选1。")
+            on_text("后到的正文。")
+            return AgentTurn(
+                outputs=("模型> 先到的中文🙂后到的正文。", "受信结果仍保留。", "__CLI_TURN_COMPLETE__"),
+                text_streamed=True,
+            )
+        on_progress("M2搜索：已评价候选1。")
+        if progress_fd is not None:
+            os.read(progress_fd, 1)
         return AgentTurn(
             outputs=("__CLI_TURN_COMPLETE__",),
             should_exit=message.strip() == "/exit",
@@ -193,3 +222,85 @@ def test_terminal_eof_and_interrupt_close_without_dispatch(repo_root: Path, fini
         "closed": True,
         "code": 0,
     }
+
+
+@pytest.mark.parametrize(
+    ("columns", "interrupt", "text_mode"),
+    [
+        pytest.param(80, False, None, id="normal-terminal"),
+        pytest.param(20, False, None, id="narrow-terminal"),
+        pytest.param(20, True, None, id="interrupt-during-progress"),
+        pytest.param(80, False, "success", id="text-before-completion-with-progress"),
+        pytest.param(20, False, "failure", id="partial-text-before-failure"),
+    ],
+)
+def test_terminal_progress_and_text_are_flushed_before_handle_finishes(
+    repo_root: Path, columns: int, interrupt: bool, text_mode: str | None
+) -> None:
+    master, slave = pty.openpty()
+    release_read, release_write = os.pipe()
+    child: subprocess.Popen[bytes] | None = None
+    try:
+        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, columns, 0, 0))
+        child = subprocess.Popen(
+            [sys.executable, "-B", "-c", _CHILD, str(repo_root / "src"), str(release_read)]
+            + ([text_mode] if text_mode else []),
+            stdin=slave,
+            stdout=slave,
+            stderr=slave,
+            start_new_session=True,
+            pass_fds=(release_read,),
+            env={
+                **os.environ,
+                "TERM": "xterm-256color",
+                "LC_ALL": "C.UTF-8",
+                "INPUTRC": os.devnull,
+            },
+        )
+        os.close(slave)
+        slave = -1
+        before, pending = _read_until(master, b"", _PROMPT)
+        transcript = before + _PROMPT
+        os.write(master, "确认\r".encode())
+        first_marker = _TEXT_MARKER if text_mode else _PROGRESS_MARKER
+        before, pending = _read_until(master, pending, first_marker)
+        transcript += before + first_marker
+        # The child cannot return from handle until this test releases the pipe.
+        assert child.poll() is None
+        assert _TURN_MARKER not in transcript + pending
+        assert _RESULT_MARKER not in transcript + pending
+        if interrupt:
+            os.write(master, b"\x03")
+        else:
+            os.write(release_write, b"1")
+            before, pending = _read_until(master, pending, _PROMPT)
+            transcript += before + _PROMPT
+            os.write(master, b"\x04")
+        before, pending = _read_until(master, pending, _RESULT_MARKER)
+        transcript += before + _RESULT_MARKER
+        result_line, _ = _read_until(master, pending, b"\n")
+        assert json.loads(result_line) == {
+            "messages": ["确认\n"],
+            "closed": True,
+            "code": 0,
+        }
+        assert child.wait(timeout=5) == 0
+        assert transcript.count(_PROGRESS_MARKER) == (0 if text_mode == "failure" else 1)
+        assert transcript.count(_TURN_MARKER) == (0 if interrupt else 1)
+        if text_mode:
+            assert transcript.count(_TEXT_MARKER) == 1
+            assert transcript.count("模型> ".encode()) == 1
+            assert transcript.count("后到的正文。".encode()) == (1 if text_mode == "success" else 0)
+            assert ("本次模型回答未完整生成。".encode() in transcript) is (text_mode == "failure")
+            assert "受信结果仍保留。".encode() in transcript
+    finally:
+        try:
+            if child is not None and child.poll() is None:
+                child.kill()
+                child.wait(timeout=5)
+        finally:
+            os.close(release_read)
+            os.close(release_write)
+            os.close(master)
+            if slave != -1:
+                os.close(slave)

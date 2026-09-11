@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol, TextIO
 
@@ -10,7 +11,13 @@ from .turn import AgentTurn
 
 
 class TerminalRuntime(Protocol):
-    def handle(self, message: str) -> AgentTurn: ...
+    def handle(
+        self,
+        message: str,
+        *,
+        on_progress: Callable[[str], None] | None = None,
+        on_text: Callable[[str], None] | None = None,
+    ) -> AgentTurn: ...
 
 
 def _new_runtime() -> TerminalRuntime:
@@ -22,22 +29,36 @@ def _new_runtime() -> TerminalRuntime:
 
     from .native_tools import AgentDomainTools
     from .react import SYSTEM_PROMPT, ReactAgent
+    from .session import SessionStore
 
     workspace = Path.cwd().resolve()
     settings = load_dmx_chat_settings()
     if not settings.url.endswith("/chat/completions"):
         raise ValueError("DMX配置应包含标准Chat端点，用于确定共享API根地址。")
-    model = DmxNativeModel(
-        transport=NativeTransport(
-            settings.api_key, base_url=settings.url.removesuffix("/chat/completions")
-        ),
-        selection=ModelSelection(model_profile(settings.model)),
+    transport = NativeTransport(
+        settings.api_key, base_url=settings.url.removesuffix("/chat/completions")
     )
-    return ReactAgent(
-        model,
-        AgentDomainTools(workspace),
-        system_prompt=SYSTEM_PROMPT + "\n" + (settings.system_prompt or ""),
-    )
+    store: SessionStore | None = None
+    try:
+        store = SessionStore(workspace / "runs/assistant/session.sqlite")
+        model = DmxNativeModel(
+            transport=transport,
+            selection=ModelSelection(model_profile(settings.model)),
+            use_stream=True,
+        )
+        return ReactAgent(
+            model,
+            AgentDomainTools(workspace),
+            store=store,
+            system_prompt=SYSTEM_PROMPT + "\n" + (settings.system_prompt or ""),
+        )
+    except BaseException:
+        try:
+            if store is not None:
+                store.close()
+        finally:
+            transport.close()
+        raise
 
 
 def _write_safe_error(stream: TextIO, message: str) -> None:
@@ -64,7 +85,35 @@ def _run_repl(
         except ImportError:
             _write_safe_error(error, "当前Python环境缺少终端行编辑支持，请使用包含readline的环境。")
             return 1
+    startup = getattr(runtime, "startup", None)
+    if callable(startup):
+        for message in startup():
+            print(message, file=output)
     print("输入 /help 查看命令。", file=output)
+
+    text_started = False
+    text_open = False
+
+    def finish_text() -> None:
+        nonlocal text_open
+        if text_open:
+            print(file=output, flush=True)
+            text_open = False
+
+    def report_progress(message: str) -> None:
+        finish_text()
+        print(message, file=output, flush=True)
+
+    def report_text(fragment: str) -> None:
+        nonlocal text_started, text_open
+        if not fragment:
+            return
+        if not text_started:
+            print("模型> ", end="", file=output)
+            text_started = True
+        print(fragment, end="", file=output, flush=True)
+        text_open = not fragment.endswith("\n")
+
     while True:
         if interactive:
             try:
@@ -78,8 +127,22 @@ def _run_repl(
         if line == "":
             print(file=output)
             return 0
-        turn = runtime.handle(line)
+        text_started = False
+        try:
+            turn = (
+                runtime.handle(line, on_progress=report_progress, on_text=report_text)
+                if interactive
+                else runtime.handle(line)
+            )
+        finally:
+            finish_text()
+        if interactive and turn.text_streamed and turn.errors:
+            print("本次模型回答未完整生成。", file=output, flush=True)
         for message in turn.outputs:
+            if interactive and message in turn.streamed_outputs:
+                continue
+            if interactive and turn.text_streamed and message.startswith("模型> "):
+                continue
             print(message, file=output)
         for message in turn.errors:
             _write_safe_error(error, message)
@@ -93,7 +156,15 @@ def main(argv: list[str] | None = None) -> int:
         _write_safe_error(sys.stderr, "该命令无需参数；启动后输入 /help 查看命令。")
         return 2
     try:
+        from .session import SessionError
+    except ImportError:
+        _write_safe_error(sys.stderr, "无法启动对话，请检查领域模型运行依赖。")
+        return 1
+    try:
         runtime = _new_runtime()
+    except SessionError as exc:
+        _write_safe_error(sys.stderr, str(exc))
+        return 1
     except Exception:  # noqa: BLE001 - configuration exceptions may contain a credential
         _write_safe_error(sys.stderr, "无法启动对话，请检查本地DMX配置。")
         return 1
@@ -104,6 +175,9 @@ def main(argv: list[str] | None = None) -> int:
             output=sys.stdout,
             error=sys.stderr,
         )
+    except SessionError as exc:
+        _write_safe_error(sys.stderr, str(exc))
+        return 1
     except KeyboardInterrupt:
         print(file=sys.stdout)
         return 0

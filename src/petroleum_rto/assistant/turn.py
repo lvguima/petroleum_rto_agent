@@ -8,3 +8,5 @@ class AgentTurn:
     outputs: tuple[str, ...] = ()
     errors: tuple[str, ...] = ()
     should_exit: bool = False
+    text_streamed: bool = False
+    streamed_outputs: tuple[str, ...] = ()

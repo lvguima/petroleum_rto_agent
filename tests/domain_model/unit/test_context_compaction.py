@@ -33,13 +33,27 @@ def fixture(
     return manager, wire
 
 
+def prepare(manager: ConversationContext, records: list[Any], **kwargs: Any) -> list[Any]:
+    # Standalone adapter tests drive the same one-batch steps as the graph.
+    while True:
+        before = manager.total_summaries
+        outgoing = manager.prepare(records, **kwargs)
+        if manager.total_summaries == before:
+            return outgoing
+
+
+def protect(manager: ConversationContext, current: HumanMessage) -> None:
+    manager.identify(current)
+    manager.protected_id = current.id
+
+
 def history(manager: ConversationContext, count: int = 12) -> list[Any]:
     records: list[Any] = [
         HumanMessage(content=f"用户要求{i}：只调整温度，排除压力。" + "工程说明" * 55)
         for i in range(count)
     ]
     current = HumanMessage(content="继续使用原来的限制")
-    manager.begin_turn(current)
+    protect(manager, current)
     return [*records, current]
 
 
@@ -47,10 +61,10 @@ def test_component_compacts_old_prefix_and_preserves_raw_history_and_recent_tail
     manager, wire = fixture([chat("用户要求仅调整温度、排除压力，正在讨论工程方案。")])
     raw = history(manager)
     original = [m.content for m in raw]
-    outgoing = manager.prepare(raw, system=[SystemMessage(content="role")], tools=[])
+    outgoing = prepare(manager, raw, system=[SystemMessage(content="role")], tools=[])
     assert manager.total_summaries == 1
     assert len(raw) == 13 and [m.content for m in raw] == original
-    assert outgoing[-1] is raw[-1]
+    assert outgoing[-1] == raw[-1]
     assert outgoing[1].id != raw[0].id
     assert "排除压力" in str(outgoing[0].content)
     assert "tools" not in wire.requests[0]
@@ -59,7 +73,7 @@ def test_component_compacts_old_prefix_and_preserves_raw_history_and_recent_tail
     assert all(f"用户要求{i}" in summarized_text for i in range(cutoff + 1))
     assert "继续使用原来的限制" not in summarized_text
     request_payload(manager.model.selection, outgoing, [], stream=False)
-    again = manager.prepare(raw, system=[], tools=[])
+    again = prepare(manager, raw, system=[], tools=[])
     assert [m.content for m in again] == [m.content for m in outgoing]
     assert len(wire.requests) == 1  # covered prefix is not sent/summarized again
 
@@ -67,7 +81,7 @@ def test_component_compacts_old_prefix_and_preserves_raw_history_and_recent_tail
 def test_oversized_history_is_summarized_in_complete_chunks_without_default_trim() -> None:
     manager, wire = fixture([chat("历史摘要：排除压力，只调温度。") for _ in range(10)])
     raw = history(manager, count=30)
-    outgoing = manager.prepare(raw, system=[], tools=[])
+    outgoing = prepare(manager, raw, system=[], tools=[])
     assert manager.total_summaries >= 2
     cutoff = next(i for i, m in enumerate(raw) if m.id == manager.covered_until)
     requests = "\n".join(r["messages"][0]["content"] for r in wire.requests)
@@ -87,29 +101,42 @@ def test_summary_chunk_can_start_with_one_indivisible_multi_tool_group() -> None
         AIMessage(content="", tool_calls=calls),
         *[ToolMessage(content=f"工况{i}", tool_call_id=f"c{i}") for i in range(4)],
     ]
-    consumed, summary = manager._summarize(prefix, manager._budget())
-    assert consumed == len(prefix) and "四项工况" in summary.text
+    current = HumanMessage(content="继续")
+    manager.identify(current)
+    outgoing = manager._summarize([*prefix, current], 1, 1, manager._budget())
+    assert outgoing is not None and len(outgoing) == 2
+    assert "四项工况" in outgoing[0].text and outgoing[-1] == current
     assert all(f"工况{i}" in wire.requests[0]["messages"][0]["content"] for i in range(4))
 
 
 @pytest.mark.parametrize(
     "reply",
-    [httpx.ConnectError("private data"), chat(""), chat("bad", calls=[call("solve_optimization")])],
+    [401, chat(""), chat("bad", calls=[call("solve_optimization")])],
 )
 def test_summary_failure_is_not_retried_and_does_not_commit_archive(reply: Any) -> None:
     manager, wire = fixture([reply])
     raw = history(manager)
     with pytest.raises(NativeModelError):
-        manager.prepare(raw, system=[], tools=[])
+        prepare(manager, raw, system=[], tools=[])
     assert manager.summary is None and manager.covered_until is None
     assert len(raw) == 13 and len(wire.requests) == 1
+
+
+def test_summary_retries_only_transient_failure_with_one_logical_batch() -> None:
+    manager, wire = fixture([httpx.ConnectError("private data"), chat("只调整温度，排除压力。")])
+    raw = history(manager)
+    outgoing = prepare(manager, raw, system=[], tools=[])
+    assert manager.summary_calls == manager.total_summaries == 1
+    assert len(wire.requests) == manager.model.transport.request_count == 2
+    assert wire.requests[0] == wire.requests[1]
+    assert manager.summary and "排除压力" in outgoing[0].text
 
 
 def test_summary_must_shrink_context() -> None:
     manager, wire = fixture([chat("重复的冗余内容" * 1_500)])
     raw = history(manager)
     with pytest.raises(NativeModelError, match="summary-no-progress"):
-        manager.prepare(raw, system=[], tools=[])
+        prepare(manager, raw, system=[], tools=[])
     assert manager.covered_until is None
     assert len(wire.requests) == 1
 
@@ -118,7 +145,7 @@ def test_summary_call_budget_is_bounded_and_successful_prefix_remains_committed(
     manager, wire = fixture([chat("第一段历史摘要，保留原目标与排除压力。")], max_calls=1)
     raw = history(manager, count=30)
     with pytest.raises(NativeModelError, match="summary-call-limit"):
-        manager.prepare(raw, system=[], tools=[])
+        prepare(manager, raw, system=[], tools=[])
     assert len(wire.requests) == 1 and manager.covered_until
     assert len(raw) == 31
 
@@ -126,9 +153,9 @@ def test_summary_call_budget_is_bounded_and_successful_prefix_remains_committed(
 def test_current_user_text_is_never_silently_truncated() -> None:
     manager, wire = fixture([])
     raw = [HumanMessage(content="很长的用户原文" * 1_000)]
-    manager.begin_turn(raw[-1])
+    protect(manager, raw[-1])
     with pytest.raises(NativeModelError, match="context-overflow"):
-        manager.prepare(raw, system=[], tools=[])
+        prepare(manager, raw, system=[], tools=[])
     assert not wire.requests and raw[0].text == "很长的用户原文" * 1_000
 
 
@@ -138,8 +165,8 @@ def test_large_tool_result_is_paged_exactly_with_unicode_and_no_reexecution() ->
     ai = parse_response(manager.model.selection, chat(None, calls=[call("get_plant_info")]))
     result = ToolMessage(content=raw, name="get_plant_info", tool_call_id="c1")
     user = HumanMessage(content="查工况")
-    manager.begin_turn(user)
-    outgoing = manager.prepare([user, ai, result], system=[], tools=[])
+    protect(manager, user)
+    outgoing = prepare(manager, [user, ai, result], system=[], tools=[])
     projection = json.loads(outgoing[-1].content)
     assert projection["content_omitted"]
     assert result.content == raw and outgoing[-1].tool_call_id == result.tool_call_id
@@ -158,8 +185,6 @@ def test_large_tool_result_is_paged_exactly_with_unicode_and_no_reexecution() ->
         manager.read_tool_result(projection["result_ref"], offset=len(raw) + 1)
     with pytest.raises(ValueError):
         manager.read_tool_result("../../file")
-    manager.clear()
-    assert not manager.results
 
 
 def test_tool_pairs_and_required_native_reasoning_survive_cutoff() -> None:
@@ -180,9 +205,9 @@ def test_tool_pairs_and_required_native_reasoning_survive_cutoff() -> None:
         content='{"snapshot_ref":"trusted"}', tool_call_id="c1", name="read_operating_context"
     )
     current = HumanMessage(content="压力保持不变")
-    manager.begin_turn(current)
+    protect(manager, current)
     raw.extend([ai, tool, current])
-    outgoing = manager.prepare(raw, system=[], tools=[])
+    outgoing = prepare(manager, raw, system=[], tools=[])
     request = request_payload(manager.model.selection, outgoing, [], stream=False)
     # AI and tool are either both kept natively or both covered by the summary.
     assert manager.total_summaries == 1
@@ -197,38 +222,45 @@ def test_tool_pairs_and_required_native_reasoning_survive_cutoff() -> None:
 def test_compaction_and_model_switch_keep_program_plan_and_no_foreign_reasoning(
     repo_root: Path,
 ) -> None:
-    domain = prepared(repo_root)
     manager, wire = fixture(
-        [chat("旧会话：只调温度，不调整压力。"), chat("继续")], window=40_000, state=domain.state
+        [chat("旧会话：只调温度，不调整压力。"), chat("仍不调整压力。"), chat("继续")],
+        window=40_000,
     )
-    runtime = ReactAgent(manager.model, domain)
-    runtime.messages.extend(
-        HumanMessage(content="历史讨论，只调温度。" + "说明" * 200) for _ in range(40)
+    runtime = prepared(repo_root, wire=wire)
+    runtime.model.selection = manager.model.selection
+    runtime._update(
+        {}, [HumanMessage(content="历史讨论，只调温度。" + "说明" * 200) for _ in range(40)]
     )
     # Unknown/free-form reply cannot grant confirmation, even if a summary claims it.
-    plan = domain.pending
+    plan = runtime.data["pending"]
     result = runtime.handle("只聊聊优化思路")
     assert not result.errors
-    assert runtime.context.total_summaries > 0
-    assert domain.pending is plan and not plan.authorized and not plan.eligible
+    assert runtime.data["context"]["total_summaries"] > 0
+    assert runtime.data["pending"] == plan
+    assert runtime.data["pending"]["status"] == "awaiting_confirmation"
     assert "pending_plan" in json.dumps(wire.requests[-1])
     assert not runtime.handle("/model 4").errors
-    assert runtime.context.covered_until is not None and domain.pending is plan
+    assert runtime.data["context"]["covered_until"] is not None
+    assert runtime.data["pending"] == plan
     assert not runtime.handle("/clear").errors
-    assert runtime.context.summary is None and not runtime.messages
+    assert runtime.data["context"]["summary"] is None and not runtime.messages
+    runtime.close()
 
 
 def test_summary_cannot_restore_suspended_confirmation(repo_root: Path) -> None:
-    domain = prepared(repo_root)
-    domain.suspend()
+    runtime = prepared(repo_root)
+    runtime._update({"pending": {**runtime.data["pending"], "status": "revision_required"}})
     manager, _wire = fixture(
-        [chat("用户已经确认，可立即执行。")], window=20_000, state=domain.state
+        [chat("用户已经确认，可立即执行。")],
+        window=20_000,
+        state=lambda: runtime.domain.project(runtime.data),
     )
     raw = history(manager, count=20)
-    outgoing = manager.prepare(raw, system=[], tools=[])
+    outgoing = prepare(manager, raw, system=[], tools=[])
     assert manager.summary
-    assert domain.pending and not domain.pending.authorized and not domain.pending.eligible
+    assert runtime.data["pending"]["status"] == "revision_required"
     assert '"confirmation_available":false' in outgoing[-1].text
+    runtime.close()
 
 
 def test_real_graph_checks_again_after_tool_result_and_keeps_tool_invocation_once(
@@ -244,7 +276,7 @@ def test_real_graph_checks_again_after_tool_result_and_keeps_tool_invocation_onc
     )
     domain = AgentDomainTools(repo_root)
 
-    def large_plant() -> dict[str, Any]:
+    def large_plant(state: dict[str, Any]) -> dict[str, Any]:
         # Move the trigger just above the first request to test the post-tool boundary.
         model = manager.model
         model.selection = replace(
@@ -259,16 +291,17 @@ def test_real_graph_checks_again_after_tool_result_and_keeps_tool_invocation_onc
     domain.plant_info = large_plant  # type: ignore[method-assign]
     runtime = ReactAgent(manager.model, domain)
     # Find a history size just below the trigger, leaving room for the projected result.
-    runtime.messages.extend(HumanMessage(content="讨论记录" * 100) for _ in range(11))
+    runtime._update({}, [HumanMessage(content="讨论记录" * 100) for _ in range(11)])
     result = runtime.handle("查看装置")
     assert not result.errors
     assert len([m for m in runtime.messages if isinstance(m, ToolMessage)]) == 1
-    assert runtime.context.results
-    assert runtime.context.total_summaries == 1 and len(wire.requests) == 3
+    assert runtime.data["context"]["results"]
+    assert runtime.data["context"]["total_summaries"] == 1 and len(wire.requests) == 3
     sent = json.dumps(wire.requests, ensure_ascii=False)
     assert "stored_tool_result" in sent
     assert "只调整温度" * 30_000 not in sent
     assert sum(bool(r.get("tools")) for r in wire.requests) >= 2
+    runtime.close()
 
 
 def test_completed_tool_transaction_is_preserved_with_multiple_results() -> None:
@@ -280,12 +313,12 @@ def test_completed_tool_transaction_is_preserved_with_multiple_results() -> None
     a = ToolMessage(content="first result", tool_call_id="c1")
     b = ToolMessage(content="second result", tool_call_id="c2")
     current = HumanMessage(content="继续")
-    manager.begin_turn(current)
-    outgoing = manager.prepare([*raw, ai, a, b, current], system=[], tools=[])
+    protect(manager, current)
+    outgoing = prepare(manager, [*raw, ai, a, b, current], system=[], tools=[])
     assert manager.total_summaries == 1
     request_payload(manager.model.selection, outgoing, [], stream=False)
     assert sum(isinstance(m, ToolMessage) for m in outgoing) == 2
-    assert any(m is ai for m in outgoing)
+    assert any(m == ai for m in outgoing)
 
 
 def test_cross_model_request_uses_summary_once_and_excludes_raw_reasoning(repo_root: Path) -> None:
@@ -298,14 +331,19 @@ def test_cross_model_request_uses_summary_once_and_excludes_raw_reasoning(repo_r
         window=30_000,
     )
     runtime = ReactAgent(manager.model, AgentDomainTools(repo_root))
-    runtime.messages.extend(HumanMessage(content=f"旧记录{i}:" + "旧对话" * 100) for i in range(26))
-    runtime.messages.append(
-        parse_response(manager.model.selection, chat("曾经回答", reasoning="old-private-reasoning"))
+    runtime._update(
+        {},
+        [
+            *[HumanMessage(content=f"旧记录{i}:" + "旧对话" * 100) for i in range(26)],
+            parse_response(
+                manager.model.selection, chat("曾经回答", reasoning="old-private-reasoning")
+            ),
+        ],
     )
     assert not runtime.handle("继续").errors
-    assert runtime.context.total_summaries == 1
-    summary = runtime.context.summary.text
-    covered = runtime.context.covered_until
+    assert runtime.data["context"]["total_summaries"] == 1
+    summary = runtime.data["context"]["summary"]["data"]["content"]
+    covered = runtime.data["context"]["covered_until"]
     assert not runtime.handle("/model 2").errors
     assert not runtime.handle("记得我排除了什么吗？").errors
     request = wire.requests[-1]
@@ -313,8 +351,9 @@ def test_cross_model_request_uses_summary_once_and_excludes_raw_reasoning(repo_r
     assert "old-private-reasoning" not in text
     assert sum(m.get("content") == summary for m in request["messages"]) == 1
     assert "旧记录0:" not in text
-    assert runtime.context.covered_until == covered
+    assert runtime.data["context"]["covered_until"] == covered
     assert "排除压力" in text
+    runtime.close()
 
 
 def responses(text: str) -> dict[str, Any]:
@@ -344,8 +383,8 @@ def test_responses_compaction_has_no_tools_and_preserves_native_items() -> None:
     raw = history(manager, count=12)[:-1]
     ai = parse_response(manager.model.selection, responses("近期的合法回复"))
     current = HumanMessage(content="继续")
-    manager.begin_turn(current)
-    outgoing = manager.prepare([*raw, ai, current], system=[], tools=[])
+    protect(manager, current)
+    outgoing = prepare(manager, [*raw, ai, current], system=[], tools=[])
     assert manager.total_summaries == 1 and wire.paths == ["/v1/responses"]
     assert "tools" not in wire.requests[0]
     assert "opaque-summary" not in json.dumps(wire.requests[0])
@@ -358,7 +397,7 @@ def test_system_and_tool_schema_budget_cannot_be_hidden_by_summary() -> None:
     manager, wire = fixture([])
     raw = history(manager, count=12)
     with pytest.raises(NativeModelError, match="context-overflow"):
-        manager.prepare(raw, system=[SystemMessage(content="role" * 4_000)], tools=[])
+        prepare(manager, raw, system=[SystemMessage(content="role" * 4_000)], tools=[])
     assert not wire.requests
 
 
@@ -367,7 +406,7 @@ def test_invalid_summary_watermark_never_silently_reuses_unrelated_archive() -> 
     raw = history(manager)
     manager.covered_until = "not-in-transcript"
     with pytest.raises(NativeModelError, match="summary-history-mismatch"):
-        manager.prepare(raw, system=[], tools=[])
+        prepare(manager, raw, system=[], tools=[])
     assert not wire.requests
 
 
@@ -381,7 +420,7 @@ def test_thinking_model_summary_uses_its_own_protocol_without_replaying_private_
         selected, profile=replace(selected.profile, context_tokens=12_000), output_tokens=512
     )
     raw = history(manager, count=12)
-    outgoing = manager.prepare(raw, system=[], tools=[])
+    outgoing = prepare(manager, raw, system=[], tools=[])
     assert manager.total_summaries == 1
     assert wire.requests[0]["model"] == model_id
     assert "tools" not in wire.requests[0]
@@ -399,7 +438,7 @@ def test_paging_is_a_real_native_tool_roundtrip_and_does_not_repeat_original_que
     domain = AgentDomainTools(repo_root)
     reads = 0
 
-    def large_plant() -> dict[str, Any]:
+    def large_plant(state: dict[str, Any]) -> dict[str, Any]:
         nonlocal reads
         reads += 1
         return {"detail": "ABC中文" * 10_000}
@@ -407,7 +446,7 @@ def test_paging_is_a_real_native_tool_roundtrip_and_does_not_repeat_original_que
     domain.plant_info = large_plant  # type: ignore[method-assign]
     runtime = ReactAgent(manager.model, domain)
     assert not runtime.handle("查工况").errors
-    ref = next(iter(runtime.context.results))
+    ref = next(iter(runtime.data["context"]["results"]))
     wire.replies.extend(
         [
             chat(
@@ -430,3 +469,4 @@ def test_paging_is_a_real_native_tool_roundtrip_and_does_not_repeat_original_que
     assert page["status"] == "ok" and page["next_offset"] == 100
     assert reads == 1
     assert "read_tool_result" in {t["function"]["name"] for t in wire.requests[0]["tools"]}
+    runtime.close()

@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 
 from .._file_lock import exclusive_file_lock
 from ..capabilities import (
@@ -46,6 +46,7 @@ from ..evaluation import (
 from ..intent import OptimizationIntent
 from ..ports.interfaces import ProviderRequestFactory, SimulatorPort
 from ..problem import ProblemBuilder, ProblemFeatureAnalyzer
+from ..progress import RtoProgress, RtoProgressCallback
 from ..selection import FinalizationArtifacts, FinalSelector
 from ..solvers import (
     CoarseRefineGridSolver,
@@ -54,6 +55,7 @@ from ..solvers import (
     SolverRouter,
     SolverRoutingDecision,
 )
+from ..solvers.port import CandidateEvaluatorPort
 from .models import (
     OFFLINE_MANIFEST_VERSION,
     OFFLINE_WORKFLOW_SCHEMA_ID,
@@ -165,6 +167,50 @@ class _ReplayEvaluator:
             raise ValueError("stored solver execution lacks a generated proposal") from exc
 
 
+class _ProgressEvaluator:
+    """Observe the real evaluator port without changing candidate evidence."""
+
+    def __init__(
+        self,
+        evaluator: CandidateEvaluatorPort,
+        stage: Literal["m2", "m4"],
+        on_progress: RtoProgressCallback | None,
+        total: int | None = None,
+    ) -> None:
+        self._evaluator = evaluator
+        self._stage = stage
+        self._on_progress = on_progress
+        self._total = total
+        self._completed = 0
+
+    def evaluate(self, proposal: CandidateProposal) -> CandidateEvaluation:
+        evaluation = self._evaluator.evaluate(proposal)
+        self._completed += 1
+        if self._on_progress is not None:
+            self._on_progress(RtoProgress(self._stage, "progress", self._completed, self._total))
+        return evaluation
+
+
+def _stage_finished(
+    on_progress: RtoProgressCallback | None,
+    stage: Literal["m2", "m4"],
+    outcome: str,
+    completed: int,
+    *,
+    reused: bool,
+) -> None:
+    if on_progress is None:
+        return
+    if reused:
+        on_progress(RtoProgress(stage, "reused", completed, completed))
+    if outcome in {"no_feasible", "no_verified_candidate"}:
+        on_progress(RtoProgress(stage, "no_feasible", completed, completed))
+    elif outcome not in {"ready", "success", "feasible_not_publishable"}:
+        on_progress(RtoProgress(stage, "error", completed, completed))
+    elif not reused:
+        on_progress(RtoProgress(stage, "completed", completed, completed))
+
+
 class OfflineRtoOrchestrator:
     """Execute or strictly resume one offline workflow."""
 
@@ -252,10 +298,17 @@ class OfflineRtoOrchestrator:
         problem: OptimizationProblem,
         *,
         run_root: Path,
+        on_progress: RtoProgressCallback | None = None,
     ) -> StaticRtoRunRecord:
         """Execute/replay M2 and ranking, stopping before any M4 evaluation."""
         record = self._run(
-            bundle, intent, context, problem, run_root=run_root, stop_after_static=True
+            bundle,
+            intent,
+            context,
+            problem,
+            run_root=run_root,
+            stop_after_static=True,
+            on_progress=on_progress,
         )
         if isinstance(record, StaticRtoRunRecord):
             return record
@@ -277,12 +330,74 @@ class OfflineRtoOrchestrator:
         *,
         run_root: Path,
         coverage_policy: CoveragePolicy = "point",
+        on_progress: RtoProgressCallback | None = None,
     ) -> OfflineRtoRunRecord:
         record = self._run(
-            bundle, intent, context, problem, run_root=run_root, coverage_policy=coverage_policy
+            bundle,
+            intent,
+            context,
+            problem,
+            run_root=run_root,
+            coverage_policy=coverage_policy,
+            on_progress=on_progress,
         )
         assert isinstance(record, OfflineRtoRunRecord)
         return record
+
+    def read_static(
+        self,
+        bundle: CapabilityBundle,
+        intent: OptimizationIntent,
+        context: OperatingContext,
+        problem: OptimizationProblem,
+        *,
+        run_root: Path,
+    ) -> StaticRtoRunRecord:
+        """Strictly replay an existing M2 checkpoint without starting computation."""
+        record = self._run(
+            bundle,
+            intent,
+            context,
+            problem,
+            run_root=run_root,
+            stop_after_static=True,
+            read_only=True,
+        )
+        if isinstance(record, StaticRtoRunRecord):
+            return record
+        return StaticRtoRunRecord(
+            record.run_dir,
+            record.request,
+            record.problem,
+            record.solver_execution,
+            record.static_selection,
+            0,
+        )
+
+    def read_completed(
+        self,
+        bundle: CapabilityBundle,
+        intent: OptimizationIntent,
+        context: OperatingContext,
+        problem: OptimizationProblem,
+        *,
+        run_root: Path,
+    ) -> OfflineRtoRunRecord:
+        """Read a committed workflow; never finish an incomplete workflow."""
+        request = self._request_for(bundle, intent, context, problem, "point")
+        run_dir = run_root.resolve() / request.workflow_id
+        if not run_dir.is_dir() or run_dir.is_symlink():
+            raise ValueError("completed workflow does not exist")
+        with _workflow_lock(run_dir):
+            return read_offline_run(
+                run_dir,
+                request_factory=self._request_factory,
+                simulator=self._simulator_factory(run_dir / "simulator"),
+                expected_intent=intent,
+                expected_context=context,
+                expected_bundle=bundle,
+                expected_problem=problem,
+            )
 
     def _run(
         self,
@@ -294,6 +409,8 @@ class OfflineRtoOrchestrator:
         run_root: Path,
         coverage_policy: CoveragePolicy = "point",
         stop_after_static: bool = False,
+        read_only: bool = False,
+        on_progress: RtoProgressCallback | None = None,
     ) -> OfflineRtoRunRecord | StaticRtoRunRecord:
         request = self._request_for(bundle, intent, context, problem, coverage_policy)
         execution_route = BundleCapabilityView(bundle).route_by_ref(problem.execution_route_ref)
@@ -305,11 +422,15 @@ class OfflineRtoOrchestrator:
             claim_scope=ENGINEERING_CLAIM_SCOPE,
         )
         run_dir = run_root.resolve() / request.workflow_id
-        run_dir.mkdir(parents=True, exist_ok=True)
+        if read_only:
+            if not run_dir.is_dir() or run_dir.is_symlink():
+                raise ValueError("static checkpoint does not exist")
+        else:
+            run_dir.mkdir(parents=True, exist_ok=True)
         simulator = self._simulator_factory(run_dir / "simulator")
         with _workflow_lock(run_dir):
             if (run_dir / "manifest.json").exists():
-                return read_offline_run(
+                record = read_offline_run(
                     run_dir,
                     request_factory=self._request_factory,
                     simulator=simulator,
@@ -318,8 +439,43 @@ class OfflineRtoOrchestrator:
                     expected_bundle=bundle,
                     expected_problem=problem,
                 )
+                _stage_finished(
+                    on_progress,
+                    "m2",
+                    record.static_selection.status,
+                    len(record.solver_execution.result.evaluations),
+                    reused=True,
+                )
+                if not stop_after_static:
+                    _stage_finished(
+                        on_progress,
+                        "m4",
+                        record.finalization.result.status,
+                        len(record.dynamic_verification.evaluations),
+                        reused=True,
+                    )
+                return record
 
-            events = list(_read_events(run_dir / "events.jsonl", request.ref, allow_missing=True))
+            if read_only:
+                for name in (
+                    "request.json",
+                    "intent.json",
+                    "context.json",
+                    "capability_bundle.json",
+                    "problem.json",
+                    "solver_route.json",
+                    "static_solve.json",
+                    "static_selection.json",
+                    "events.jsonl",
+                ):
+                    path = run_dir / name
+                    if not path.is_file() or path.is_symlink():
+                        raise ValueError(f"static checkpoint lacks a regular artifact: {name}")
+            events = list(
+                _read_events(run_dir / "events.jsonl", request.ref, allow_missing=not read_only)
+            )
+            if read_only and "static-selection-ready" not in {item.stage for item in events}:
+                raise ValueError("static checkpoint lacks its completed stage event")
             input_paths = (
                 run_dir / "request.json",
                 run_dir / "intent.json",
@@ -384,6 +540,10 @@ class OfflineRtoOrchestrator:
                 )
                 recovered.append("static-solve-ready")
             else:
+                if read_only:
+                    raise ValueError("static checkpoint disappeared during strict replay")
+                if on_progress is not None:
+                    on_progress(RtoProgress("m2", "started", 0))
                 if expected_route.solver is None:
                     solver_result = _unsupported_solver_result(problem, routing)
                 else:
@@ -395,7 +555,9 @@ class OfflineRtoOrchestrator:
                         self._request_factory,
                         simulator,
                     )
-                    solver_result = expected_route.solver.solve(problem, steady)
+                    solver_result = expected_route.solver.solve(
+                        problem, _ProgressEvaluator(steady, "m2", on_progress)
+                    )
                     physical_m2 += steady.physical_execution_count
                     solver_result = _relativize_solver_result(solver_result, run_dir)
                 solver_execution = SolverExecutionArtifact(
@@ -437,6 +599,13 @@ class OfflineRtoOrchestrator:
                 "static-selection-ready",
                 static_selection.ref,
             )
+            _stage_finished(
+                on_progress,
+                "m2",
+                static_selection.status,
+                len(solver_execution.result.evaluations),
+                reused="static-solve-ready" in recovered,
+            )
 
             if stop_after_static:
                 return StaticRtoRunRecord(
@@ -462,6 +631,9 @@ class OfflineRtoOrchestrator:
             else:
                 dynamic_evaluations: tuple[CandidateEvaluation, ...] = ()
                 if static_selection.status == "ready":
+                    total = len(static_selection.shortlist_proposal_refs)
+                    if on_progress is not None:
+                        on_progress(RtoProgress("m4", "started", 0, total))
                     proposal_by_ref = {item.ref: item for item in solver_execution.result.proposals}
                     service = M4EvaluationService(
                         problem,
@@ -471,8 +643,9 @@ class OfflineRtoOrchestrator:
                         self._request_factory,
                         simulator,
                     )
+                    observed = _ProgressEvaluator(service, "m4", on_progress, total)
                     dynamic_evaluations = tuple(
-                        _relativize_evaluation(service.evaluate(proposal_by_ref[ref]), run_dir)
+                        _relativize_evaluation(observed.evaluate(proposal_by_ref[ref]), run_dir)
                         for ref in static_selection.shortlist_proposal_refs
                     )
                     physical_m4 += service.physical_execution_count
@@ -608,6 +781,13 @@ class OfflineRtoOrchestrator:
                 physical_m4_executions=physical_m4,
             )
             _write_result(run_dir / "result.json", build_optimization_run_summary(record).as_dict())
+            _stage_finished(
+                on_progress,
+                "m4",
+                finalization.result.status,
+                len(dynamic.evaluations),
+                reused="dynamic-evaluations-ready" in recovered,
+            )
             return record
 
     def _anchors(

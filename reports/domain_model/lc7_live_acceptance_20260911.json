@@ -1,0 +1,2699 @@
+{
+  "evidence_kind": "LC7 actual mapped-protocol production-parser and ReactAgent synthetic acceptance",
+  "started_utc": "2026-09-11T02:15:33.154056+00:00",
+  "finished_utc": "2026-09-11T02:33:17.243433+00:00",
+  "endpoint_host": "www.dmxapi.cn",
+  "synthetic_only": true,
+  "summary": {
+    "effective_model_configurations": 20,
+    "production_native_sse_tool_roundtrips_passed": 20,
+    "public_official_summaries_passed": 5,
+    "react_agent_help_switch_turns_passed": 5,
+    "react_agent_tool_continuations_passed": 5,
+    "original_matrix_summary_help_http_attempts": 50,
+    "additional_graph_tool_http_attempts": 10,
+    "flash_public_stream_followup_http_attempts": 2,
+    "actual_http_attempts": 62,
+    "http_200": 62,
+    "failed_http_attempts": 0,
+    "retries_observed": 0,
+    "required_acceptance_failures": [],
+    "local_model_selections_without_http": 8,
+    "original_probe_comparison_mismatches": [
+      {
+        "model_id": "deepseek-v4-flash-0731",
+        "check": "full-turn stream equals final non-tool message only",
+        "preserved_raw_result": "react_agent_tool_continuation.turns[4].streamed_text_matches=false",
+        "followup": "flash_public_stream_confirmation"
+      }
+    ],
+    "synthetic_graph_tool_executions": 6,
+    "other_domain_tool_calls": 0,
+    "physical_computation": false,
+    "production_protocol_mapping_changed": false
+  },
+  "scope_and_checks": {
+    "matrix": "Production DmxNativeModel streaming parser, complete native tool call and ToolMessage continuation; a random marker is generated only after the first tool call. All supported distinct ModelSelection.parameters payloads are tested; exact aliases are deduplicated.",
+    "summary_programmatic": "Production SummaryModel with public SummarizationMiddleware.before_model, trim_tokens_to_summarize=None, a retained current HumanMessage, nonempty no-tool output, and current input preservation.",
+    "summary_semantic_review": "Parent agent separately read all five generated summaries: allowed temperature, excluded pressure, no user confirmation, and no execution are preserved; no new authorization was introduced. This is a manual content review, distinct from parser assertions.",
+    "help": "Actual ReactAgent, current application state, original random session marker, full current model ID, commands /help /model /resume, streamed/final text equality, and local selection HTTP count. Thinking states were manually checked against actual parameters, including CDX low application default.",
+    "graph_tool_addendum": "Added because the native matrix does not attach application_help, while initial real-agent help turns call no tools. Each fresh real graph now calls get_plant_info once; a synthetic override creates a new marker without loading configuration. Assertions verify one complete canonical tool group, tool receipt before the application_help tail, marker/model recovery, and no pending preparation or result.",
+    "stream_comparison_resolution": "The original Flash graph sample failed an additional comparison of all on_text output against only the final non-tool AIMessage. The application streams text from tool-call messages too. A local two-newline tool-prefix fixture proves these quantities may legitimately differ. The original sample did not retain its streamed text, so its exact difference is not reconstructed. One authorized Flash live followup retains only public text and validates full stream against all canonical AIMessage.text, and final output against non-tool AIMessage.text; no raw reasoning is retained.",
+    "data_boundary": "Only handwritten synthetic inputs, random markers, and ordinary application/tool contract text were transmitted. Domain overrides prevent configuration reads and physical execution; no raw requests/responses, reasoning, headers, or credentials are retained.",
+    "authorization": "Network escalations for the scoped LC7 acceptance were approved; no denied action was bypassed."
+  },
+  "limits": [
+    "Sixty-two successful HTTP exchanges validate these samples, not long-term provider stability or maximum context capacity.",
+    "Response-declared model aliases are recorded, not independently authenticated backend identities.",
+    "No all-Responses migration was tested; existing Chat/Responses mappings remain in force.",
+    "Small synthetic summary and conversation checks are not an exhaustive language-fidelity evaluation or physical/site validation.",
+    "Usage and latency are safe per-case observations, not a complete cost total or performance benchmark."
+  ],
+  "source_evidence": {
+    "captured_utc": "2026-09-11T02:34:23.634972+00:00",
+    "git_head": "66993dbc83e68a6fa5fc997bbc56192eb0239b31",
+    "working_tree": "uncommitted LC1-LC7 implementation; file hashes identify the inspected production files",
+    "production_sha256": {
+      "src/petroleum_rto/domain_model/native.py": "f265c9599254979af2133e6045dc3925be3110b267232e7748d7398d8f272314",
+      "src/petroleum_rto/domain_model/models.py": "e64f7b258a7774fdff1dc4fa849c177b209649c8b7acd7738a5ecdafb7c5dbfe",
+      "src/petroleum_rto/domain_model/chat_settings.py": "815815702e32f068cfef5c2aa551a2a3589f61d3da4caa65f260755c368d1c99",
+      "src/petroleum_rto/assistant/react.py": "eb729a6d83c876796a546e3968247161b364ea5edda799840b75aa5f979659d2",
+      "src/petroleum_rto/assistant/context.py": "d3ea88f0ff659bc29c963f9edb624d9309387ebdb5c71d0d4c32d38f5a7917c2",
+      "src/petroleum_rto/assistant/native_tools.py": "44dde1b8499787eb3cd5ee384a947d0ed893b6a6b3ee784127febc28e2f9fba0",
+      "uv.lock": "d38b608a44074f2dea91df169ad1d63ba05f904fbda72f8331d2cc8b2f23e3a1"
+    },
+    "installed_versions": {
+      "langchain": "1.4.0",
+      "langchain-core": "1.6.2",
+      "langgraph": "1.2.11",
+      "httpx": "0.28.1"
+    },
+    "temporary_probe_sha256": {
+      "/private/tmp/petroleum-rto-lc7-live/acceptance.py": "7768c9e59350c3ce970367ec849fec48178ef4f7cc3a51b6085f5ed8a4870418",
+      "/private/tmp/petroleum-rto-lc7-live/selftest.py": "c4f1a058ea4e71f0680983e37fa2af1fbe7d76269bdf9083299090741e59fe1e",
+      "/private/tmp/petroleum-rto-lc7-live/agent_help_switch.py": "b82096eb70c9779f387cceab912e593d63c7580545eb4404f488710bc6d70db6",
+      "/private/tmp/petroleum-rto-lc7-live/agent_tool_roundtrip.py": "ecd262e01f05f52642d696e26b468b0b1fe01b02d383265c53aab7b6da1bb351",
+      "/private/tmp/petroleum-rto-lc7-live/stream_comparison_diagnosis.py": "032975ff962faa5ae351d679a5ce28a55e7ab6e3e715b0029f128325b7e5b605",
+      "/private/tmp/petroleum-rto-lc7-live/flash_stream_confirmation.py": "44b9a5ef7504879be0fbb018f9a812b280083ecabb53b37d5f14980020bd6220",
+      "/private/tmp/petroleum-rto-lc7-live/collect_evidence.py": "b97904fc37ec10f26e84208a39fdfe3aeb2892ac5f15abcc7ba5f7c150945ef9"
+    },
+    "temporary_source_manifest_sha256": {
+      "/private/tmp/petroleum-rto-lc7-live/flash-default.json": "98563f272e27bd83bb6f850e60dd289343b003ab280c0a648c49f765092479f3",
+      "/private/tmp/petroleum-rto-lc7-live/qwen.json": "3fedb8045d3241254997a69f3837d6710d6cd3574abb216d4da1244b28d47c5b",
+      "/private/tmp/petroleum-rto-lc7-live/kimi.json": "6f57451cbee8528f59ffd03445eb5a941d697bb092e66334bfa8a6610f9d3c76",
+      "/private/tmp/petroleum-rto-lc7-live/cdx.json": "38f0116ccfad7be48760241b80a3db67173af4438c8deac93546aa247f784b4e",
+      "/private/tmp/petroleum-rto-lc7-live/pro.json": "b7814647a0cacf2b934b034103ecfe1f83360be21faf577e42c66b9fa76219cf",
+      "/private/tmp/petroleum-rto-lc7-live/agent-help-switch.json": "1d1e41eed9660e185a6aa1ef24d2ece0230e667f9d09d9afa1aecaad7fcf0fc1",
+      "/private/tmp/petroleum-rto-lc7-live/agent-tool-roundtrip.json": "1e91f834523c17703ddb825df168b9dbb097e84e65f639d35d4d6f2fbff23e96",
+      "/private/tmp/petroleum-rto-lc7-live/flash-stream-confirmation.json": "ad90d0c5840e207d2020c1a1bcbde3d8fcfef633be370cffd624afbdd09bf330",
+      "/private/tmp/petroleum-rto-lc7-live/stream-comparison-diagnosis.json": "f1cd15ec7516caa021b6ae69f4b0cfd01166509e215c1f922ffdc03c05789af1",
+      "/private/tmp/petroleum-rto-lc7-live/plan.json": "0cfaafeb11033b6c294c87622152d2e45ed9e827b65b2e418f964a7cb3caa39e"
+    },
+    "temporary_file_retention": "Probe sources are temporary and may be cleaned; this JSON retains safe results and hashes, not a permanent rerun entry point."
+  },
+  "matrix_plan": {
+    "cases": [
+      {
+        "case_id": "qwen3.8-max-0902--default",
+        "aliases": [
+          {
+            "thinking": "default",
+            "effort": null
+          },
+          {
+            "thinking": "on",
+            "effort": null
+          }
+        ],
+        "model_id": "qwen3.8-max-0902",
+        "protocol": "chat",
+        "parameters": {
+          "enable_thinking": true,
+          "preserve_thinking": true
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "qwen3.8-max-0902--off",
+        "aliases": [
+          {
+            "thinking": "off",
+            "effort": null
+          }
+        ],
+        "model_id": "qwen3.8-max-0902",
+        "protocol": "chat",
+        "parameters": {
+          "enable_thinking": false
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "qwen3.8-max-0902--low",
+        "aliases": [
+          {
+            "thinking": "on",
+            "effort": "low"
+          }
+        ],
+        "model_id": "qwen3.8-max-0902",
+        "protocol": "chat",
+        "parameters": {
+          "enable_thinking": true,
+          "reasoning_effort": "low",
+          "preserve_thinking": true
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "qwen3.8-max-0902--medium",
+        "aliases": [
+          {
+            "thinking": "on",
+            "effort": "medium"
+          }
+        ],
+        "model_id": "qwen3.8-max-0902",
+        "protocol": "chat",
+        "parameters": {
+          "enable_thinking": true,
+          "reasoning_effort": "medium",
+          "preserve_thinking": true
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "qwen3.8-max-0902--xhigh",
+        "aliases": [
+          {
+            "thinking": "on",
+            "effort": "xhigh"
+          }
+        ],
+        "model_id": "qwen3.8-max-0902",
+        "protocol": "chat",
+        "parameters": {
+          "enable_thinking": true,
+          "reasoning_effort": "xhigh",
+          "preserve_thinking": true
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "kimi-k3--default",
+        "aliases": [
+          {
+            "thinking": "default",
+            "effort": null
+          },
+          {
+            "thinking": "on",
+            "effort": null
+          }
+        ],
+        "model_id": "kimi-k3",
+        "protocol": "chat",
+        "parameters": {},
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "kimi-k3--low",
+        "aliases": [
+          {
+            "thinking": "on",
+            "effort": "low"
+          }
+        ],
+        "model_id": "kimi-k3",
+        "protocol": "chat",
+        "parameters": {
+          "reasoning_effort": "low"
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "kimi-k3--high",
+        "aliases": [
+          {
+            "thinking": "on",
+            "effort": "high"
+          }
+        ],
+        "model_id": "kimi-k3",
+        "protocol": "chat",
+        "parameters": {
+          "reasoning_effort": "high"
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "kimi-k3--max",
+        "aliases": [
+          {
+            "thinking": "on",
+            "effort": "max"
+          }
+        ],
+        "model_id": "kimi-k3",
+        "protocol": "chat",
+        "parameters": {
+          "reasoning_effort": "max"
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "gpt-5.6-sol-cdx--default",
+        "aliases": [
+          {
+            "thinking": "default",
+            "effort": null
+          },
+          {
+            "thinking": "on",
+            "effort": null
+          },
+          {
+            "thinking": "on",
+            "effort": "low"
+          }
+        ],
+        "model_id": "gpt-5.6-sol-cdx",
+        "protocol": "responses",
+        "parameters": {
+          "reasoning": {
+            "effort": "low",
+            "summary": "auto"
+          }
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "gpt-5.6-sol-cdx--off",
+        "aliases": [
+          {
+            "thinking": "off",
+            "effort": null
+          }
+        ],
+        "model_id": "gpt-5.6-sol-cdx",
+        "protocol": "responses",
+        "parameters": {
+          "reasoning": {
+            "effort": "none"
+          }
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "gpt-5.6-sol-cdx--medium",
+        "aliases": [
+          {
+            "thinking": "on",
+            "effort": "medium"
+          }
+        ],
+        "model_id": "gpt-5.6-sol-cdx",
+        "protocol": "responses",
+        "parameters": {
+          "reasoning": {
+            "effort": "medium",
+            "summary": "auto"
+          }
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "gpt-5.6-sol-cdx--high",
+        "aliases": [
+          {
+            "thinking": "on",
+            "effort": "high"
+          }
+        ],
+        "model_id": "gpt-5.6-sol-cdx",
+        "protocol": "responses",
+        "parameters": {
+          "reasoning": {
+            "effort": "high",
+            "summary": "auto"
+          }
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "gpt-5.6-sol-cdx--xhigh",
+        "aliases": [
+          {
+            "thinking": "on",
+            "effort": "xhigh"
+          }
+        ],
+        "model_id": "gpt-5.6-sol-cdx",
+        "protocol": "responses",
+        "parameters": {
+          "reasoning": {
+            "effort": "xhigh",
+            "summary": "auto"
+          }
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "gpt-5.6-sol-cdx--max",
+        "aliases": [
+          {
+            "thinking": "on",
+            "effort": "max"
+          }
+        ],
+        "model_id": "gpt-5.6-sol-cdx",
+        "protocol": "responses",
+        "parameters": {
+          "reasoning": {
+            "effort": "max",
+            "summary": "auto"
+          }
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "deepseek-v4-pro-0813--default",
+        "aliases": [
+          {
+            "thinking": "default",
+            "effort": null
+          },
+          {
+            "thinking": "on",
+            "effort": null
+          }
+        ],
+        "model_id": "deepseek-v4-pro-0813",
+        "protocol": "chat",
+        "parameters": {
+          "thinking": {
+            "type": "enabled"
+          }
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "deepseek-v4-pro-0813--off",
+        "aliases": [
+          {
+            "thinking": "off",
+            "effort": null
+          }
+        ],
+        "model_id": "deepseek-v4-pro-0813",
+        "protocol": "chat",
+        "parameters": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "deepseek-v4-pro-0813--high",
+        "aliases": [
+          {
+            "thinking": "on",
+            "effort": "high"
+          }
+        ],
+        "model_id": "deepseek-v4-pro-0813",
+        "protocol": "chat",
+        "parameters": {
+          "thinking": {
+            "type": "enabled"
+          },
+          "reasoning_effort": "high"
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "deepseek-v4-pro-0813--max",
+        "aliases": [
+          {
+            "thinking": "on",
+            "effort": "max"
+          }
+        ],
+        "model_id": "deepseek-v4-pro-0813",
+        "protocol": "chat",
+        "parameters": {
+          "thinking": {
+            "type": "enabled"
+          },
+          "reasoning_effort": "max"
+        },
+        "output_tokens": 16384
+      },
+      {
+        "case_id": "deepseek-v4-flash-0731--default",
+        "aliases": [
+          {
+            "thinking": "default",
+            "effort": null
+          },
+          {
+            "thinking": "off",
+            "effort": null
+          }
+        ],
+        "model_id": "deepseek-v4-flash-0731",
+        "protocol": "chat",
+        "parameters": {
+          "enable_thinking": false
+        },
+        "output_tokens": 16384
+      }
+    ],
+    "case_count": 20,
+    "planned_http": 45,
+    "maximum_http": 55
+  },
+  "matrix_runs": [
+    {
+      "started_utc": "2026-09-11T02:15:33.154056+00:00",
+      "endpoint_host": "www.dmxapi.cn",
+      "synthetic_only": true,
+      "protocol_mappings_unchanged": true,
+      "normal_requests_retry": false,
+      "expected_max_requests": 5,
+      "cases": [
+        {
+          "case_id": "deepseek-v4-flash-0731--default",
+          "aliases": [
+            {
+              "thinking": "default",
+              "effort": null
+            },
+            {
+              "thinking": "off",
+              "effort": null
+            }
+          ],
+          "model_id": "deepseek-v4-flash-0731",
+          "protocol": "chat",
+          "parameters": {
+            "enable_thinking": false
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 2,
+              "first_chunk_seconds": 44.95942195900716,
+              "first_text_seconds": 44.959428333997494,
+              "elapsed_seconds": 44.96304841700476,
+              "response_model": "deepseek-v4-flash-0731",
+              "response_id": "21a062395c635811-1789092975531-2c0a5644",
+              "finish_reason": "tool_calls",
+              "usage": {
+                "input_tokens": 366,
+                "output_tokens": 50,
+                "total_tokens": 416,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 0
+                }
+              },
+              "native_reasoning_present": false,
+              "tool_count": 1,
+              "text_characters": 2
+            },
+            "continuation": {
+              "chunks": 5,
+              "first_chunk_seconds": 1.5972565409902018,
+              "first_text_seconds": 1.5972574579936918,
+              "elapsed_seconds": 1.7580411660019308,
+              "response_model": "deepseek-v4-flash-0731",
+              "response_id": "21a062395c635811-1789093020297-1dba35c6",
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 449,
+                "output_tokens": 17,
+                "total_tokens": 466,
+                "input_token_details": {
+                  "cache_read": 256
+                },
+                "output_token_details": {
+                  "reasoning": 0
+                }
+              },
+              "native_reasoning_present": false,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 46.726419124985114
+          },
+          "summary": {
+            "kind": "summary",
+            "status": "passed",
+            "summary": "Here is a summary of the conversation to date:\n\n用户仅允许调整温度，排除压力；方案未获确认，不得执行。已记录：只讨论温度，压力不变，尚未计算。",
+            "elapsed_seconds": 2.8321243340033107,
+            "current_input_preserved": true,
+            "actual_http_attempts": 1,
+            "http_statuses": [
+              200
+            ],
+            "wall_seconds": 2.8532300000078976
+          }
+        }
+      ],
+      "actual_http_attempts": 3,
+      "http_audit": [
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        }
+      ],
+      "finished_utc": "2026-09-11T02:16:22.735798+00:00"
+    },
+    {
+      "started_utc": "2026-09-11T02:17:21.982526+00:00",
+      "endpoint_host": "www.dmxapi.cn",
+      "synthetic_only": true,
+      "protocol_mappings_unchanged": true,
+      "normal_requests_retry": false,
+      "expected_max_requests": 13,
+      "cases": [
+        {
+          "case_id": "qwen3.8-max-0902--default",
+          "aliases": [
+            {
+              "thinking": "default",
+              "effort": null
+            },
+            {
+              "thinking": "on",
+              "effort": null
+            }
+          ],
+          "model_id": "qwen3.8-max-0902",
+          "protocol": "chat",
+          "parameters": {
+            "enable_thinking": true,
+            "preserve_thinking": true
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 2.0489210409868974,
+              "first_text_seconds": null,
+              "elapsed_seconds": 2.049029874993721,
+              "response_model": "qwen3.8-max-0902",
+              "response_id": "chatcmpl-c668e534-72c7-949e-92f0-f4f5f4f631f8",
+              "finish_reason": "tool_calls",
+              "usage": {
+                "input_tokens": 386,
+                "output_tokens": 58,
+                "total_tokens": 444,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 27
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 8,
+              "first_chunk_seconds": 2.4684257920016535,
+              "first_text_seconds": 2.4684267080156133,
+              "elapsed_seconds": 2.5964830000011716,
+              "response_model": "qwen3.8-max-0902",
+              "response_id": "chatcmpl-3c71dfed-fdb7-9af7-bc5f-f731b2feaabc",
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 488,
+                "output_tokens": 74,
+                "total_tokens": 562,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 48
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 4.65101954198326
+          },
+          "summary": {
+            "kind": "summary",
+            "status": "passed",
+            "summary": "Here is a summary of the conversation to date:\n\n仅允许调整温度，排除压力；方案未获用户确认，未执行。",
+            "elapsed_seconds": 4.46894216700457,
+            "current_input_preserved": true,
+            "actual_http_attempts": 1,
+            "http_statuses": [
+              200
+            ],
+            "wall_seconds": 4.474671083007706
+          }
+        },
+        {
+          "case_id": "qwen3.8-max-0902--off",
+          "aliases": [
+            {
+              "thinking": "off",
+              "effort": null
+            }
+          ],
+          "model_id": "qwen3.8-max-0902",
+          "protocol": "chat",
+          "parameters": {
+            "enable_thinking": false
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 0.971304250007961,
+              "first_text_seconds": null,
+              "elapsed_seconds": 0.9714089999906719,
+              "response_model": "qwen3.8-max-0902",
+              "response_id": "chatcmpl-2cae6e80-5876-949b-99bd-ce9ae9a7046b",
+              "finish_reason": "tool_calls",
+              "usage": {
+                "input_tokens": 350,
+                "output_tokens": 28,
+                "total_tokens": 378,
+                "input_token_details": {
+                  "cache_read": 0
+                }
+              },
+              "native_reasoning_present": false,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 8,
+              "first_chunk_seconds": 0.754690917005064,
+              "first_text_seconds": 0.7546917500148993,
+              "elapsed_seconds": 0.8630262500082608,
+              "response_model": "qwen3.8-max-0902",
+              "response_id": "chatcmpl-e49b836c-f532-90cb-8ea4-ecfb6d1a9df7",
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 423,
+                "output_tokens": 22,
+                "total_tokens": 445,
+                "input_token_details": {
+                  "cache_read": 0
+                }
+              },
+              "native_reasoning_present": false,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 1.8392177920031827
+          }
+        },
+        {
+          "case_id": "qwen3.8-max-0902--low",
+          "aliases": [
+            {
+              "thinking": "on",
+              "effort": "low"
+            }
+          ],
+          "model_id": "qwen3.8-max-0902",
+          "protocol": "chat",
+          "parameters": {
+            "enable_thinking": true,
+            "reasoning_effort": "low",
+            "preserve_thinking": true
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 2.3275392909999937,
+              "first_text_seconds": null,
+              "elapsed_seconds": 2.3276392499974463,
+              "response_model": "qwen3.8-max-0902",
+              "response_id": "chatcmpl-c9b2c865-568b-9d81-af71-dffafc87e1e2",
+              "finish_reason": "tool_calls",
+              "usage": {
+                "input_tokens": 374,
+                "output_tokens": 68,
+                "total_tokens": 442,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 37
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 8,
+              "first_chunk_seconds": 1.9632337499933783,
+              "first_text_seconds": 1.963234625000041,
+              "elapsed_seconds": 2.2206332499918062,
+              "response_model": "qwen3.8-max-0902",
+              "response_id": "chatcmpl-443be574-5f1f-9425-bdf6-e583c8c28635",
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 488,
+                "output_tokens": 46,
+                "total_tokens": 534,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 18
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 4.552839165990008
+          }
+        },
+        {
+          "case_id": "qwen3.8-max-0902--medium",
+          "aliases": [
+            {
+              "thinking": "on",
+              "effort": "medium"
+            }
+          ],
+          "model_id": "qwen3.8-max-0902",
+          "protocol": "chat",
+          "parameters": {
+            "enable_thinking": true,
+            "reasoning_effort": "medium",
+            "preserve_thinking": true
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 2.06470770802116,
+              "first_text_seconds": null,
+              "elapsed_seconds": 2.064810000010766,
+              "response_model": "qwen3.8-max-0902",
+              "response_id": "chatcmpl-f4b1481a-6cc4-9fef-9dbb-f57f37846ce0",
+              "finish_reason": "tool_calls",
+              "usage": {
+                "input_tokens": 348,
+                "output_tokens": 56,
+                "total_tokens": 404,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 25
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 8,
+              "first_chunk_seconds": 1.5704794589837547,
+              "first_text_seconds": 1.5704801669926383,
+              "elapsed_seconds": 1.8186722499958705,
+              "response_model": "qwen3.8-max-0902",
+              "response_id": "chatcmpl-65583b32-c467-9396-b845-fa3ea377f24b",
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 451,
+                "output_tokens": 37,
+                "total_tokens": 488,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 8
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 3.888367208011914
+          }
+        },
+        {
+          "case_id": "qwen3.8-max-0902--xhigh",
+          "aliases": [
+            {
+              "thinking": "on",
+              "effort": "xhigh"
+            }
+          ],
+          "model_id": "qwen3.8-max-0902",
+          "protocol": "chat",
+          "parameters": {
+            "enable_thinking": true,
+            "reasoning_effort": "xhigh",
+            "preserve_thinking": true
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 2.0487797079840675,
+              "first_text_seconds": null,
+              "elapsed_seconds": 2.04890658298973,
+              "response_model": "qwen3.8-max-0902",
+              "response_id": "chatcmpl-2c3acd05-f105-982d-a710-256728596fdc",
+              "finish_reason": "tool_calls",
+              "usage": {
+                "input_tokens": 386,
+                "output_tokens": 59,
+                "total_tokens": 445,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 28
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 7,
+              "first_chunk_seconds": 1.1264887080178596,
+              "first_text_seconds": 1.1264895000203978,
+              "elapsed_seconds": 1.3695992910070345,
+              "response_model": "qwen3.8-max-0902",
+              "response_id": "chatcmpl-1867bc85-b564-91dd-8df6-6bcb2b7dbe89",
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 488,
+                "output_tokens": 32,
+                "total_tokens": 520,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 7
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 3.423704707995057
+          }
+        }
+      ],
+      "actual_http_attempts": 11,
+      "http_audit": [
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        }
+      ],
+      "finished_utc": "2026-09-11T02:17:44.815123+00:00"
+    },
+    {
+      "started_utc": "2026-09-11T02:17:31.103413+00:00",
+      "endpoint_host": "www.dmxapi.cn",
+      "synthetic_only": true,
+      "protocol_mappings_unchanged": true,
+      "normal_requests_retry": false,
+      "expected_max_requests": 11,
+      "cases": [
+        {
+          "case_id": "kimi-k3--default",
+          "aliases": [
+            {
+              "thinking": "default",
+              "effort": null
+            },
+            {
+              "thinking": "on",
+              "effort": null
+            }
+          ],
+          "model_id": "kimi-k3",
+          "protocol": "chat",
+          "parameters": {},
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 6.546773249981925,
+              "first_text_seconds": null,
+              "elapsed_seconds": 6.546936124999775,
+              "response_model": "kimi-k3",
+              "response_id": "021789093052269923718d11d313173fa258a554449eb8772872b",
+              "finish_reason": "tool_calls",
+              "usage": {
+                "input_tokens": 251,
+                "output_tokens": 117,
+                "total_tokens": 368,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 63
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 18,
+              "first_chunk_seconds": 7.799544832989341,
+              "first_text_seconds": 7.799545790971024,
+              "elapsed_seconds": 7.8170264159853105,
+              "response_model": "kimi-k3",
+              "response_id": "0217890930586177093713527b8c530401a403eec8fc152c142d9",
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 418,
+                "output_tokens": 79,
+                "total_tokens": 497,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 47
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 14.369523165980354
+          },
+          "summary": {
+            "kind": "summary",
+            "status": "passed",
+            "summary": "Here is a summary of the conversation to date:\n\n用户仅允许调整温度，明确排除压力；方案尚未获用户确认，未执行任何操作，等待确认。",
+            "elapsed_seconds": 21.57273504199111,
+            "current_input_preserved": true,
+            "actual_http_attempts": 1,
+            "http_statuses": [
+              200
+            ],
+            "wall_seconds": 21.581491499993717
+          }
+        },
+        {
+          "case_id": "kimi-k3--low",
+          "aliases": [
+            {
+              "thinking": "on",
+              "effort": "low"
+            }
+          ],
+          "model_id": "kimi-k3",
+          "protocol": "chat",
+          "parameters": {
+            "reasoning_effort": "low"
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 4.6469597080140375,
+              "first_text_seconds": null,
+              "elapsed_seconds": 4.647066167002777,
+              "response_model": "kimi-k3",
+              "response_id": "0217890930879517093713527b8c530401a403eec8fc1529897c5",
+              "finish_reason": "tool_calls",
+              "usage": {
+                "input_tokens": 252,
+                "output_tokens": 86,
+                "total_tokens": 338,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 32
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 18,
+              "first_chunk_seconds": 4.27863337501185,
+              "first_text_seconds": 4.2786345000204165,
+              "elapsed_seconds": 4.294185667007696,
+              "response_model": "kimi-k3",
+              "response_id": "021789093092290923718d11d313173fa258a554449eb87b7d9f4",
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 390,
+                "output_tokens": 76,
+                "total_tokens": 466,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 42
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 8.945732791005867
+          }
+        },
+        {
+          "case_id": "kimi-k3--high",
+          "aliases": [
+            {
+              "thinking": "on",
+              "effort": "high"
+            }
+          ],
+          "model_id": "kimi-k3",
+          "protocol": "chat",
+          "parameters": {
+            "reasoning_effort": "high"
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 5.015499667002587,
+              "first_text_seconds": null,
+              "elapsed_seconds": 5.015619834011886,
+              "response_model": "kimi-k3",
+              "response_id": "02178909309660648e426867c3c446aaa68159641220ac18227b1",
+              "finish_reason": "tool_calls",
+              "usage": {
+                "input_tokens": 252,
+                "output_tokens": 103,
+                "total_tokens": 355,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 49
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 5,
+              "first_chunk_seconds": 4.162953374994686,
+              "first_text_seconds": 4.162954125000397,
+              "elapsed_seconds": 4.341361625003628,
+              "response_model": "kimi-k3",
+              "response_id": "chatcmpl-fDfaa0dr0tKxoENTu1dOjM0Q",
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 403,
+                "output_tokens": 72,
+                "total_tokens": 475,
+                "output_token_details": {
+                  "reasoning": 41
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 9.361611792002805
+          }
+        },
+        {
+          "case_id": "kimi-k3--max",
+          "aliases": [
+            {
+              "thinking": "on",
+              "effort": "max"
+            }
+          ],
+          "model_id": "kimi-k3",
+          "protocol": "chat",
+          "parameters": {
+            "reasoning_effort": "max"
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 7.823869499989087,
+              "first_text_seconds": null,
+              "elapsed_seconds": 7.823979041015264,
+              "response_model": "kimi-k3",
+              "response_id": "0217890931059177093713527b8c530401a403eec8fc152f5b526",
+              "finish_reason": "tool_calls",
+              "usage": {
+                "input_tokens": 251,
+                "output_tokens": 148,
+                "total_tokens": 399,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 94
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 15,
+              "first_chunk_seconds": 4.905471708014375,
+              "first_text_seconds": 4.90547233299003,
+              "elapsed_seconds": 4.919312250014627,
+              "response_model": "kimi-k3",
+              "response_id": "021789093113758534779bc6a83ab3f36a7a90c1e71ba35e0a26e",
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 446,
+                "output_tokens": 60,
+                "total_tokens": 506,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 31
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 12.74823016600567
+          }
+        }
+      ],
+      "actual_http_attempts": 9,
+      "http_audit": [
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        }
+      ],
+      "finished_utc": "2026-09-11T02:18:38.112747+00:00"
+    },
+    {
+      "started_utc": "2026-09-11T02:17:40.780120+00:00",
+      "endpoint_host": "www.dmxapi.cn",
+      "synthetic_only": true,
+      "protocol_mappings_unchanged": true,
+      "normal_requests_retry": false,
+      "expected_max_requests": 15,
+      "cases": [
+        {
+          "case_id": "gpt-5.6-sol-cdx--default",
+          "aliases": [
+            {
+              "thinking": "default",
+              "effort": null
+            },
+            {
+              "thinking": "on",
+              "effort": null
+            },
+            {
+              "thinking": "on",
+              "effort": "low"
+            }
+          ],
+          "model_id": "gpt-5.6-sol-cdx",
+          "protocol": "responses",
+          "parameters": {
+            "reasoning": {
+              "effort": "low",
+              "summary": "auto"
+            }
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 3.5046931250253692,
+              "first_text_seconds": null,
+              "elapsed_seconds": 3.504853541002376,
+              "response_model": "gpt-5.6-sol",
+              "response_id": "resp_0e1cc76cbd8ca4de016aa364c6639487d0a4c3f60d05b4ca70",
+              "finish_reason": "completed",
+              "usage": {
+                "input_tokens": 122,
+                "output_tokens": 21,
+                "total_tokens": 143,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 0
+                }
+              },
+              "native_reasoning_present": false,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 14,
+              "first_chunk_seconds": 3.4873647910135332,
+              "first_text_seconds": 3.4873657080170233,
+              "elapsed_seconds": 3.867794916004641,
+              "response_model": "gpt-5.6-sol",
+              "response_id": "resp_0e1cc76cbd8ca4de016aa364c9ef6c87d0b1c2a0281b5518b8",
+              "finish_reason": "completed",
+              "usage": {
+                "input_tokens": 174,
+                "output_tokens": 18,
+                "total_tokens": 192,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 0
+                }
+              },
+              "native_reasoning_present": false,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 7.378531333000865
+          },
+          "summary": {
+            "kind": "summary",
+            "status": "passed",
+            "summary": "Here is a summary of the conversation to date:\n\n仅允许调整温度，明确排除压力；方案尚未获用户确认，尚未执行。",
+            "elapsed_seconds": 7.319198957993649,
+            "current_input_preserved": true,
+            "actual_http_attempts": 1,
+            "http_statuses": [
+              200
+            ],
+            "wall_seconds": 7.325925584009383
+          }
+        },
+        {
+          "case_id": "gpt-5.6-sol-cdx--off",
+          "aliases": [
+            {
+              "thinking": "off",
+              "effort": null
+            }
+          ],
+          "model_id": "gpt-5.6-sol-cdx",
+          "protocol": "responses",
+          "parameters": {
+            "reasoning": {
+              "effort": "none"
+            }
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 6.104361832985887,
+              "first_text_seconds": null,
+              "elapsed_seconds": 6.104450457991334,
+              "response_model": "gpt-5.6-sol",
+              "response_id": "resp_00e895696d55c765016aa364d592e087d29262b1eafccb4cf6",
+              "finish_reason": "completed",
+              "usage": {
+                "input_tokens": 122,
+                "output_tokens": 21,
+                "total_tokens": 143,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 0
+                }
+              },
+              "native_reasoning_present": false,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 15,
+              "first_chunk_seconds": 3.7273547500080895,
+              "first_text_seconds": 3.727355584007455,
+              "elapsed_seconds": 4.191702959011309,
+              "response_model": "gpt-5.6-sol",
+              "response_id": "resp_00e895696d55c765016aa364db70dc87d282e7003b5f41673b",
+              "finish_reason": "completed",
+              "usage": {
+                "input_tokens": 174,
+                "output_tokens": 18,
+                "total_tokens": 192,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 0
+                }
+              },
+              "native_reasoning_present": false,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 10.301126292004483
+          }
+        },
+        {
+          "case_id": "gpt-5.6-sol-cdx--medium",
+          "aliases": [
+            {
+              "thinking": "on",
+              "effort": "medium"
+            }
+          ],
+          "model_id": "gpt-5.6-sol-cdx",
+          "protocol": "responses",
+          "parameters": {
+            "reasoning": {
+              "effort": "medium",
+              "summary": "auto"
+            }
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 6.820314749988029,
+              "first_text_seconds": null,
+              "elapsed_seconds": 6.820409334002761,
+              "response_model": "gpt-5.6-sol",
+              "response_id": "resp_0773f22e47b73070016aa364df824087d285748bb3e052d99f",
+              "finish_reason": "completed",
+              "usage": {
+                "input_tokens": 122,
+                "output_tokens": 21,
+                "total_tokens": 143,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 0
+                }
+              },
+              "native_reasoning_present": false,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 14,
+              "first_chunk_seconds": 2.6386693749809638,
+              "first_text_seconds": 2.6386699579888955,
+              "elapsed_seconds": 3.047186582989525,
+              "response_model": "gpt-5.6-sol",
+              "response_id": "resp_0773f22e47b73070016aa364e624c487d29ce849b8b6b443ad",
+              "finish_reason": "completed",
+              "usage": {
+                "input_tokens": 174,
+                "output_tokens": 18,
+                "total_tokens": 192,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 0
+                }
+              },
+              "native_reasoning_present": false,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 9.872206875006668
+          }
+        },
+        {
+          "case_id": "gpt-5.6-sol-cdx--high",
+          "aliases": [
+            {
+              "thinking": "on",
+              "effort": "high"
+            }
+          ],
+          "model_id": "gpt-5.6-sol-cdx",
+          "protocol": "responses",
+          "parameters": {
+            "reasoning": {
+              "effort": "high",
+              "summary": "auto"
+            }
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 6.38447183300741,
+              "first_text_seconds": null,
+              "elapsed_seconds": 6.384587332984665,
+              "response_model": "gpt-5.6-sol",
+              "response_id": "resp_02749bfc9ff95085016aa364e99afc87d2a5f21f9e4ee2bf1e",
+              "finish_reason": "completed",
+              "usage": {
+                "input_tokens": 122,
+                "output_tokens": 34,
+                "total_tokens": 156,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 11
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 15,
+              "first_chunk_seconds": 4.0321097080013715,
+              "first_text_seconds": 4.032110375002958,
+              "elapsed_seconds": 4.537316166009987,
+              "response_model": "gpt-5.6-sol",
+              "response_id": "resp_02749bfc9ff95085016aa364ef945087d2b418493069584e59",
+              "finish_reason": "completed",
+              "usage": {
+                "input_tokens": 174,
+                "output_tokens": 18,
+                "total_tokens": 192,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 0
+                }
+              },
+              "native_reasoning_present": false,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 10.92674020800041
+          }
+        },
+        {
+          "case_id": "gpt-5.6-sol-cdx--xhigh",
+          "aliases": [
+            {
+              "thinking": "on",
+              "effort": "xhigh"
+            }
+          ],
+          "model_id": "gpt-5.6-sol-cdx",
+          "protocol": "responses",
+          "parameters": {
+            "reasoning": {
+              "effort": "xhigh",
+              "summary": "auto"
+            }
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 5.14923258300405,
+              "first_text_seconds": null,
+              "elapsed_seconds": 5.149345040990738,
+              "response_model": "gpt-5.6-sol",
+              "response_id": "resp_093c8555ea0775d2016aa364f4803487d1be09e4090c49f5f2",
+              "finish_reason": "completed",
+              "usage": {
+                "input_tokens": 122,
+                "output_tokens": 34,
+                "total_tokens": 156,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 11
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 17,
+              "first_chunk_seconds": 5.0840232920018025,
+              "first_text_seconds": 5.084024000010686,
+              "elapsed_seconds": 5.525587083015125,
+              "response_model": "gpt-5.6-sol",
+              "response_id": "resp_093c8555ea0775d2016aa364f9a2d487d1916cec9d49c633a2",
+              "finish_reason": "completed",
+              "usage": {
+                "input_tokens": 176,
+                "output_tokens": 20,
+                "total_tokens": 196,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 0
+                }
+              },
+              "native_reasoning_present": false,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 10.67967008400592
+          }
+        },
+        {
+          "case_id": "gpt-5.6-sol-cdx--max",
+          "aliases": [
+            {
+              "thinking": "on",
+              "effort": "max"
+            }
+          ],
+          "model_id": "gpt-5.6-sol-cdx",
+          "protocol": "responses",
+          "parameters": {
+            "reasoning": {
+              "effort": "max",
+              "summary": "auto"
+            }
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 4.174023708997993,
+              "first_text_seconds": null,
+              "elapsed_seconds": 4.17411654200987,
+              "response_model": "gpt-5.6-sol",
+              "response_id": "resp_042b7dfa4a079fe6016aa364feb11487d1ac9a890cebd6b1ad",
+              "finish_reason": "completed",
+              "usage": {
+                "input_tokens": 122,
+                "output_tokens": 38,
+                "total_tokens": 160,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 15
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 16,
+              "first_chunk_seconds": 5.823281249991851,
+              "first_text_seconds": 5.82328187499661,
+              "elapsed_seconds": 6.803691915993113,
+              "response_model": "gpt-5.6-sol",
+              "response_id": "resp_042b7dfa4a079fe6016aa36503144c87d1a8702d8f008c86a6",
+              "finish_reason": "completed",
+              "usage": {
+                "input_tokens": 175,
+                "output_tokens": 19,
+                "total_tokens": 194,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 0
+                }
+              },
+              "native_reasoning_present": false,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 10.982397667015903
+          }
+        }
+      ],
+      "actual_http_attempts": 13,
+      "http_audit": [
+        {
+          "path": "/v1/responses",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/responses",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/responses",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/responses",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/responses",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/responses",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/responses",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/responses",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/responses",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/responses",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/responses",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/responses",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/responses",
+          "http_status": 200
+        }
+      ],
+      "finished_utc": "2026-09-11T02:18:48.251084+00:00"
+    },
+    {
+      "started_utc": "2026-09-11T02:17:50.227378+00:00",
+      "endpoint_host": "www.dmxapi.cn",
+      "synthetic_only": true,
+      "protocol_mappings_unchanged": true,
+      "normal_requests_retry": false,
+      "expected_max_requests": 11,
+      "cases": [
+        {
+          "case_id": "deepseek-v4-pro-0813--default",
+          "aliases": [
+            {
+              "thinking": "default",
+              "effort": null
+            },
+            {
+              "thinking": "on",
+              "effort": null
+            }
+          ],
+          "model_id": "deepseek-v4-pro-0813",
+          "protocol": "chat",
+          "parameters": {
+            "thinking": {
+              "type": "enabled"
+            }
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 5.390158333000727,
+              "first_text_seconds": null,
+              "elapsed_seconds": 5.390365832980024,
+              "response_model": "deepseek-v4-pro-ga-260813",
+              "response_id": "02178909307068508e37163f19fb200d5e116edcbda02b4d58313",
+              "finish_reason": "tool_calls",
+              "usage": {
+                "input_tokens": 441,
+                "output_tokens": 78,
+                "total_tokens": 519,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 28
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 17,
+              "first_chunk_seconds": 1.2781650410033762,
+              "first_text_seconds": 1.2781664160138462,
+              "elapsed_seconds": 1.4002685410086997,
+              "response_model": "deepseek-v4-pro-ga-260813",
+              "response_id": "021789093076092efca7158d8a072a352f4e6ec3154e35ac8d80d",
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 553,
+                "output_tokens": 45,
+                "total_tokens": 598,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 28
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 6.796119083010126
+          },
+          "summary": {
+            "kind": "summary",
+            "status": "passed",
+            "summary": "Here is a summary of the conversation to date:\n\n仅允许调整温度，排除压力；方案尚未经用户确认，未执行。",
+            "elapsed_seconds": 2.199910750001436,
+            "current_input_preserved": true,
+            "actual_http_attempts": 1,
+            "http_statuses": [
+              200
+            ],
+            "wall_seconds": 2.2070577919948846
+          }
+        },
+        {
+          "case_id": "deepseek-v4-pro-0813--off",
+          "aliases": [
+            {
+              "thinking": "off",
+              "effort": null
+            }
+          ],
+          "model_id": "deepseek-v4-pro-0813",
+          "protocol": "chat",
+          "parameters": {
+            "thinking": {
+              "type": "disabled"
+            }
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 1.180895291006891,
+              "first_text_seconds": null,
+              "elapsed_seconds": 1.1809943330008537,
+              "response_model": "deepseek-v4-pro-ga-260813",
+              "response_id": "021789093079708de824baea9702e17bffa39e9c3bdc4f6f1f121",
+              "finish_reason": "tool_calls",
+              "usage": {
+                "input_tokens": 362,
+                "output_tokens": 49,
+                "total_tokens": 411,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 0
+                }
+              },
+              "native_reasoning_present": false,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 14,
+              "first_chunk_seconds": 1.0151239580009133,
+              "first_text_seconds": 1.0151249160117004,
+              "elapsed_seconds": 1.0856963330006693,
+              "response_model": "deepseek-v4-pro-ga-260813",
+              "response_id": "021789093080885efca7158d8a072a352f4e6ec3154e35a102512",
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 444,
+                "output_tokens": 15,
+                "total_tokens": 459,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 0
+                }
+              },
+              "native_reasoning_present": false,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 2.2716783749929164
+          }
+        },
+        {
+          "case_id": "deepseek-v4-pro-0813--high",
+          "aliases": [
+            {
+              "thinking": "on",
+              "effort": "high"
+            }
+          ],
+          "model_id": "deepseek-v4-pro-0813",
+          "protocol": "chat",
+          "parameters": {
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high"
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 1.678459707996808,
+              "first_text_seconds": null,
+              "elapsed_seconds": 1.6785633749968838,
+              "response_model": "deepseek-v4-pro-ga-260813",
+              "response_id": "021789093082038de824baea9702e17bffa39e9c3bdc4f62ed15c",
+              "finish_reason": "tool_calls",
+              "usage": {
+                "input_tokens": 441,
+                "output_tokens": 74,
+                "total_tokens": 515,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 24
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 16,
+              "first_chunk_seconds": 1.7585336659976747,
+              "first_text_seconds": 1.7585344160033856,
+              "elapsed_seconds": 1.9059153330163099,
+              "response_model": "deepseek-v4-pro-ga-260813",
+              "response_id": "021789093083687ca3041a3a8c2b7f648d1ff1a7e90ae3f73902c",
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 548,
+                "output_tokens": 28,
+                "total_tokens": 576,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 12
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 3.5894736670015845
+          }
+        },
+        {
+          "case_id": "deepseek-v4-pro-0813--max",
+          "aliases": [
+            {
+              "thinking": "on",
+              "effort": "max"
+            }
+          ],
+          "model_id": "deepseek-v4-pro-0813",
+          "protocol": "chat",
+          "parameters": {
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "max"
+          },
+          "output_tokens": 16384,
+          "roundtrip": {
+            "kind": "roundtrip",
+            "status": "passed",
+            "phase": "completed",
+            "initial": {
+              "chunks": 1,
+              "first_chunk_seconds": 2.0184979159967043,
+              "first_text_seconds": null,
+              "elapsed_seconds": 2.0185894159949385,
+              "response_model": "deepseek-v4-pro-ga-260813",
+              "response_id": "021789093085554efca7158d8a072a352f4e6ec3154e35a61300f",
+              "finish_reason": "tool_calls",
+              "usage": {
+                "input_tokens": 454,
+                "output_tokens": 76,
+                "total_tokens": 530,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 26
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 1,
+              "text_characters": 0
+            },
+            "continuation": {
+              "chunks": 17,
+              "first_chunk_seconds": 1.9779401249834336,
+              "first_text_seconds": 1.9779407909954898,
+              "elapsed_seconds": 2.1113568329892587,
+              "response_model": "deepseek-v4-pro-ga-260813",
+              "response_id": "0217890930875750e23c04e8b740c94d8512f0597aa5fa6ef9647",
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 566,
+                "output_tokens": 52,
+                "total_tokens": 618,
+                "input_token_details": {
+                  "cache_read": 0
+                },
+                "output_token_details": {
+                  "reasoning": 33
+                }
+              },
+              "native_reasoning_present": true,
+              "tool_count": 0,
+              "text_characters": 28
+            },
+            "answer_exact": true,
+            "marker_recovered": true,
+            "actual_http_attempts": 2,
+            "http_statuses": [
+              200,
+              200
+            ],
+            "wall_seconds": 4.134649124986026
+          }
+        }
+      ],
+      "actual_http_attempts": 9,
+      "http_audit": [
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        },
+        {
+          "path": "/v1/chat/completions",
+          "http_status": 200
+        }
+      ],
+      "finished_utc": "2026-09-11T02:18:09.228633+00:00"
+    }
+  ],
+  "react_agent_help_switch": {
+    "started_utc": "2026-09-11T02:20:13.354060+00:00",
+    "synthetic_only": true,
+    "marker": "lc7-session-29dbed257b46509b",
+    "max_http_attempts": 30,
+    "domain_backend": "all domain methods reject without reading configuration",
+    "turns": [
+      {
+        "model_id": "gpt-5.6-sol-cdx",
+        "errors": [],
+        "answer": "- **完整模型ID**：`gpt-5.6-sol-cdx`\n- **思考状态**：开启，强度 `low`\n- **最初标记**：`lc7-session-29dbed257b46509b`\n\n本地命令：\n- **查看帮助**：`/help`\n- **选择模型**：`/model`（打开列表后回复编号或完整ID），或 `/model <编号或完整ID>`\n- **恢复已批准未完成任务**：`/resume`",
+        "streamed_text_matches": true,
+        "marker_recovered": true,
+        "correct_model_id": true,
+        "commands_present": true,
+        "expected_thinking": true,
+        "http_attempts": 1,
+        "wall_seconds": 16.412637834000634,
+        "status": "passed"
+      },
+      {
+        "model_id": "qwen3.8-max-0902",
+        "errors": [],
+        "answer": "- **当前完整模型ID**：`qwen3.8-max-0902`（Qwen Max）\n- **思考状态**：开启，强度为「模型默认」（该模型可选 low、medium、xhigh）\n- **最初合成标记**：`lc7-session-29dbed257b46509b`\n\n本地命令：\n- **查看帮助**：`/help`\n- **选择模型**：`/model`（打开列表后回复编号或完整ID），或 `/model <编号或完整ID>` 直接切换\n- **恢复已批准但未完成的任务**：`/resume`\n\n说明：历史中提到的 `gpt-5.6-sol-cdx`／强度 low 属于切换前的旧状态，以当前程序应用状态为准；我仅说明命令，未替你执行任何切换。当前也没有待执行方案或最近结果。",
+        "streamed_text_matches": true,
+        "marker_recovered": true,
+        "correct_model_id": true,
+        "commands_present": true,
+        "expected_thinking": true,
+        "http_attempts": 1,
+        "wall_seconds": 8.312089625018416,
+        "status": "passed"
+      },
+      {
+        "model_id": "kimi-k3",
+        "errors": [],
+        "answer": "- **当前完整模型ID**：`kimi-k3`（Kimi K3）\n- **思考状态**：开启；强度为「模型默认」（可选 low、high、max）\n- **最初合成标记**：`lc7-session-29dbed257b46509b`\n\n本地命令：\n- **查看帮助**：`/help`\n- **选择模型**：`/model`（打开列表后回复编号或完整ID），或 `/model <编号或完整ID>`\n- **恢复已批准未完成任务**：`/resume`\n\n注：历史中 `qwen3.8-max-0902`、`gpt-5.6-sol-cdx` 均为切换前旧状态，以当前程序状态为准；当前没有待执行方案或最近结果。",
+        "streamed_text_matches": true,
+        "marker_recovered": true,
+        "correct_model_id": true,
+        "commands_present": true,
+        "expected_thinking": true,
+        "http_attempts": 1,
+        "wall_seconds": 15.218736292008543,
+        "status": "passed"
+      },
+      {
+        "model_id": "deepseek-v4-pro-0813",
+        "errors": [],
+        "answer": "- **当前完整模型ID**：`deepseek-v4-pro-0813`（DeepSeek Pro）\n- **思考状态**：开启；强度为「模型默认」（当前可选 high、max）\n- **最初合成标记**：`lc7-session-29dbed257b46509b`\n\n本地命令：\n- **查看帮助**：`/help`\n- **选择模型**：`/model`（打开列表后回复编号或完整ID），或 `/model <编号或完整ID>`\n- **恢复已批准未完成任务**：`/resume`\n\n注：历史中的 `kimi-k3`、`qwen3.8-max-0902`、`gpt-5.6-sol-cdx` 均为切换前旧状态，以当前程序状态为准。",
+        "streamed_text_matches": true,
+        "marker_recovered": true,
+        "correct_model_id": true,
+        "commands_present": true,
+        "expected_thinking": true,
+        "http_attempts": 1,
+        "wall_seconds": 4.450025707978057,
+        "status": "passed"
+      },
+      {
+        "model_id": "deepseek-v4-flash-0731",
+        "errors": [],
+        "answer": "- **当前完整模型ID**：`deepseek-v4-flash-0731`（DeepSeek Flash）\n- **思考状态**：关闭（Flash渠道仅使用非思考模式）\n- **最初合成标记**：`lc7-session-29dbed257b46509b`\n\n本地命令：\n- **查看帮助**：`/help`\n- **选择模型**：`/model`（打开列表后回复编号或完整ID），或 `/model <编号或完整ID>`\n- **恢复已批准未完成任务**：`/resume`\n\n注：当前没有待执行方案或最近结果；未代你执行任何切换。",
+        "streamed_text_matches": true,
+        "marker_recovered": true,
+        "correct_model_id": true,
+        "commands_present": true,
+        "expected_thinking": false,
+        "http_attempts": 1,
+        "wall_seconds": 6.166049624996958,
+        "status": "passed"
+      }
+    ],
+    "actual_http_attempts": 5,
+    "http_audit": [
+      {
+        "path": "/v1/responses",
+        "http_status": 200
+      },
+      {
+        "path": "/v1/chat/completions",
+        "http_status": 200
+      },
+      {
+        "path": "/v1/chat/completions",
+        "http_status": 200
+      },
+      {
+        "path": "/v1/chat/completions",
+        "http_status": 200
+      },
+      {
+        "path": "/v1/chat/completions",
+        "http_status": 200
+      }
+    ],
+    "request_history_counts": [
+      {
+        "requested_model": "gpt-5.6-sol-cdx",
+        "native_assistant_history": 0,
+        "native_reasoning_history": 0
+      },
+      {
+        "requested_model": "qwen3.8-max-0902",
+        "native_assistant_history": 0,
+        "native_reasoning_history": 0
+      },
+      {
+        "requested_model": "kimi-k3",
+        "native_assistant_history": 0,
+        "native_reasoning_history": 0
+      },
+      {
+        "requested_model": "deepseek-v4-pro-0813",
+        "native_assistant_history": 0,
+        "native_reasoning_history": 0
+      },
+      {
+        "requested_model": "deepseek-v4-flash-0731",
+        "native_assistant_history": 0,
+        "native_reasoning_history": 0
+      }
+    ],
+    "domain_tool_calls": 0,
+    "finished_utc": "2026-09-11T02:21:03.924381+00:00"
+  },
+  "react_agent_tool_continuation": {
+    "started_utc": "2026-09-11T02:27:46.627220+00:00",
+    "synthetic_only": true,
+    "mock_http": false,
+    "planned_http_attempts": 10,
+    "max_http_attempts": 30,
+    "purpose": "Current application_help tail survives real graph tool result continuation on all five mapped protocols.",
+    "domain_backend": "get_plant_info generates only a random marker; other domain methods reject without configuration reads",
+    "user_prompt": "这是合成接口验收；本会话get_plant_info只返回临时生成的随机marker，不读取真实配置。请先且仅调用一次get_plant_info，获得工具结果后只简短回答：工具marker的完整值，以及程序当前应用状态里的完整模型ID。禁止猜测marker，不调用其他工具，不准备优化，不确认执行，不计算。",
+    "turns": [
+      {
+        "model_id": "qwen3.8-max-0902",
+        "protocol": "chat",
+        "errors": [],
+        "answer": "- 工具 marker 完整值：`lc7-graph-tool-dae235036fa22acf476c0f71`\n- 当前应用状态模型 ID：`qwen3.8-max-0902`（Qwen Max）\n\n已按要求仅调用一次 get_plant_info，未做其他操作，也未准备优化或确认执行。",
+        "actual_http_attempts": 2,
+        "tool_calls": 1,
+        "blocked_domain_calls": 0,
+        "marker_recovered": true,
+        "correct_model_id": true,
+        "streamed_text_matches": true,
+        "canonical_complete_tool_group": true,
+        "no_preparation_or_result": true,
+        "app_help_last_on_all_requests": true,
+        "tool_result_then_app_help_on_continuation": true,
+        "wall_seconds": 7.4352904580009636,
+        "status": "passed"
+      },
+      {
+        "model_id": "kimi-k3",
+        "protocol": "chat",
+        "errors": [],
+        "answer": "- 工具marker：`lc7-graph-tool-b1fa4042a62418bc4880e810`\n- 当前模型ID：`kimi-k3`",
+        "actual_http_attempts": 2,
+        "tool_calls": 1,
+        "blocked_domain_calls": 0,
+        "marker_recovered": true,
+        "correct_model_id": true,
+        "streamed_text_matches": true,
+        "canonical_complete_tool_group": true,
+        "no_preparation_or_result": true,
+        "app_help_last_on_all_requests": true,
+        "tool_result_then_app_help_on_continuation": true,
+        "wall_seconds": 15.663594040990574,
+        "status": "passed"
+      },
+      {
+        "model_id": "gpt-5.6-sol-cdx",
+        "protocol": "responses",
+        "errors": [],
+        "answer": "marker：`lc7-graph-tool-27cad31fc135b7bda60fad1f`\n\n模型ID：`gpt-5.6-sol-cdx`",
+        "actual_http_attempts": 2,
+        "tool_calls": 1,
+        "blocked_domain_calls": 0,
+        "marker_recovered": true,
+        "correct_model_id": true,
+        "streamed_text_matches": true,
+        "canonical_complete_tool_group": true,
+        "no_preparation_or_result": true,
+        "app_help_last_on_all_requests": true,
+        "tool_result_then_app_help_on_continuation": true,
+        "wall_seconds": 12.563703041989356,
+        "status": "passed"
+      },
+      {
+        "model_id": "deepseek-v4-pro-0813",
+        "protocol": "chat",
+        "errors": [],
+        "answer": "工具marker：`lc7-graph-tool-066c8d08945fe330921884fc`\n\n当前应用状态里的完整模型ID：`deepseek-v4-pro-0813`",
+        "actual_http_attempts": 2,
+        "tool_calls": 1,
+        "blocked_domain_calls": 0,
+        "marker_recovered": true,
+        "correct_model_id": true,
+        "streamed_text_matches": true,
+        "canonical_complete_tool_group": true,
+        "no_preparation_or_result": true,
+        "app_help_last_on_all_requests": true,
+        "tool_result_then_app_help_on_continuation": true,
+        "wall_seconds": 14.18890583398752,
+        "status": "passed"
+      },
+      {
+        "model_id": "deepseek-v4-flash-0731",
+        "protocol": "chat",
+        "errors": [],
+        "answer": "工具marker的完整值：`lc7-graph-tool-7087a15619b54e9ee3cfee78`\n\n程序当前应用状态里的完整模型ID：`deepseek-v4-flash-0731`",
+        "actual_http_attempts": 2,
+        "tool_calls": 1,
+        "blocked_domain_calls": 0,
+        "marker_recovered": true,
+        "correct_model_id": true,
+        "streamed_text_matches": false,
+        "canonical_complete_tool_group": true,
+        "no_preparation_or_result": true,
+        "app_help_last_on_all_requests": true,
+        "tool_result_then_app_help_on_continuation": true,
+        "wall_seconds": 5.006666458008112,
+        "status": "failed"
+      }
+    ],
+    "actual_http_attempts": 10,
+    "http_audit": [
+      {
+        "path": "/v1/chat/completions",
+        "http_status": 200
+      },
+      {
+        "path": "/v1/chat/completions",
+        "http_status": 200
+      },
+      {
+        "path": "/v1/chat/completions",
+        "http_status": 200
+      },
+      {
+        "path": "/v1/chat/completions",
+        "http_status": 200
+      },
+      {
+        "path": "/v1/responses",
+        "http_status": 200
+      },
+      {
+        "path": "/v1/responses",
+        "http_status": 200
+      },
+      {
+        "path": "/v1/chat/completions",
+        "http_status": 200
+      },
+      {
+        "path": "/v1/chat/completions",
+        "http_status": 200
+      },
+      {
+        "path": "/v1/chat/completions",
+        "http_status": 200
+      },
+      {
+        "path": "/v1/chat/completions",
+        "http_status": 200
+      }
+    ],
+    "request_facts": [
+      {
+        "requested_model": "qwen3.8-max-0902",
+        "tool_result_count": 0,
+        "last_item_role": "user",
+        "last_item_has_application_help": true
+      },
+      {
+        "requested_model": "qwen3.8-max-0902",
+        "tool_result_count": 1,
+        "last_item_role": "user",
+        "last_item_has_application_help": true
+      },
+      {
+        "requested_model": "kimi-k3",
+        "tool_result_count": 0,
+        "last_item_role": "user",
+        "last_item_has_application_help": true
+      },
+      {
+        "requested_model": "kimi-k3",
+        "tool_result_count": 1,
+        "last_item_role": "user",
+        "last_item_has_application_help": true
+      },
+      {
+        "requested_model": "gpt-5.6-sol-cdx",
+        "tool_result_count": 0,
+        "last_item_role": "user",
+        "last_item_has_application_help": true
+      },
+      {
+        "requested_model": "gpt-5.6-sol-cdx",
+        "tool_result_count": 1,
+        "last_item_role": "user",
+        "last_item_has_application_help": true
+      },
+      {
+        "requested_model": "deepseek-v4-pro-0813",
+        "tool_result_count": 0,
+        "last_item_role": "user",
+        "last_item_has_application_help": true
+      },
+      {
+        "requested_model": "deepseek-v4-pro-0813",
+        "tool_result_count": 1,
+        "last_item_role": "user",
+        "last_item_has_application_help": true
+      },
+      {
+        "requested_model": "deepseek-v4-flash-0731",
+        "tool_result_count": 0,
+        "last_item_role": "user",
+        "last_item_has_application_help": true
+      },
+      {
+        "requested_model": "deepseek-v4-flash-0731",
+        "tool_result_count": 1,
+        "last_item_role": "user",
+        "last_item_has_application_help": true
+      }
+    ],
+    "finished_utc": "2026-09-11T02:28:41.610937+00:00"
+  },
+  "flash_public_stream_confirmation": {
+    "started_utc": "2026-09-11T02:33:09.536302+00:00",
+    "synthetic_only": true,
+    "model_id": "deepseek-v4-flash-0731",
+    "planned_http_attempts": 2,
+    "max_http_attempts": 6,
+    "purpose": "Distinguish all public streamed model text from final non-tool output; retain the original comparison mismatch separately.",
+    "errors": [],
+    "visible_text": "\n\n工具marker完整值为：`lc7-graph-tool-4897e23981ad7091d5ad8336`\n\n程序当前应用状态里的完整模型ID为：`deepseek-v4-flash-0731`",
+    "canonical_model_messages": [
+      {
+        "text": "\n\n",
+        "tool_call_names": [
+          "get_plant_info"
+        ]
+      },
+      {
+        "text": "工具marker完整值为：`lc7-graph-tool-4897e23981ad7091d5ad8336`\n\n程序当前应用状态里的完整模型ID为：`deepseek-v4-flash-0731`",
+        "tool_call_names": []
+      }
+    ],
+    "final_output": "工具marker完整值为：`lc7-graph-tool-4897e23981ad7091d5ad8336`\n\n程序当前应用状态里的完整模型ID为：`deepseek-v4-flash-0731`",
+    "full_stream_equals_all_canonical_model_text": true,
+    "final_output_equals_non_tool_model_text": true,
+    "old_full_stream_equals_final_only_comparison": false,
+    "tool_calls": 1,
+    "blocked_domain_calls": 0,
+    "marker_recovered": true,
+    "correct_model_id": true,
+    "canonical_complete_tool_group": true,
+    "no_preparation_or_result": true,
+    "app_help_last_on_all_requests": true,
+    "tool_result_then_app_help_on_continuation": true,
+    "status": "passed",
+    "finished_utc": "2026-09-11T02:33:17.243433+00:00",
+    "actual_http_attempts": 2,
+    "http_audit": [
+      {
+        "path": "/v1/chat/completions",
+        "http_status": 200
+      },
+      {
+        "path": "/v1/chat/completions",
+        "http_status": 200
+      }
+    ],
+    "request_facts": [
+      {
+        "requested_model": "deepseek-v4-flash-0731",
+        "tool_result_count": 0,
+        "last_item_role": "user",
+        "last_item_has_application_help": true
+      },
+      {
+        "requested_model": "deepseek-v4-flash-0731",
+        "tool_result_count": 1,
+        "last_item_role": "user",
+        "last_item_has_application_help": true
+      }
+    ]
+  },
+  "offline_stream_comparison_diagnosis": {
+    "mock_http_only": true,
+    "model_calls": 2,
+    "tool_calls": 1,
+    "full_stream_equals_all_canonical_model_text": true,
+    "full_stream_equals_final_message": false,
+    "injected_tool_message_text": "\n\n"
+  }
+}

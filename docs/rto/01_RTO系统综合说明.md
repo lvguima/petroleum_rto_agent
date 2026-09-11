@@ -1,8 +1,8 @@
 # RTO系统综合说明
 
-> 当前Agent通过原生工具循环和`rto.runtime.staged`调用RTO；D0是独立公共合同，旧Assistant分类入口已移除。生产交互见[Agent说明](../domain_model/01_聚合式垂域模型综合说明.md)。
+> 当前Agent使用单一官方图管理会话与审批，真实用户确认后通过`rto.runtime.staged`固定执行M2→M4；模型只能查询、准备和取消，不能调度计算阶段。D0仍是独立公共合同。生产交互见[Agent说明](../domain_model/01_聚合式垂域模型综合说明.md)。
 
-_更新日期：2026-09-03 · 本文说明当前离线RTO的职责、算法、评价、结果和独立证据边界；实时状态见[项目实施状态](../STATUS_REACT_REBUILD.md)。_
+_更新日期：2026-09-11 · 本文说明离线RTO职责、固定问题重建、阶段读取与独立证据边界；实时状态见[项目实施状态](../STATUS_REACT_REBUILD.md)。_
 
 ## 核心结论
 
@@ -22,14 +22,15 @@ _更新日期：2026-09-03 · 本文说明当前离线RTO的职责、算法、�
 ```mermaid
 flowchart LR
     accTitle: 当前离线RTO执行链
-    accDescr: 严格意图在当前能力下重新验证，与最新受信工况构造一次不可变问题；问题绑定网格搜索路线，候选经同上下文M2和M4评价后直接生成内存结果与简洁结果文件。
+    accDescr: 准备时由严格意图、能力与受信工况构造不可变问题，恢复时从保存的完整内容重建同一问题；真实用户确认后按已绑定路线进行同上下文M2和M4评价，再生成结果。
 
     intent[📋 OptimizationIntent] --> resolver[🔍 当前能力复核]
     capability[📚 CapabilityBundle] --> resolver
     resolver --> builder[🧩 ProblemBuilder]
-    context[📊 最新OperatingContext] --> builder
+    context[📊 绑定的OperatingContext] --> builder
     builder --> problem[📦 唯一OptimizationProblem]
-    problem --> router[🧭 SolverRouter]
+    problem --> approved[👤 程序展示后真实用户确认]
+    approved --> router[🧭 SolverRouter]
     router --> solver[🔢 确定性网格搜索]
     solver --> m2[🧪 M2配对评价]
     m2 --> shortlist[📋 静态短名单]
@@ -63,6 +64,12 @@ flowchart LR
 [受信Context](../../configs/rto/contexts/case_20260604.json)独立保存模型与案例、运行模式、进料、组成、当前设定值、初态、时刻和数据质量。它不从用户话术或模型输出生成。
 
 当前Agent先读取并保存受信工况，再在准备阶段加载能力、解析严格Intent并构造一次Problem。用户确认的是已展示版本和绑定快照；执行复用该Problem，确认时不换工况。修改业务要求或更新快照须重新准备、展示并确认。独立`run_confirmed_optimization`公共API仍面向受信调用方按其原合同一次读取并构造，不是当前终端装配路径。
+
+`rto.runtime.staged`公开`dump_prepared_optimization`和`load_prepared_optimization`，以独立版本化合同保存完整能力包、Intent、Context、Problem及指纹。读取时严格检查字段与引用，并以保存的能力包和工况确定性重建Problem后比对；不读取当前配置、不求解、不仿真。因此修改或删除外部配置不会悄悄替换已确认问题，保存内容不完整或不一致则明确拒绝。
+
+Agent图的本机SQLite会话保存这一固定方案及审批、阶段回执；数据库属于Assistant层，RTO核心仍只使用中立合同与文件证据。三种完整确认输入在本地经过公共审批节点后，固定调用`solve_prepared_optimization`和`verify_prepared_optimization`。重启只展示恢复摘要；已批准未完成任务经明确`/resume`才续算，待审批任务仍须确认，普通追问不执行计算。
+
+分阶段公开入口支持可选`on_progress`回调，事件类型经`rto.runtime`导出。M2按实际搜索点评价计数，M4按完整入围候选计数；严格重载后报告复用，系统错误与无可行结果分别报告。回调不改变求解、配对评价、结果或v4持久化合同，RTO不依赖Agent框架，临时进度不能代替物理证据。
 
 ## 当前优化算法
 
@@ -109,15 +116,21 @@ flowchart LR
 
 同一七字段结构直接返回Agent并写为格式化`result.json`。完成路径不为了生成回复再读取文件、不重复校验manifest哈希、不重放物理证据、不比较策略副本。其他候选只是同一次离线计算的设定点组合，不是`StrategyEntry`、策略草案或已批准策略。
 
-当前Agent的`/result [workflow_id]`严格重载指定运行的内部证据，再构造可读业务结果；当前进程已经完成的结果直接复用。外部结果路径不作为模型参数。
+当前Agent的`/result <workflow_id>`严格重载指定运行，再构造可读业务结果；不带编号时读取当前会话已经保存的结果。重启、显式恢复或重复确认已完成方案时重新核对磁盘证据，取消后保留的最近结果也在启动恢复时独立验真。外部结果路径不作为模型参数。
 
 ## 内部workflow与开发者检查
 
 RTO仍保存内部阶段文件以支持恢复：请求、Intent、Context、能力快照、Problem、路线、静态求解、短名单、动态评价、最终选择、可选锚点、`workflow.json`、事件链、manifest和CDU证据。当前offline workflow合同版本为`4.0.0`，manifest版本为`offline-rto-manifest-4.0.0`。`result.json`是从内存生成的独立可读投影，不是内部manifest的一部分。
 
-新鲜运行在提交内部workflow后直接返回内存记录；普通Agent不会随后重新读取内部workflow。七字段结果改变了严格公共合同，当前reader不兼容旧v3六字段结果。需要诊断当前版本内部文件时，开发者可显式调用`inspect_offline`或`rto-offline inspect`。该独立路径会检查当前合同、文件集、哈希、引用、事件和可重建结果，且不应启动新的物理仿真。
+新鲜运行在提交内部workflow后直接返回内存记录，完成时的结果投影不为生成回复重复读取内部workflow。七字段结果改变了严格公共合同，当前reader不兼容旧v3六字段结果。开发者可用`inspect_offline`或`rto-offline inspect`检查当前合同、文件集、哈希、引用、事件和可重建结果；读取已有证据不启动新的物理仿真。
 
 新鲜运行从内存生成结果；读取已有持久化运行时执行严格证据检查。这是不同数据来源的验证边界。
+
+`read_prepared_static`和`read_prepared_result`提供与固定方案绑定的只读阶段入口：缺少M2完整检查点或最终manifest时明确失败，不通过恢复读取补算。Agent在M2/M4节点分别保存回执；恢复后阶段内容与严格重载结果比对，完整阶段复用不新增仿真，半个阶段仍沿用原编排恢复规则，不承诺每个候选恰好执行一次。
+
+回执中的`physical_m2_executions`和`physical_m4_executions`是产生该回执时的历史调用计数。恢复校验只要求其为非负整数，不重新证明历史次数，也不把保留的旧计数解释为本次新增仿真；其他字段仍必须与磁盘重载结果一致。内容指纹支持损坏检测，不等于身份认证或恶意防篡改证明。
+
+Agent的`/cancel`只取消后续任务，已有结果保留；`/clear`清除Assistant当前会话全部可恢复记录和授权，保留模型选择以及磁盘RTO证据。清除会话后不能凭旧审批继续，必须重新准备、展示并确认；严格匹配的已有完整阶段仍可复用。
 
 ## 策略v3
 
@@ -143,7 +156,7 @@ RTO仍保存内部阶段文件以支持恢复：请求、Intent、Context、能�
 - 唯一真实仿真实现是CDU Mini Loop适配器；第二后端尚未证明可替换性。
 - 当前只支持两个高层决策、最多三个已发布目标和固定M2/M4漏斗。
 - 额外业务约束尚无受信参数绑定。
-- 系统同步、单进程、离线运行；没有服务、数据库、在线调度或现场接口。
+- RTO同步、离线运行，文件证据保持原合同；没有数据库服务、在线调度或现场接口。Assistant使用本机SQLite保存一个当前会话并拒绝并发写入，不扩展RTO依赖。
 - point或有限采样锚点不能外推为连续现场适用域。
 
 ## 相关资料

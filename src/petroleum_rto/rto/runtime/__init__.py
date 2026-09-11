@@ -1,5 +1,7 @@
 """Public runtime surface for the offline RTO workflow."""
 
+from ..contracts.context import OperatingContext
+from ..progress import RtoProgress, RtoProgressCallback
 from .api import (
     OfflineInspectionError,
     OfflineRunRecord,
@@ -30,6 +32,7 @@ from .chat_summary import (
 __all__ = [
     "OfflineInspectionError",
     "OfflineRunRecord",
+    "OperatingContext",
     "OptimizationAdjustmentSummary",
     "OptimizationAlternativeCandidateSummary",
     "OptimizationBaselineSummary",
@@ -39,15 +42,21 @@ __all__ = [
     "OptimizationRunSummary",
     "OptimizationTargetSummary",
     "PreparedOptimization",
+    "RtoProgress",
+    "RtoProgressCallback",
     "approve_strategy",
     "build_chat_operating_status",
     "build_intent_communication_service",
     "build_optimization_run_summary",
     "capabilities",
+    "dump_prepared_optimization",
     "inspect_offline",
+    "load_prepared_optimization",
     "prepare_optimization",
     "publish_strategy",
     "query_strategies",
+    "read_prepared_result",
+    "read_prepared_static",
     "render_confirmation",
     "run_confirmed_optimization",
     "run_offline",
@@ -61,7 +70,11 @@ __all__ = [
 from .staged import (
     OptimizationPreparationError,
     PreparedOptimization,
+    dump_prepared_optimization,
+    load_prepared_optimization,
     prepare_optimization,
+    read_prepared_result,
+    read_prepared_static,
     render_confirmation,
     solve_prepared_optimization,
     verify_prepared_optimization,

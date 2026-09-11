@@ -8,7 +8,7 @@ import httpx
 import pytest
 from langchain_core.messages import HumanMessage, ToolMessage
 
-from petroleum_rto.domain_model.models import DEFAULT_MODEL_ID, ModelSelection, model_profile
+from petroleum_rto.domain_model.models import ModelSelection, model_profile
 from petroleum_rto.domain_model.native import (
     DmxNativeModel,
     NativeModelError,
@@ -16,8 +16,11 @@ from petroleum_rto.domain_model.native import (
     request_payload,
 )
 
+FLASH_MODEL_ID = "deepseek-v4-flash-0731"
 
-def selection(model: str = DEFAULT_MODEL_ID) -> ModelSelection:
+
+def selection(model: str = FLASH_MODEL_ID) -> ModelSelection:
+    """Chat fixtures select Flash explicitly, independently of the startup default."""
     return ModelSelection(model_profile(model))
 
 
@@ -295,8 +298,8 @@ def test_responses_sse_preserves_opaque_output_and_call_id() -> None:
 @pytest.mark.parametrize(
     "model,mode,expected",
     [
-        (DEFAULT_MODEL_ID, "default", {"enable_thinking": False}),
-        (DEFAULT_MODEL_ID, "off", {"enable_thinking": False}),
+        (FLASH_MODEL_ID, "default", {"enable_thinking": False}),
+        (FLASH_MODEL_ID, "off", {"enable_thinking": False}),
         ("deepseek-v4-pro-0813", "off", {"thinking": {"type": "disabled"}}),
         ("qwen3.8-max-0902", "on", {"enable_thinking": True, "preserve_thinking": True}),
         ("kimi-k3", "default", {}),
@@ -314,7 +317,7 @@ def test_model_specific_thinking_parameters(
 
 def test_flash_thinking_is_rejected_before_constructing_a_request() -> None:
     with pytest.raises(ValueError, match="Flash渠道仅使用非思考模式"):
-        ModelSelection(model_profile(DEFAULT_MODEL_ID), thinking="on")
+        ModelSelection(model_profile(FLASH_MODEL_ID), thinking="on")
 
 
 def test_responses_incomplete_event_never_becomes_executable_output() -> None:

@@ -9,128 +9,168 @@ import pytest
 from langchain_core.messages import ToolMessage
 from test_native_protocol import Wire, call, chat
 
-from petroleum_rto.assistant import native_tools
-from petroleum_rto.assistant.native_tools import AgentDomainTools, ConfirmationInputError
+from petroleum_rto.assistant import react
+from petroleum_rto.assistant.native_tools import AgentDomainTools
 from petroleum_rto.assistant.react import ReactAgent
+from petroleum_rto.assistant.session import SessionError, SessionStore
+from petroleum_rto.assistant.state import new_session
 from petroleum_rto.domain_model.models import DEFAULT_MODEL_ID, ModelSelection, model_profile
-from petroleum_rto.domain_model.native import DmxNativeModel, NativeTransport
-from petroleum_rto.rto.runtime import OptimizationPreparationError
+from petroleum_rto.rto.runtime import OptimizationPreparationError, load_prepared_optimization
 
 
-def arguments(domain: AgentDomainTools, *, pressure: bool = True) -> dict[str, Any]:
-    snapshot = domain.operating_context()["snapshot_ref"]
+def arguments(
+    domain: AgentDomainTools, state: dict[str, Any] | None = None, *, pressure: bool = True
+) -> dict[str, Any]:
+    if state is None:
+        state = new_session(ModelSelection(model_profile(DEFAULT_MODEL_ID)))
+    snapshot = domain.operating_context(state)["snapshot_ref"]
     return {
         "snapshot_ref": snapshot,
         "objectives": [{"metric_id": "valuable_distillate_yield", "sense": "maximize"}],
         "decision_variables": ["furnace_temperature_target_k"]
         + (["tower_top_pressure_target_pa_a"] if pressure else []),
-        "previous_plan_ref": domain.pending.ref if domain.pending else None,
+        "previous_plan_ref": state["pending"]["ref"] if state["pending"] else None,
     }
 
 
-def test_capability_to_prepare_repairs_fields_without_changing_user_goal(
-    repo_root: Path,
-    stages: list[Any],
+def prepared(
+    repo_root: Path, *, wire: Wire | None = None, store: SessionStore | None = None
+) -> ReactAgent:
+    domain = AgentDomainTools(repo_root)
+    wire = wire or Wire([])
+    wire.replies[:0] = [
+        chat(None, calls=[call("read_operating_context", call_id="prepare-context")]),
+        chat(
+            None,
+            calls=[call("prepare_optimization", json.dumps(arguments(domain)), "prepare-plan")],
+        ),
+        chat("方案已准备，请审阅程序摘要。"),
+    ]
+    runtime = ReactAgent(wire.model(), domain, store=store)
+    result = runtime.handle("提高收率，允许调温度和压力")
+    assert not result.errors, result.errors
+    assert runtime.data["pending"]["status"] == "awaiting_confirmation"
+    assert "允许调整：炉出口温度目标、塔顶压力目标" in "".join(result.outputs)
+    return runtime
+
+
+@pytest.fixture
+def stages(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
+    calls: list[Any] = []
+    static = {"static_ref": "static-1", "status": "static_complete"}
+    result = {"status": "complete", "result": {"status": "feasible_not_publishable"}}
+
+    def solve(plan: Any, **kwargs: Any) -> dict[str, Any]:
+        calls.append(("M2", plan))
+        return dict(static)
+
+    def verify(plan: Any, **kwargs: Any) -> dict[str, Any]:
+        calls.append(("M4", plan))
+        assert kwargs["static_ref"] == static["static_ref"]
+        return dict(result)
+
+    monkeypatch.setattr(react, "solve_prepared_optimization", solve)
+    monkeypatch.setattr(react, "verify_prepared_optimization", verify)
+    monkeypatch.setattr(react, "read_prepared_static", lambda *a, **kw: dict(static))
+    monkeypatch.setattr(react, "read_prepared_result", lambda *a, **kw: dict(result))
+    return calls
+
+
+def test_tool_contract_has_no_model_controlled_approval_or_stage_calls(repo_root: Path) -> None:
+    wire = Wire([])
+    runtime = prepared(repo_root, wire=wire)
+    names = {t["function"]["name"] for t in wire.requests[0]["tools"]}
+    assert names == {
+        "get_plant_info",
+        "read_operating_context",
+        "prepare_optimization",
+        "cancel_optimization",
+        "inspect_optimization",
+        "read_tool_result",
+    }
+    schema = next(
+        t["function"]
+        for t in wire.requests[0]["tools"]
+        if t["function"]["name"] == "prepare_optimization"
+    )
+    assert "constraints" not in schema["parameters"]["properties"]
+    info = runtime.domain.plant_info(runtime.data)
+    assert info["tool_contract_version"] == "3.0.0"
+    assert "自动" in info["preparation"]["constraints"]
+    runtime.close()
+
+
+def test_tool_field_repair_preserves_goals_and_guardrails_without_computation(
+    repo_root: Path, stages: list[Any]
 ) -> None:
     domain = AgentDomainTools(repo_root)
-    step = 0
-    expected_args: dict[str, Any] = {}
+    args = arguments(domain)
+    wire = Wire(
+        [
+            chat(None, calls=[call("read_operating_context", call_id="context")]),
+            chat(
+                None,
+                calls=[
+                    call(
+                        "prepare_optimization",
+                        json.dumps(args | {"constraints": ["quality-proxy-preservation"]}),
+                        "constraints",
+                    )
+                ],
+            ),
+            chat(
+                None,
+                calls=[
+                    call("prepare_optimization", json.dumps(args | {"max_candidates": 33}), "count")
+                ],
+            ),
+            chat(
+                None,
+                calls=[
+                    call("prepare_optimization", json.dumps(args | {"max_candidates": 1}), "valid")
+                ],
+            ),
+            chat("已保留用户目标与变量，请单独确认。"),
+        ]
+    )
+    runtime = ReactAgent(wire.model(), domain)
+    reply = runtime.handle("提高收率，允许调温度和压力，保留质量门禁。开始吧。")
+    assert not reply.errors
+    results = [json.loads(str(m.content)) for m in runtime.messages if isinstance(m, ToolMessage)]
+    assert results[1]["issues"][0]["json_pointer"] == "/constraints"
+    assert "自动保留" in results[1]["issues"][0]["message"]
+    assert results[2]["issues"][0]["code"] == "result-count-out-of-range"
+    assert results[2]["issues"][0]["maximum"] == 3
+    plan = load_prepared_optimization(runtime.data["pending"]["prepared"])
+    assert plan.intent.objectives[0].metric_id == "valuable_distillate_yield"
+    assert set(plan.intent.decision_variables) == set(args["decision_variables"])
+    assert len(plan.problem.hard_constraints) == 4
+    assert len(plan.problem.publishability_constraints) == 1
+    assert runtime.data["pending"]["status"] == "awaiting_confirmation" and not stages
+    runtime.close()
 
-    def handle(request: httpx.Request) -> httpx.Response:
-        nonlocal step, expected_args
-        payload = json.loads(request.content)
-        messages = payload["messages"]
-        tool_results = [json.loads(m["content"]) for m in messages if m["role"] == "tool"]
-        if step == 0:
-            schema = next(
-                t["function"]
-                for t in payload["tools"]
-                if t["function"]["name"] == "prepare_optimization"
-            )
-            assert "constraints" not in schema["parameters"]["properties"]
-            reply = chat(None, calls=[call("get_plant_info", call_id="c1")])
-        elif step == 1:
-            info = tool_results[-1]
-            assert info["tool_contract_version"] == "2.0.0"
-            assert "自动" in info["preparation"]["constraints"]
-            expected_args = {
-                "objectives": [
-                    {"metric_id": "specific_furnace_fuel_energy_mj_per_t", "sense": "minimize"}
-                ],
-                "decision_variables": [
-                    d["decision_id"]
-                    for d in info["capabilities"]["decisions"]
-                    if d["availability"] == "available"
-                ],
-            }
-            reply = chat(None, calls=[call("read_operating_context", call_id="c2")])
-        elif step == 2:
-            expected_args["snapshot_ref"] = tool_results[-1]["snapshot_ref"]
-            reply = chat(
-                None,
-                calls=[
-                    call(
-                        "prepare_optimization",
-                        json.dumps(expected_args | {"constraints": ["quality-proxy-preservation"]}),
-                        "c3",
-                    )
-                ],
-            )
-        elif step == 3:
-            issue = tool_results[-1]["issues"][0]
-            assert issue["json_pointer"] == "/constraints" and "自动保留" in issue["message"]
-            reply = chat(
-                None,
-                calls=[
-                    call(
-                        "prepare_optimization",
-                        json.dumps(expected_args | {"max_candidates": 33}),
-                        "c4",
-                    )
-                ],
-            )
-        elif step == 4:
-            issue = tool_results[-1]["issues"][0]
-            assert issue["code"] == "result-count-out-of-range"
-            assert issue["json_pointer"] == "/max_candidates" and issue["maximum"] == 3
-            reply = chat(
-                None,
-                calls=[
-                    call(
-                        "prepare_optimization",
-                        json.dumps(expected_args | {"max_candidates": 1}),
-                        "c5",
-                    )
-                ],
-            )
-        else:
-            assert step == 5 and tool_results[-1]["status"] == "prepared"
-            reply = chat("方案已准备，请审阅程序摘要。")
-        step += 1
-        return httpx.Response(200, json=reply)
 
-    transport = NativeTransport("fake-private-api-key", http_transport=httpx.MockTransport(handle))
-    runtime = ReactAgent(
-        DmxNativeModel(
-            transport=transport,
-            selection=ModelSelection(model_profile(DEFAULT_MODEL_ID)),
-            use_stream=False,
-        ),
-        domain,
+def test_model_failure_before_plan_display_cannot_leave_an_approvable_plan(
+    repo_root: Path, stages: list[Any]
+) -> None:
+    domain = AgentDomainTools(repo_root)
+    wire = Wire(
+        [
+            chat(None, calls=[call("read_operating_context", call_id="context")]),
+            chat(
+                None, calls=[call("prepare_optimization", json.dumps(arguments(domain)), "prepare")]
+            ),
+            *[httpx.ConnectError("private-provider-detail") for _ in range(3)],
+        ]
     )
-    turn = runtime.handle(
-        "降低单位进料炉燃料热负荷，允许调炉温和压力，保住现有质量和收率门禁。可以，开始吧。"
-    )
-    assert not turn.errors and step == 6
-    assert domain.pending is not None and domain.pending.eligible and not domain.pending.authorized
-    prepared_plan = domain.pending.prepared
-    assert (
-        prepared_plan.intent.objectives[0].metric_id == expected_args["objectives"][0]["metric_id"]
-    )
-    assert set(prepared_plan.intent.decision_variables) == set(expected_args["decision_variables"])
-    assert len(prepared_plan.problem.hard_constraints) == 4
-    assert len(prepared_plan.problem.publishability_constraints) == 1
-    assert not stages
+    runtime = ReactAgent(wire.model(), domain)
+    reply = runtime.handle("准备优化")
+    assert reply.errors and "private-provider-detail" not in str(reply)
+    assert len(wire.requests) == 5 and not wire.replies
+    assert runtime.data["pending"]["status"] == "revision_required"
+    assert runtime.data["pending"]["displayed_turn"] is None
+    assert runtime.handle("/confirm").errors and not stages
+    assert len(wire.requests) == 5
     runtime.close()
 
 
@@ -139,18 +179,110 @@ def test_prepare_result_count_uses_current_route_limit(
     repo_root: Path, count: int, maximum: int
 ) -> None:
     domain = AgentDomainTools(repo_root)
-    domain.begin_turn("准备方案")
-    args = arguments(domain)
+    state = new_session(ModelSelection(model_profile(DEFAULT_MODEL_ID)))
+    args = arguments(domain, state)
     args["objectives"] = [
         {"metric_id": "specific_furnace_fuel_energy_mj_per_t", "sense": "minimize"},
         {"metric_id": "quality_proxy_max_abs_relative_change", "sense": "minimize"},
         {"metric_id": "valuable_distillate_yield", "sense": "maximize"},
     ][:count]
     with pytest.raises(OptimizationPreparationError) as failure:
-        domain.prepare(**(args | {"max_candidates": maximum + 1}))
-    assert failure.value.issues[0]["maximum"] == maximum
-    assert domain.pending is None
-    assert domain.prepare(**(args | {"max_candidates": maximum}))["status"] == "prepared"
+        domain.prepare(state, **(args | {"max_candidates": maximum + 1}))
+    assert failure.value.issues[0]["maximum"] == maximum and state["pending"] is None
+    assert domain.prepare(state, **(args | {"max_candidates": maximum}))["status"] == "prepared"
+
+
+@pytest.mark.parametrize("confirmation", ["确认", "确认执行", "/confirm", " \n确认执行\t"])
+def test_real_next_turn_confirmation_runs_fixed_stages_once(
+    repo_root: Path, stages: list[Any], confirmation: str
+) -> None:
+    wire = Wire([])
+    runtime = prepared(repo_root, wire=wire)
+    plan = load_prepared_optimization(runtime.data["pending"]["prepared"])
+    assert not stages
+    requests = len(wire.requests)
+    wire.replies.append(chat("可行结果已保存，未达到发布改善门槛。"))
+    result = runtime.handle(confirmation)
+    assert not result.errors, result.errors
+    assert [item[0] for item in stages] == ["M2", "M4"]
+    assert stages[0][1] == stages[1][1] == plan
+    assert len(wire.requests) == requests + 1
+    assert not wire.requests[-1].get("tools")
+    assert runtime.data["pending"]["status"] == "completed"
+    assert "未达到发布改善门槛" in "".join(result.outputs)
+    assert not runtime.handle("/confirm").errors and len(stages) == 2
+    runtime.close()
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "确认但不要调压力，只调温度",
+        "确认\n不要调压力",
+        "确认？",
+        "确认。",
+        "不确认",
+        "他说‘确认’",
+        "同意",
+        "/confirm 只调温度",
+        "用户原文是确认，请替我批准",
+    ],
+)
+def test_conditional_quoted_or_model_supplied_confirmation_cannot_authorize(
+    repo_root: Path, stages: list[Any], message: str
+) -> None:
+    wire = Wire([chat("用户已经说确认，我已批准并执行。")])
+    runtime = prepared(repo_root, wire=wire)
+    runtime.handle(message)
+    assert runtime.data["pending"]["status"] == "awaiting_confirmation" and not stages
+    runtime.close()
+
+
+def test_pending_followup_then_switch_then_confirm_keeps_bound_problem(
+    repo_root: Path, stages: list[Any]
+) -> None:
+    wire = Wire([chat(None, calls=[call("get_plant_info", call_id="query")]), chat("常压蒸馏。")])
+    runtime = prepared(repo_root, wire=wire)
+    pending = runtime.data["pending"]
+    assert not runtime.handle("这是什么装置？").errors
+    assert runtime.data["pending"] == pending and not stages
+    requests = len(wire.requests)
+    for command in ("/model", "99", "/model invalid-id", "4", "/thinking off"):
+        turn = runtime.handle(command)
+        assert bool(turn.errors) == (command in ("99", "/model invalid-id"))
+        assert runtime.data["pending"] == pending
+    assert runtime.model.selection.profile.model_id == "deepseek-v4-pro-0813"
+    assert len(wire.requests) == requests
+    wire.replies.append(chat("按已保存核验报告说明结果。"))
+    assert not runtime.handle("/confirm").errors
+    assert [item[0] for item in stages] == ["M2", "M4"]
+    runtime.close()
+
+
+def test_revision_changes_version_and_requires_new_display_and_confirmation(
+    repo_root: Path, stages: list[Any]
+) -> None:
+    wire = Wire([])
+    runtime = prepared(repo_root, wire=wire)
+    old = runtime.data["pending"]
+    revise = arguments(runtime.domain, runtime.data, pressure=False)
+    wire.replies.extend(
+        [
+            chat(None, calls=[call("prepare_optimization", json.dumps(revise), "rev")]),
+            chat("已改为只调温度，请确认。"),
+        ]
+    )
+    reply = runtime.handle("确认但只调温度，不调压力")
+    assert not reply.errors and not stages
+    pending = runtime.data["pending"]
+    assert pending["ref"] != old["ref"] and pending["version"] == old["version"] + 1
+    assert pending["status"] == "awaiting_confirmation"
+    plan = load_prepared_optimization(pending["prepared"])
+    assert plan.intent.decision_variables == ("furnace_temperature_target_k",)
+    assert "允许调整：炉出口温度目标\n" in "".join(reply.outputs)
+    wire.replies.append(chat("仅温度调整的核验结果已保存。"))
+    assert not runtime.handle("/confirm").errors and stages[0][1] == plan
+    runtime.close()
 
 
 @pytest.mark.parametrize(
@@ -167,25 +299,35 @@ def test_prepare_result_count_uses_current_route_limit(
             "objective-sense-mismatch",
             "/objectives/0/sense",
         ),
+        ({"previous_plan_ref": "stale-plan"}, "stale-plan-reference", "/previous_plan_ref"),
     ],
 )
-def test_prepare_reports_specific_business_field_and_suspends_old_plan(
-    repo_root: Path,
-    bad: dict[str, Any],
-    code: str,
-    pointer: str,
+def test_failed_business_revision_preserves_specific_error_and_revokes_old_approval(
+    repo_root: Path, stages: list[Any], bad: dict[str, Any], code: str, pointer: str
 ) -> None:
-    domain = prepared(repo_root)
-    old = domain.pending
-    domain.begin_turn("修改方案")
-    with pytest.raises(OptimizationPreparationError) as failure:
-        domain.prepare(**(arguments(domain) | bad))
-    assert failure.value.issues[0]["code"] == code
-    assert failure.value.issues[0]["json_pointer"] == pointer
-    assert domain.pending is old and old is not None and not old.eligible
+    wire = Wire([])
+    runtime = prepared(repo_root, wire=wire)
+    old = runtime.data["pending"]
+    args = arguments(runtime.domain, runtime.data) | bad
+    wire.replies.extend(
+        [
+            chat(None, calls=[call("prepare_optimization", json.dumps(args), "bad")]),
+            chat("修改失败，请核对请求。"),
+        ]
+    )
+    assert not runtime.handle("修改方案").errors
+    pending = runtime.data["pending"]
+    assert pending["ref"] == old["ref"] and pending["status"] == "revision_required"
+    message = [m for m in runtime.messages if isinstance(m, ToolMessage)][-1]
+    issue = json.loads(str(message.content))["issues"][0]
+    assert issue["code"] == code and issue["json_pointer"] == pointer
+    assert runtime.handle("/confirm").errors and runtime.handle("/resume").errors and not stages
+    runtime.close()
 
 
-def test_schema_error_does_not_reflect_untrusted_values(repo_root: Path) -> None:
+def test_native_schema_failure_revokes_old_approval_without_reflecting_untrusted_values(
+    repo_root: Path, stages: list[Any]
+) -> None:
     wire = Wire(
         [
             chat(
@@ -200,484 +342,218 @@ def test_schema_error_does_not_reflect_untrusted_values(repo_root: Path) -> None
                                 "secret-field": "sensitive-value",
                             }
                         ),
+                        "bad-schema",
                     )
                 ],
             ),
-            chat("参数错误"),
+            chat("参数错误。"),
         ]
     )
-    runtime = ReactAgent(wire.model(), AgentDomainTools(repo_root))
-    runtime.handle("准备方案")
-    result = next(m for m in runtime.messages if isinstance(m, ToolMessage))
+    runtime = prepared(repo_root, wire=wire)
+    runtime.handle("改一下")
+    result = [m for m in runtime.messages if isinstance(m, ToolMessage)][-1]
     assert "sensitive-value" not in result.content and "secret-field" not in result.content
-    assert json.loads(result.content)["code"] == "invalid-tool-arguments"
-
-
-def prepared(repo_root: Path) -> AgentDomainTools:
-    domain = AgentDomainTools(repo_root)
-    domain.begin_turn("提高收率，允许调温度和压力")
-    domain.prepare(**arguments(domain))
-    assert domain.displays(success=True)
-    return domain
-
-
-def decision(domain: AgentDomainTools, action: str = "confirm", **overrides: Any) -> dict[str, Any]:
-    assert domain.pending
-    return {
-        "plan_ref": domain.pending.ref,
-        "action": action,
-        "user_turn_id": domain.turn_id,
-        "user_message": domain.user_message,
-        **overrides,
-    }
-
-
-@pytest.fixture
-def stages(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
-    calls: list[Any] = []
-
-    def solve(plan: Any, **kwargs: Any) -> dict[str, Any]:
-        calls.append(("M2", plan))
-        return {"static_ref": "static-1", "status": "static_complete"}
-
-    def verify(plan: Any, **kwargs: Any) -> dict[str, Any]:
-        calls.append(("M4", plan))
-        return {"status": "complete", "result": {"status": "feasible_not_publishable"}}
-
-    monkeypatch.setattr(native_tools, "solve_prepared_optimization", solve)
-    monkeypatch.setattr(native_tools, "verify_prepared_optimization", verify)
-    return calls
-
-
-@pytest.mark.parametrize("confirmation", ["确认", "确认执行", " \n确认执行\t"])
-def test_snapshot_binding_and_next_turn_confirmation(
-    repo_root: Path, stages: list[Any], confirmation: str
-) -> None:
-    domain = AgentDomainTools(repo_root)
-    domain.begin_turn("提高收率")
-    domain.prepare(**arguments(domain))
-    assert domain.pending
-    plan = domain.pending
-    with pytest.raises(ValueError):
-        domain.manage(**decision(domain))
-    with pytest.raises(ValueError):
-        domain.solve(plan.ref)
-    assert not stages
-    assert "塔顶压力目标" in domain.displays(success=True)[0]
-    domain.begin_turn(confirmation)
-    domain.manage(**decision(domain))
-    domain.snapshots.clear()  # execution uses the prepared object, never reloads by path/ref
-    static = domain.solve(plan.ref)
-    domain.verify(plan.ref, static["static_ref"])
-    domain.solve(plan.ref)
-    domain.verify(plan.ref, static["static_ref"])
-    assert [s[0] for s in stages] == ["M2", "M4"]
-    assert stages[0][1] is stages[1][1] is plan.prepared
+    assert json.loads(str(result.content))["code"] == "invalid-tool-arguments"
+    assert runtime.data["pending"]["status"] == "revision_required"
+    assert runtime.handle("/confirm").errors and not stages
+    runtime.close()
 
 
 @pytest.mark.parametrize(
-    "message",
-    [
-        "确只调整出口温度，不调整 压力目标",
-        "我说了不要调整压力，只调整温度啊",
-        "只调整出口温度，不调整压力目标",
-        "确认但不要调压力，只调温度",
-        "确认\n不要调压力",
-        "确认？",
-        "确认。",
-        "不确认",
-        "他说‘确认’",
-        "同意",
-        "/confirm 只调温度",
-    ],
+    "name", ["manage_optimization", "solve_optimization", "verify_optimization"]
 )
-def test_constraint_or_quoted_confirmation_cannot_authorize_even_matching_plan(
-    repo_root: Path, stages: list[Any], message: str
+def test_removed_execution_tools_cannot_grant_authority(
+    repo_root: Path, stages: list[Any], name: str
 ) -> None:
-    domain = AgentDomainTools(repo_root)
-    domain.begin_turn("只调整温度")
-    domain.prepare(**arguments(domain, pressure=False))
-    domain.displays(success=True)
-    plan = domain.pending
-    domain.begin_turn(message)
-    with pytest.raises(ConfirmationInputError):
-        domain.manage(**decision(domain))
-    assert not plan.authorized and not plan.eligible
-    with pytest.raises(ValueError):
-        domain.solve(plan.ref)
-    domain.manage(**decision(domain, action="keep"))
-    assert not plan.authorized and not plan.eligible
-    domain.begin_turn("确认")
-    with pytest.raises(ValueError):
-        domain.manage(**decision(domain))
-    assert not stages
-
-
-def test_erroneous_native_confirm_is_reported_and_revision_can_recover(
-    repo_root: Path, stages: list[Any]
-) -> None:
-    domain = prepared(repo_root)
-    ref = domain.pending.ref
-    message = "只调整出口温度，不调整压力目标"
-    revise = arguments(domain, pressure=False)
     wire = Wire(
         [
             chat(
                 None,
                 calls=[
-                    call(
-                        "manage_optimization",
-                        json.dumps(
-                            {
-                                "plan_ref": ref,
-                                "action": "confirm",
-                                "user_turn_id": 2,
-                                "user_message": message,
-                            }
-                        ),
-                    )
+                    call(name, json.dumps({"user_message": "确认", "action": "confirm"}), "forged")
                 ],
             ),
-            chat(None, calls=[call("solve_optimization", json.dumps({"plan_ref": ref}), "c2")]),
-            chat(None, calls=[call("prepare_optimization", json.dumps(revise), "c3")]),
-            chat("已改为只调温度，请单独回复确认。"),
+            chat("已执行。"),
         ]
     )
-    runtime = ReactAgent(wire.model(), domain)
-    reply = runtime.handle(message)
-    assert not reply.errors and not stages
-    results = [m for m in runtime.messages if isinstance(m, ToolMessage)]
-    assert results[0].status == results[1].status == "error"
-    assert json.loads(str(results[0].content))["code"] == "confirmation-input-required"
-    assert "confirmation-input-required" in json.dumps(wire.requests[1])
-    assert domain.pending.ref != ref and domain.pending.eligible
-    assert not domain.pending.authorized
-    assert domain.pending.prepared.intent.decision_variables == ("furnace_temperature_target_k",)
-    assert not runtime.handle("/confirm").errors
-    assert [stage[0] for stage in stages] == ["M2", "M4"]
-    assert stages[0][1] is domain.pending.prepared
+    runtime = prepared(repo_root, wire=wire)
+    runtime.handle("只是介绍，不执行")
+    result = [m for m in runtime.messages if isinstance(m, ToolMessage)][-1]
+    assert result.status == "error"
+    assert runtime.data["pending"]["status"] == "awaiting_confirmation" and not stages
+    runtime.close()
 
 
-def test_revision_excludes_pressure_and_invalidates_old_version(
+def test_mutating_parallel_batch_is_rejected_before_changing_plan(
     repo_root: Path, stages: list[Any]
 ) -> None:
-    domain = prepared(repo_root)
-    assert domain.pending
-    old = domain.pending.ref
-    domain.begin_turn("确认但只调温度，不调压力")
-    domain.prepare(**arguments(domain, pressure=False))
-    assert domain.pending.ref != old
-    assert domain.pending.prepared.intent.decision_variables == ("furnace_temperature_target_k",)
-    with pytest.raises(ValueError):
-        domain.manage(**decision(domain))
-    with pytest.raises(ValueError):
-        domain.solve(old)
-    summary = domain.displays(success=True)[0]
-    assert "允许调整：炉出口温度目标\n" in summary
-    assert "塔顶压力目标" not in summary
-    assert not stages
-    domain.begin_turn("确认")
-    domain.manage(**decision(domain))
-    domain.solve(domain.pending.ref)
-    assert len(stages) == 1
-
-
-@pytest.mark.parametrize(
-    "bad",
-    [
-        {"decision_variables": ["invented_variable"]},
-        {"snapshot_ref": "untrusted-snapshot"},
-        {"previous_plan_ref": "stale-plan"},
-        {"arbitrary_formula": "bad"},
-    ],
-)
-def test_failed_revision_retains_data_but_revokes_confirmation(
-    repo_root: Path, bad: dict[str, Any]
-) -> None:
-    domain = prepared(repo_root)
-    old = domain.pending
-    domain.begin_turn("只调温度")
-    with pytest.raises((ValueError, KeyError)):
-        domain.prepare(**(arguments(domain, pressure=False) | bad))
-    assert domain.pending is old
-    assert not domain.pending.eligible
-    domain.begin_turn("确认")
-    with pytest.raises(ValueError):
-        domain.manage(**decision(domain))
-
-
-def test_entire_current_user_message_and_turn_are_required(repo_root: Path) -> None:
-    domain = prepared(repo_root)
-    domain.begin_turn("确认，但是不要压力")
-    with pytest.raises(ValueError):
-        domain.manage(**decision(domain, user_message="确认"))
-    with pytest.raises(ValueError):
-        domain.manage(**decision(domain, user_turn_id=domain.turn_id - 1))
-
-
-def test_confirmation_projection_distinguishes_display_and_current_turn_decision(
-    repo_root: Path,
-) -> None:
-    domain = AgentDomainTools(repo_root)
-    domain.begin_turn("提高收率，只调温度")
-    domain.prepare(**arguments(domain, pressure=False))
-    pending = domain.state()["pending_plan"]
-    assert pending["confirmation_status"]["state"] == "awaiting_display"
-    assert not pending["confirmation_available"]
-    assert "下一轮" in pending["confirmation_status"]["message"]
-    domain.displays(success=True)
-    assert domain.state()["pending_plan"]["confirmation_status"]["state"] == "awaiting_confirmation"
-    domain.begin_turn("这是什么装置？")
-    pending = domain.inspect_result()["task"]["pending_plan"]
-    assert pending["confirmation_status"]["state"] == "awaiting_turn_decision"
-    assert not pending["confirmation_available"]
-    domain.manage(**decision(domain, "keep"))
-    assert domain.state()["pending_plan"]["confirmation_available"]
-    assert "尚未执行" in domain.displays(success=True)[0]
-
-
-def test_unresolved_reply_cannot_leave_a_stale_ready_projection(repo_root: Path) -> None:
-    domain = prepared(repo_root)
-    wire = Wire([chat("可直接确认执行。")])  # Deliberately wrong model statement.
-    runtime = ReactAgent(wire.model(), domain)
-    reply = runtime.handle("压力不对，我再想想")
-    assert "目前不能直接确认执行" in reply.outputs[-1]
-    pending = domain.inspect_result()["task"]["pending_plan"]
-    assert not pending["confirmation_available"]
-    assert pending["confirmation_status"]["state"] == "suspended"
-    assert runtime.handle("/confirm").errors
-
-
-def test_failed_preparation_display_does_not_advertise_ready_status(repo_root: Path) -> None:
-    domain = AgentDomainTools(repo_root)
-    domain.begin_turn("准备优化")
-    domain.prepare(**arguments(domain))
-    displays = domain.displays(success=False)
-    assert "暂停" in displays[-1]
-    assert domain.state()["pending_plan"]["confirmation_status"]["state"] == "suspended"
-    assert not domain.state()["pending_plan"]["confirmation_available"]
-
-
-def test_pending_query_keep_and_model_switch_preserve_plan(repo_root: Path) -> None:
-    domain = prepared(repo_root)
-    plan = domain.pending
-    wire = Wire(
-        [
-            chat(
-                None,
-                calls=[
-                    call(
-                        "manage_optimization",
-                        json.dumps(
-                            {
-                                "plan_ref": plan.ref,
-                                "action": "keep",
-                                "user_turn_id": 2,
-                                "user_message": "这是什么装置？",
-                            }
-                        ),
-                    )
-                ],
-            ),
-            chat(None, calls=[call("get_plant_info", call_id="c2")]),
-            chat("常压蒸馏"),
-        ]
-    )
-    runtime = ReactAgent(wire.model(), domain)
-    turn_id = domain.turn_id
-    assert plan.eligible
-    for text in ("/model", "99", "/model invalid-id", "4"):
-        turn = runtime.handle(text)
-        assert bool(turn.errors) == (text in ("99", "/model invalid-id"))
-        assert domain.pending is plan and plan.eligible
-        assert domain.turn_id == turn_id
-        assert not runtime.messages and not wire.requests
-    assert runtime.model.selection.profile.model_id == "deepseek-v4-pro-0813"
-    assert not runtime.handle("/thinking off").errors
-    assert runtime.domain.pending is plan
-    assert not runtime.handle("这是什么装置？").errors
-    assert domain.pending.eligible
-    assert "confirmation_available" in json.dumps(wire.requests[0])
-
-
-def test_leaving_model_selection_preserves_plan_but_cancel_still_cancels(repo_root: Path) -> None:
-    domain = prepared(repo_root)
-    plan = domain.pending
     wire = Wire([])
-    runtime = ReactAgent(wire.model(), domain)
-    turn_id = domain.turn_id
-    runtime.handle("/model")
-    closed = runtime.handle("0")
-    assert not closed.errors and "已退出模型选择" in closed.outputs[0]
-    assert domain.pending is plan and plan.eligible
-    assert domain.turn_id == turn_id and not runtime.messages
-    runtime.handle("/model")
-    assert not runtime.handle("/cancel").errors
-    assert domain.pending is None and not wire.requests
-
-
-def test_unresolved_pending_turn_and_transport_failure_suspend(repo_root: Path) -> None:
-    for reply in [chat("请澄清具体要求"), httpx.ConnectError("private")]:
-        domain = prepared(repo_root)
-        wire = Wire([reply])
-        runtime = ReactAgent(wire.model(), domain)
-        runtime.handle("那个不行，改一下")
-        assert not domain.pending.eligible
-        assert runtime.handle("/confirm").errors
-
-
-def test_native_schema_failure_cannot_keep_old_confirmation(repo_root: Path) -> None:
-    domain = prepared(repo_root)
-    old = domain.pending
-    wire = Wire(
+    runtime = prepared(repo_root, wire=wire)
+    old = runtime.data["pending"]
+    wire.replies.extend(
         [
-            chat(None, calls=[call("prepare_optimization", '{"unexpected":1}')]),
             chat(
                 None,
                 calls=[
                     call(
-                        "manage_optimization",
-                        json.dumps(
-                            {
-                                "plan_ref": old.ref,
-                                "action": "keep",
-                                "user_turn_id": 2,
-                                "user_message": "只调温度",
-                            }
-                        ),
-                        "c2",
-                    )
+                        "prepare_optimization",
+                        json.dumps(arguments(runtime.domain, runtime.data)),
+                        "batch-1",
+                    ),
+                    call("cancel_optimization", json.dumps({"plan_ref": old["ref"]}), "batch-2"),
                 ],
             ),
-            chat("修改失败"),
+            chat("需要逐步处理。"),
         ]
     )
-    runtime = ReactAgent(wire.model(), domain)
-    runtime.handle("只调温度")
-    assert domain.pending is old and not old.eligible
-    assert runtime.handle("/confirm").errors
-
-
-def test_mutating_parallel_batch_is_rejected_before_any_execution(
-    repo_root: Path, stages: list[Any]
-) -> None:
-    domain = prepared(repo_root)
-    domain.begin_turn("确认")
-    confirm = decision(domain)
-    # Runtime will start turn 2; rewind only the synthetic fixture's turn counter.
-    domain.turn_id -= 1
-    domain.pending.eligible = True
-    wire = Wire(
-        [
-            chat(
-                None,
-                calls=[
-                    call("manage_optimization", json.dumps(confirm)),
-                    call("solve_optimization", json.dumps({"plan_ref": domain.pending.ref}), "c2"),
-                ],
-            ),
-            chat("需顺序调用"),
-        ]
-    )
-    runtime = ReactAgent(wire.model(), domain)
-    runtime.handle("确认")
-    assert not stages
-    results = [m for m in runtime.messages if isinstance(m, ToolMessage)]
+    runtime.handle("修改方案")
+    results = [m for m in runtime.messages if isinstance(m, ToolMessage)][-2:]
     assert len(results) == 2 and all(m.status == "error" for m in results)
+    assert runtime.data["pending"]["ref"] == old["ref"] and not stages
+    runtime.close()
 
 
-@pytest.mark.parametrize("confirmation", ["确认", "确认执行"])
-def test_native_confirm_solve_verify_and_explanation_failure_preserves_result(
-    repo_root: Path, stages: list[Any], confirmation: str
+@pytest.mark.parametrize("command", ["/cancel", "/clear"])
+def test_cancel_and_clear_do_not_revive_pending_actions(
+    repo_root: Path, stages: list[Any], command: str
 ) -> None:
-    domain = prepared(repo_root)
-    ref = domain.pending.ref
-    wire = Wire(
-        [
-            chat(
-                None,
-                calls=[
-                    call(
-                        "manage_optimization",
-                        json.dumps(
-                            {
-                                "plan_ref": ref,
-                                "action": "confirm",
-                                "user_turn_id": 2,
-                                "user_message": confirmation,
-                            }
-                        ),
-                    )
-                ],
-            ),
-            chat(None, calls=[call("solve_optimization", json.dumps({"plan_ref": ref}), "c2")]),
-            chat(
-                None,
-                calls=[
-                    call(
-                        "verify_optimization",
-                        json.dumps({"plan_ref": ref, "static_ref": "static-1"}),
-                        "c3",
-                    )
-                ],
-            ),
-            httpx.ConnectError("private"),
-        ]
-    )
-    runtime = ReactAgent(wire.model(), domain)
-    result = runtime.handle(confirmation)
-    assert result.errors and "feasible_not_publishable" in "".join(result.outputs)
-    assert [stage[0] for stage in stages] == ["M2", "M4"]
-    assert "static_complete" in json.dumps(wire.requests[2])
-    assert "feasible_not_publishable" in runtime.handle("/result").outputs[0]
-    runtime.handle("/cancel")
-    assert domain.pending is None and domain.last_result is not None
-    assert len(stages) == 2
-
-
-def test_explicit_confirm_executes_without_model_then_cancel_preserves_result(
-    repo_root: Path, stages: list[Any]
-) -> None:
-    domain = prepared(repo_root)
     wire = Wire([])
-    runtime = ReactAgent(wire.model(), domain)
-    result = runtime.handle("/confirm")
-    assert not result.errors
-    assert len(stages) == 2 and not wire.requests
-    assert not runtime.handle("/confirm").errors
-    assert len(stages) == 2
-    runtime.handle("/cancel")
-    assert domain.pending is None and domain.last_result
+    runtime = prepared(repo_root, wire=wire)
+    requests = len(wire.requests)
+    runtime.handle("/model")
+    assert not runtime.handle("0").errors
+    assert not runtime.handle(command).errors
+    assert runtime.data["pending"] is None
+    runtime.handle("/confirm")
+    assert runtime.handle("/resume").errors and not stages and len(wire.requests) == requests
+    if command == "/clear":
+        assert not runtime.messages and not runtime.data["snapshots"]
+    runtime.close()
 
 
-def test_native_preparation_and_conditional_revision_are_displayed_without_simulation(
-    repo_root: Path, stages: list[Any]
+def test_pending_resume_cannot_grant_new_approval(repo_root: Path, stages: list[Any]) -> None:
+    runtime = prepared(repo_root)
+    assert runtime.handle("/resume").errors
+    assert runtime.data["pending"]["status"] == "awaiting_confirmation" and not stages
+    runtime.close()
+
+
+def _interrupt(*args: Any, **kwargs: Any) -> Any:
+    raise KeyboardInterrupt
+
+
+@pytest.mark.parametrize("valid", [True, False])
+def test_modifying_an_approved_unfinished_plan_revokes_its_existing_approval(
+    repo_root: Path, stages: list[Any], monkeypatch: pytest.MonkeyPatch, valid: bool
 ) -> None:
-    domain = AgentDomainTools(repo_root)
-    first_args = arguments(domain)
-    # Derive the expected program reference using an independent deterministic preparation.
-    reference = prepared(repo_root).pending.ref
-    second_args = {
-        **first_args,
-        "previous_plan_ref": reference,
-        "decision_variables": ["furnace_temperature_target_k"],
-    }
-    wire = Wire(
+    wire = Wire([])
+    runtime = prepared(repo_root, wire=wire)
+    solve = react.solve_prepared_optimization
+    monkeypatch.setattr(react, "solve_prepared_optimization", _interrupt)
+    assert runtime.handle("/confirm").errors
+    old = runtime.data["pending"]
+    assert old["status"] == "approved" and not stages
+    args = arguments(runtime.domain, runtime.data, pressure=False)
+    if not valid:
+        args["snapshot_ref"] = "untrusted-snapshot"
+    wire.replies.extend(
         [
-            chat(None, calls=[call("prepare_optimization", json.dumps(first_args))]),
-            chat("已准备方案，请确认"),
-            chat(None, calls=[call("prepare_optimization", json.dumps(second_args), "c2")]),
-            chat("已改为只调整温度"),
+            chat(None, calls=[call("prepare_optimization", json.dumps(args), "revise-approved")]),
+            chat("修改已处理，请核对程序状态。"),
         ]
     )
-    runtime = ReactAgent(wire.model(), domain)
-    first = runtime.handle("提高收率，允许调温度和压力")
-    assert not first.errors and "允许调整：炉出口温度目标、塔顶压力目标" in "".join(first.outputs)
-    second = runtime.handle("确只调整出口温度，不调整压力目标")
-    assert not second.errors and "允许调整：炉出口温度目标\n" in "".join(second.outputs)
-    assert domain.pending.eligible
-    assert not stages
-    assert len(wire.requests) == 4
+    assert not runtime.handle("只调温度，重新准备").errors
+    pending = runtime.data["pending"]
+    assert pending["status"] == ("awaiting_confirmation" if valid else "revision_required")
+    assert (pending["ref"] != old["ref"]) == valid
+    assert runtime.handle("/resume").errors and not stages
+    monkeypatch.setattr(react, "solve_prepared_optimization", solve)
+    if valid:
+        wire.replies.append(chat("修改后固定方案的结果已保存。"))
+        assert not runtime.handle("/confirm").errors
+        assert [item[0] for item in stages] == ["M2", "M4"]
+    else:
+        assert runtime.handle("/confirm").errors and not stages
+    runtime.close()
+
+
+def test_interrupted_m4_keeps_m2_and_explicit_resume_does_not_repeat_it(
+    repo_root: Path, stages: list[Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    wire = Wire([chat("静态搜索完成，动态复核尚未完成。")])
+    runtime = prepared(repo_root, wire=wire)
+    verify = react.verify_prepared_optimization
+    monkeypatch.setattr(react, "verify_prepared_optimization", _interrupt)
+    failure = runtime.handle("/confirm")
+    assert failure.errors and "/resume" in "".join(failure.outputs)
+    assert runtime.data["pending"]["status"] == "approved"
+    assert runtime.data["pending"]["static"] is not None
+    assert [item[0] for item in stages] == ["M2"]
+    assert not runtime.handle("进展怎么样？").errors and len(stages) == 1
+    monkeypatch.setattr(react, "verify_prepared_optimization", verify)
+    wire.replies.append(chat("动态复核恢复完成，以下说明已保存结果。"))
+    assert not runtime.handle("/resume").errors
+    assert [item[0] for item in stages] == ["M2", "M4"]
+    assert runtime.handle("/resume").errors
+    runtime.handle("/cancel")
+    assert runtime.data["pending"] is None and runtime.data["last_result"]
+    runtime.close()
+
+
+@pytest.mark.parametrize("show_startup", [True, False])
+def test_restart_shows_approved_task_without_request_or_execution_before_resume(
+    repo_root: Path,
+    tmp_path: Path,
+    stages: list[Any],
+    monkeypatch: pytest.MonkeyPatch,
+    show_startup: bool,
+) -> None:
+    path = tmp_path / "session.sqlite"
+    runtime = prepared(repo_root, store=SessionStore(path))
+    verify = react.verify_prepared_optimization
+    monkeypatch.setattr(react, "verify_prepared_optimization", _interrupt)
+    assert runtime.handle("/confirm").errors
+    runtime.close()
+    monkeypatch.setattr(react, "verify_prepared_optimization", verify)
+    wire = Wire([])
+    restored = ReactAgent(wire.model(), AgentDomainTools(repo_root), store=SessionStore(path))
+    assert [item[0] for item in stages] == ["M2"] and not wire.requests
+    if show_startup:
+        assert "/resume" in "".join(restored.startup())
+    else:
+        first_resume = restored.handle("/resume")
+        assert first_resume.errors and "/resume" in "".join(first_resume.outputs)
+        assert [item[0] for item in stages] == ["M2"] and not wire.requests
+    assert restored.data["pending"]["status"] == "approved"
+    wire.replies.append(chat("结果已完成，现作只读说明。"))
+    assert not restored.handle("/resume").errors
+    assert [item[0] for item in stages] == ["M2", "M4"] and len(wire.requests) == 1
+    assert not wire.requests[0].get("tools")
+    restored.close()
+
+
+def test_restore_rechecks_completed_evidence_and_refuses_missing_receipts(
+    repo_root: Path, tmp_path: Path, stages: list[Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "session.sqlite"
+    runtime = prepared(repo_root, wire=Wire([chat("结果已完成并保存。")]), store=SessionStore(path))
+    assert not runtime.handle("/confirm").errors
+    runtime.close()
+    wire = Wire([])
+    restored = ReactAgent(wire.model(), AgentDomainTools(repo_root), store=SessionStore(path))
+    assert not wire.requests and len(stages) == 2
+    restored.startup()
+    assert not restored.handle("/confirm").errors
+    assert restored.handle("/resume").errors and len(stages) == 2
+    restored.close()
+
+    def missing(*args: Any, **kwargs: Any) -> Any:
+        raise ValueError("missing physical evidence")
+
+    monkeypatch.setattr(react, "read_prepared_result", missing)
+    with pytest.raises(SessionError):
+        ReactAgent(wire.model(), AgentDomainTools(repo_root), store=SessionStore(path))
+    assert not wire.requests and len(stages) == 2
 
 
 def test_missing_or_corrupt_stored_result_is_a_safe_tool_error(tmp_path: Path) -> None:
@@ -700,4 +576,5 @@ def test_missing_or_corrupt_stored_result_is_a_safe_tool_error(tmp_path: Path) -
     result = next(m for m in runtime.messages if isinstance(m, ToolMessage))
     assert result.status == "error" and str(tmp_path) not in str(result.content)
     assert runtime.handle("/result offline-rto-0123456789abcdef").errors
-    assert not runtime.domain.last_result
+    assert runtime.data["last_result"] is None
+    runtime.close()

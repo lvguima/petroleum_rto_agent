@@ -1,0 +1,639 @@
+{
+  "schema_id": "hysys-readonly-inventory",
+  "schema_version": "1.0.0",
+  "audited_at": "2026-09-11T08:39:28.452716+00:00",
+  "source_root": "/Users/idc/Desktop/hysys_moni",
+  "evidence_scope": "static_file_audit_only_no_hysys_execution",
+  "source_files": [
+    {
+      "path": ".DS_Store",
+      "bytes": 6148,
+      "sha256": "a136cfae103f6788aaaa9ae50c06dc4efa3e551ce99271f71d8813f6492b0e7f"
+    },
+    {
+      "path": "README.md",
+      "bytes": 3528,
+      "sha256": "6514470757ad2f49e794c70f2500d7212cf9b5098b072bdf85a23179413884e4"
+    },
+    {
+      "path": "__pycache__/hysys_control.cpython-311.pyc",
+      "bytes": 17124,
+      "sha256": "68cec0886f0699e70909c5488b8b810813c99d136d24079f417763f67cc7b172"
+    },
+    {
+      "path": "analyze_results.py",
+      "bytes": 11608,
+      "sha256": "bba79b0c29863a409d45b64bd502323c80ab720cca31b237152bacc72f91eccb"
+    },
+    {
+      "path": "artifacts/.DS_Store",
+      "bytes": 6148,
+      "sha256": "54b018b60b1429fdc65aaf2b7542b571cb8a92ff12b5dfd107c24de36ab45111"
+    },
+    {
+      "path": "artifacts/analysis/before_after.csv",
+      "bytes": 29305,
+      "sha256": "704663228149e986a011cf2e27440f461fee6947cfb56c786dffc54d5f0400fc"
+    },
+    {
+      "path": "artifacts/analysis/heat_loads.csv",
+      "bytes": 208,
+      "sha256": "069f4806bcc6fe5c07666cac7fd88f969c995a8af8bcf465248f611155c2596a"
+    },
+    {
+      "path": "artifacts/analysis/products.csv",
+      "bytes": 1034,
+      "sha256": "9e1b51742ce4fee62ec4a2e3c961132c4895293445df86f08416402c409a6eb2"
+    },
+    {
+      "path": "artifacts/analysis/results_analysis.md",
+      "bytes": 6550,
+      "sha256": "a24538804deca565964596eb9413837539c0450a6d33c0a92669947f137c6cce"
+    },
+    {
+      "path": "artifacts/analysis/stages.csv",
+      "bytes": 6564,
+      "sha256": "32ec6c783c730b2cd0d0b126fe47aeffdefafe29ecf16916ac3d23f77b667501"
+    },
+    {
+      "path": "artifacts/analysis/summary.json",
+      "bytes": 4057,
+      "sha256": "325ab4f85329757d1285bc28c03a4a9d8a463056552575163d9e33a5169649a8"
+    },
+    {
+      "path": "artifacts/hysys_inspection.json",
+      "bytes": 14979,
+      "sha256": "524735252b826369e1567c7bdbe81608ae1c49da4c31f9766be955b33cbdd764"
+    },
+    {
+      "path": "artifacts/nature-figure.json",
+      "bytes": 29,
+      "sha256": "dad100bf58fece91f6d9ce9ef861408b330aea06bb703ea8229bf8d464754a8b"
+    },
+    {
+      "path": "artifacts/operating_point_before.json",
+      "bytes": 20357,
+      "sha256": "21ed572cc511a25d28414ca815357997abec183bb7a7f0458e6ea073f60f512d"
+    },
+    {
+      "path": "artifacts/original/data_read",
+      "bytes": 20351,
+      "sha256": "313be0bd61ce5c77dddf3f48bd2d29be2293638bac5b636779a25facde825886"
+    },
+    {
+      "path": "artifacts/original/hysys_control.py",
+      "bytes": 5258,
+      "sha256": "ba1fb17f13858250bd5c025f6558aad6e81016899451284d48329194e4ab2073"
+    },
+    {
+      "path": "artifacts/original/main.py",
+      "bytes": 344,
+      "sha256": "2e7ecf5824aebdd11bc16776e704518a44148b28ac864d29fc03633fc8e8a1e8"
+    },
+    {
+      "path": "artifacts/run_report.json",
+      "bytes": 604,
+      "sha256": "3c15797bbb3e5b01ba4a1e8d58f96102e6106810aa38c16017375859cc9d4b01"
+    },
+    {
+      "path": "data_read",
+      "bytes": 20336,
+      "sha256": "e8bf169c8033c676690846b3a81448d65c099f934b663e6b801ea9f6d85aa04e"
+    },
+    {
+      "path": "data_write",
+      "bytes": 20351,
+      "sha256": "313be0bd61ce5c77dddf3f48bd2d29be2293638bac5b636779a25facde825886"
+    },
+    {
+      "path": "hysys_control.py",
+      "bytes": 10056,
+      "sha256": "8394f6c3ec0be4e996158590c0de3542be4008fa35f4112704702f920e7374a7"
+    },
+    {
+      "path": "inspect_hysys.py",
+      "bytes": 1847,
+      "sha256": "6b74d55ca3449d0df651693d14a138a10d7df0b77e477e5b4ce1ed275c2a2071"
+    },
+    {
+      "path": "main.py",
+      "bytes": 2639,
+      "sha256": "645270e6d746399e0baca4928d73c98e06360901a14e0e98ccab9627a91c7fd1"
+    },
+    {
+      "path": "mjh_ATM.hsc",
+      "bytes": 1773263,
+      "sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741"
+    },
+    {
+      "path": "tests/__pycache__/test_hysys_control.cpython-311.pyc",
+      "bytes": 15332,
+      "sha256": "89add5b5e601c82ba2cb42a03e37dc1ff934ad98b1d5a317e4a971bd4579c804"
+    },
+    {
+      "path": "tests/test_hysys_control.py",
+      "bytes": 6306,
+      "sha256": "f4e7ef4f1b825af26259a5baecaef8a1777b640dca1bb8ba48540a706e98f0e6"
+    }
+  ],
+  "historical_run_report": {
+    "started_at": "2026-09-09T01:54:59.276393+00:00",
+    "case": "mjh_ATM.hsc",
+    "read_only": false,
+    "success": true,
+    "initial_status": {
+      "can_solve": true,
+      "is_solving": false,
+      "is_valid": true,
+      "column_converged": true
+    },
+    "mv_written": 24,
+    "final_status": {
+      "can_solve": true,
+      "is_solving": false,
+      "is_valid": true,
+      "column_converged": true
+    },
+    "counts": {
+      "mv": 24,
+      "cv": 36,
+      "stages": 73
+    },
+    "output": "data_read",
+    "elapsed_seconds": 3.687
+  },
+  "historical_run_case_hash_available": false,
+  "checks": {
+    "json_files_parsed": 8,
+    "python_files_syntax_checked": 5,
+    "current_scalar_count": 352,
+    "summary_source_hashes_match": {
+      "data_read": true,
+      "data_write": true,
+      "artifacts/operating_point_before.json": true,
+      "artifacts/run_report.json": true
+    },
+    "input_before_after_mvs_equal": true,
+    "table_rows": 60,
+    "table_unique_pairs": 60,
+    "current_values_finite": true,
+    "product_tbp_points_nondecreasing": true
+  },
+  "observations": {
+    "mv_count": 24,
+    "cv_count": 36,
+    "stage_count": 73,
+    "stage_groups": {
+      "Main Tower": 52,
+      "Kerosene SS": 8,
+      "Kerosene SS_Reb": 1,
+      "Diesel SS": 6,
+      "AGO SS": 6
+    },
+    "feed_kg_h": 400000.0,
+    "water_kg_h": 3000.0,
+    "listed_product_kg_h": 403000.00000000006,
+    "listed_mass_residual_kg_h": 5.820766091346741e-11,
+    "listed_duties_MW": 106.73947144583747,
+    "listed_duties_GJ_per_t_crude": 0.9606552430125372,
+    "max_stage_temperature_drift_C": 0.009463129860478148,
+    "max_product_tbp_drift_C": 0.029947933606706556,
+    "vapor_equals_liquid_counts": {
+      "data_write": 73,
+      "data_read": 0,
+      "artifacts/operating_point_before.json": 0,
+      "artifacts/original/data_read": 73
+    }
+  },
+  "table_mapping": [
+    {
+      "row": 2,
+      "source_object": "crude_oil",
+      "source_property": "temperature_C",
+      "table_unit_label": "C",
+      "observed_current_value": 32.6
+    },
+    {
+      "row": 3,
+      "source_object": "crude_oil",
+      "source_property": "pressure_kPa",
+      "table_unit_label": "kpa",
+      "observed_current_value": 180.0
+    },
+    {
+      "row": 4,
+      "source_object": "crude_oil",
+      "source_property": "massflow_kg_h",
+      "table_unit_label": "kg/h",
+      "observed_current_value": 400000.0
+    },
+    {
+      "row": 5,
+      "source_object": "heater_to_flash",
+      "source_property": "D_temperature_C",
+      "table_unit_label": "C",
+      "observed_current_value": 169.4
+    },
+    {
+      "row": 6,
+      "source_object": "flash_column",
+      "source_property": "liquid_level",
+      "table_unit_label": "%",
+      "observed_current_value": 44.5
+    },
+    {
+      "row": 7,
+      "source_object": "pump",
+      "source_property": "D_pressure_kPa",
+      "table_unit_label": "kpa",
+      "observed_current_value": 550.0
+    },
+    {
+      "row": 8,
+      "source_object": "heater_to_furnace",
+      "source_property": "D_temperature_C",
+      "table_unit_label": "C",
+      "observed_current_value": 67.85
+    },
+    {
+      "row": 9,
+      "source_object": "furnace_1",
+      "source_property": "D_temperature_C",
+      "table_unit_label": "C",
+      "observed_current_value": 115.0
+    },
+    {
+      "row": 10,
+      "source_object": "furnace_2",
+      "source_property": "D_temperature_C",
+      "table_unit_label": "C",
+      "observed_current_value": 225.0
+    },
+    {
+      "row": 11,
+      "source_object": "furnace_3",
+      "source_property": "D_temperature_C",
+      "table_unit_label": "C",
+      "observed_current_value": 225.0
+    },
+    {
+      "row": 12,
+      "source_object": "furnace_4",
+      "source_property": "D_temperature_C",
+      "table_unit_label": "C",
+      "observed_current_value": 225.0
+    },
+    {
+      "row": 13,
+      "source_object": "Water1",
+      "source_property": "massflow_kg_h",
+      "table_unit_label": "kg/h",
+      "observed_current_value": 2200.0
+    },
+    {
+      "row": 14,
+      "source_object": "Water2",
+      "source_property": "massflow_kg_h",
+      "table_unit_label": "kg/h",
+      "observed_current_value": 300.0
+    },
+    {
+      "row": 15,
+      "source_object": "Water3",
+      "source_property": "massflow_kg_h",
+      "table_unit_label": "kg/h",
+      "observed_current_value": 500.0
+    },
+    {
+      "row": 16,
+      "source_object": "C-1102",
+      "source_property": "top_massflow_kg_h",
+      "table_unit_label": "kg/h",
+      "observed_current_value": 320690.0
+    },
+    {
+      "row": 17,
+      "source_object": "C-1102",
+      "source_property": "top_temperature_C",
+      "table_unit_label": "C",
+      "observed_current_value": 105.55555555555556
+    },
+    {
+      "row": 18,
+      "source_object": "C-1102",
+      "source_property": "one_massflow_kg_h",
+      "table_unit_label": "kg/h",
+      "observed_current_value": 170000.0
+    },
+    {
+      "row": 19,
+      "source_object": "C-1102",
+      "source_property": "one_temperature_C",
+      "table_unit_label": "C",
+      "observed_current_value": 150.0
+    },
+    {
+      "row": 20,
+      "source_object": "C-1102",
+      "source_property": "two_massflow_kg_h",
+      "table_unit_label": "kg/h",
+      "observed_current_value": 241000.0
+    },
+    {
+      "row": 21,
+      "source_object": "C-1102",
+      "source_property": "two_temperature_C",
+      "table_unit_label": "C",
+      "observed_current_value": 180.0
+    },
+    {
+      "row": 22,
+      "source_object": "C-1102",
+      "source_property": "boilup_rate",
+      "table_unit_label": "%",
+      "observed_current_value": 0.5
+    },
+    {
+      "row": 23,
+      "source_object": "C-1102",
+      "source_property": "39_temperature_C",
+      "table_unit_label": "C",
+      "observed_current_value": 156.8
+    },
+    {
+      "row": 24,
+      "source_object": "C-1102",
+      "source_property": "26_temperature_C",
+      "table_unit_label": "C",
+      "observed_current_value": 215.0
+    },
+    {
+      "row": 25,
+      "source_object": "C-1102",
+      "source_property": "16_temperature_C",
+      "table_unit_label": "C",
+      "observed_current_value": 301.0
+    },
+    {
+      "row": 28,
+      "source_object": "heater_to_flash",
+      "source_property": "heat_load_KJ_h",
+      "table_unit_label": "KJ/h",
+      "observed_current_value": 159045560.1692256
+    },
+    {
+      "row": 29,
+      "source_object": "heater_to_furnace",
+      "source_property": "heat_load_KJ_h",
+      "table_unit_label": "KJ/h",
+      "observed_current_value": 74413867.56096981
+    },
+    {
+      "row": 30,
+      "source_object": "furnace_1",
+      "source_property": "heat_load_KJ_h",
+      "table_unit_label": "KJ/h",
+      "observed_current_value": 142137920.28323987
+    },
+    {
+      "row": 31,
+      "source_object": "furnace_2",
+      "source_property": "heat_load_KJ_h",
+      "table_unit_label": "KJ/h",
+      "observed_current_value": 6354149.4071583785
+    },
+    {
+      "row": 32,
+      "source_object": "furnace_3",
+      "source_property": "heat_load_KJ_h",
+      "table_unit_label": "KJ/h",
+      "observed_current_value": 866474.91915796
+    },
+    {
+      "row": 33,
+      "source_object": "furnace_4",
+      "source_property": "heat_load_KJ_h",
+      "table_unit_label": "KJ/h",
+      "observed_current_value": 1444124.865263267
+    },
+    {
+      "row": 34,
+      "source_object": "Naptha",
+      "source_property": "massflow_kg_h",
+      "table_unit_label": "kg/h",
+      "observed_current_value": 12370.20711702424
+    },
+    {
+      "row": 35,
+      "source_object": "Naptha",
+      "source_property": "20%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 11.10632320913297
+    },
+    {
+      "row": 36,
+      "source_object": "Naptha",
+      "source_property": "40%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 55.58532998574192
+    },
+    {
+      "row": 37,
+      "source_object": "Naptha",
+      "source_property": "60%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 138.491008694708
+    },
+    {
+      "row": 38,
+      "source_object": "Naptha",
+      "source_property": "80%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 153.93300879512682
+    },
+    {
+      "row": 39,
+      "source_object": "Naptha",
+      "source_property": "100%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 174.85445754364906
+    },
+    {
+      "row": 40,
+      "source_object": "Kerosene",
+      "source_property": "massflow_kg_h",
+      "table_unit_label": "kg/h",
+      "observed_current_value": 9620.279964461632
+    },
+    {
+      "row": 41,
+      "source_object": "Kerosene",
+      "source_property": "20%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 167.1853128948981
+    },
+    {
+      "row": 42,
+      "source_object": "Kerosene",
+      "source_property": "40%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 179.94754111173089
+    },
+    {
+      "row": 43,
+      "source_object": "Kerosene",
+      "source_property": "60%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 191.79459488366945
+    },
+    {
+      "row": 44,
+      "source_object": "Kerosene",
+      "source_property": "80%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 201.52782723386497
+    },
+    {
+      "row": 45,
+      "source_object": "Kerosene",
+      "source_property": "100%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 222.4299363338692
+    },
+    {
+      "row": 46,
+      "source_object": "Diesel",
+      "source_property": "massflow_kg_h",
+      "table_unit_label": "kg/h",
+      "observed_current_value": 25584.96627186053
+    },
+    {
+      "row": 47,
+      "source_object": "Diesel",
+      "source_property": "20%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 212.2053857540355
+    },
+    {
+      "row": 48,
+      "source_object": "Diesel",
+      "source_property": "40%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 228.0670220992831
+    },
+    {
+      "row": 49,
+      "source_object": "Diesel",
+      "source_property": "60%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 241.16991483129445
+    },
+    {
+      "row": 50,
+      "source_object": "Diesel",
+      "source_property": "80%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 255.88518440219292
+    },
+    {
+      "row": 51,
+      "source_object": "Diesel",
+      "source_property": "100%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 281.89094306820976
+    },
+    {
+      "row": 52,
+      "source_object": "AGO",
+      "source_property": "massflow_kg_h",
+      "table_unit_label": "kg/h",
+      "observed_current_value": 55234.268712176636
+    },
+    {
+      "row": 53,
+      "source_object": "AGO",
+      "source_property": "20%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 281.7337371400156
+    },
+    {
+      "row": 54,
+      "source_object": "AGO",
+      "source_property": "40%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 301.8495455437741
+    },
+    {
+      "row": 55,
+      "source_object": "AGO",
+      "source_property": "60%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 321.1146979611873
+    },
+    {
+      "row": 56,
+      "source_object": "AGO",
+      "source_property": "80%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 342.5569618609918
+    },
+    {
+      "row": 57,
+      "source_object": "AGO",
+      "source_property": "100%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 379.6579874273826
+    },
+    {
+      "row": 58,
+      "source_object": "Risedue",
+      "source_property": "massflow_kg_h",
+      "table_unit_label": "kg/h",
+      "observed_current_value": 300190.277934477
+    },
+    {
+      "row": 59,
+      "source_object": "Risedue",
+      "source_property": "20%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 398.6504915732676
+    },
+    {
+      "row": 60,
+      "source_object": "Risedue",
+      "source_property": "40%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 455.0698868167465
+    },
+    {
+      "row": 61,
+      "source_object": "Risedue",
+      "source_property": "60%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 512.6885872140045
+    },
+    {
+      "row": 62,
+      "source_object": "Risedue",
+      "source_property": "80%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 594.0172921842648
+    },
+    {
+      "row": 63,
+      "source_object": "Risedue",
+      "source_property": "100%TBP",
+      "table_unit_label": "C",
+      "observed_current_value": 714.2938568176805
+    }
+  ],
+  "not_verified": [
+    "opening_or_solving_hsc_on_windows",
+    "binding_historical_run_to_current_hsc_hash",
+    "full_flowsheet_topology_and_external_stream_boundary",
+    "variable_property_links_units_and_engineering_bounds",
+    "dynamic_model_and_control_configuration",
+    "perturbation_sensitivity_and_optimizer_response",
+    "net_utilities_dry_hydrocarbon_yields_and_product_specifications"
+  ]
+}

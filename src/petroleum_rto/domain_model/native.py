@@ -9,14 +9,23 @@ from typing import Any
 import httpx
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.language_models import BaseChatModel, LanguageModelInput
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.messages import (
+    AIMessage,
+    AIMessageChunk,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+    message_chunk_to_message,
+)
+from langchain_core.messages.ai import UsageMetadata
+from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 from langchain_core.utils.function_calling import convert_to_openai_tool
-from pydantic import Field
+from pydantic import ConfigDict, Field, model_validator
 
-from .credentials import contains_credential
+from .credentials import _credential_variants, contains_credential
 from .models import ModelSelection
 
 
@@ -26,6 +35,10 @@ class NativeModelError(RuntimeError):
     def __init__(self, code: str) -> None:
         super().__init__(code)
         self.code = code
+
+
+class RetryableNativeModelError(NativeModelError):
+    """A transient transport failure; callers still control retries and visible output."""
 
 
 def _object(value: Any) -> dict[str, Any]:
@@ -188,6 +201,46 @@ def _calls(raw: list[Any], *, responses: bool) -> list[dict[str, Any]]:
     return calls
 
 
+def _usage(raw: Any, *, responses: bool) -> UsageMetadata | None:
+    """Expose only complete, actually reported standard token counts."""
+    if raw is None:
+        return None
+    usage = _object(raw)
+    input_key, output_key = (
+        ("input_tokens", "output_tokens") if responses else ("prompt_tokens", "completion_tokens")
+    )
+    keys = (input_key, output_key, "total_tokens")
+    for key in keys:
+        if key in usage and (type(usage[key]) is not int or usage[key] < 0):
+            raise NativeModelError("invalid-response")
+    if any(key not in usage for key in keys):
+        return None  # A total alone does not establish its input/output breakdown.
+    result: UsageMetadata = {
+        "input_tokens": usage[input_key],
+        "output_tokens": usage[output_key],
+        "total_tokens": usage["total_tokens"],
+    }
+    for source, target, field, name in (
+        (f"{input_key}_details", "input_token_details", "cached_tokens", "cache_read"),
+        (f"{output_key}_details", "output_token_details", "reasoning_tokens", "reasoning"),
+    ):
+        details = usage.get(source)
+        if details is None:
+            continue
+        details = _object(details)
+        if field in details:
+            count = details[field]
+            if type(count) is not int or count < 0:
+                raise NativeModelError("invalid-response")
+            result[target] = {name: count}  # type: ignore[literal-required]
+    if "prompt_cache_hit_tokens" in usage and "input_token_details" not in result:
+        count = usage["prompt_cache_hit_tokens"]
+        if type(count) is not int or count < 0:
+            raise NativeModelError("invalid-response")
+        result["input_token_details"] = {"cache_read": count}
+    return result
+
+
 def parse_response(selection: ModelSelection, payload: dict[str, Any]) -> AIMessage:
     """Retain raw assistant/output items, usage, stop reason and declared model."""
     profile = selection.profile
@@ -273,6 +326,7 @@ def parse_response(selection: ModelSelection, payload: dict[str, Any]) -> AIMess
             "finish_reason": reason,
             "usage": payload.get("usage"),
         },
+        usage_metadata=_usage(payload.get("usage"), responses=profile.protocol == "responses"),
     )
 
 
@@ -289,6 +343,8 @@ class NativeTransport:
         if not base_url.startswith("https://") or base_url != base_url.strip():
             raise ValueError("DMX地址必须使用HTTPS。")
         self._api_key = api_key
+        self._credential_variants = _credential_variants(api_key)
+        self.request_count = 0
         self._client = httpx.Client(
             base_url=base_url.rstrip("/") + "/",
             timeout=180,
@@ -300,7 +356,25 @@ class NativeTransport:
     def close(self) -> None:
         self._client.close()
 
+    def assert_safe_persistence(self, value: object) -> None:
+        """Reject known credential material before saving or restoring session data."""
+        if contains_credential(value, self._api_key):
+            raise NativeModelError("credential-in-persistence")
+
     def complete(self, selection: ModelSelection, payload: dict[str, Any]) -> AIMessage:
+        """Aggregate the same checked chunks used by live framework streaming."""
+        chunks = self.stream(selection, payload)
+        result = next(chunks)
+        for chunk in chunks:
+            result += chunk
+        message = message_chunk_to_message(result)
+        assert isinstance(message, AIMessage)
+        return message
+
+    def stream(
+        self, selection: ModelSelection, payload: dict[str, Any]
+    ) -> Iterator[AIMessageChunk]:
+        """Emit safe text now; emit executable calls only after full validation."""
         if contains_credential(payload, self._api_key):
             raise NativeModelError("credential-in-request")
         endpoint = "chat/completions" if selection.profile.protocol == "chat" else "responses"
@@ -308,6 +382,7 @@ class NativeTransport:
         # generation budget; JSON escaping and SSE framing need more than 4 bytes/token.
         max_bytes = selection.output_tokens * 256
         try:
+            self.request_count += 1
             with self._client.stream(
                 "POST", endpoint, json=payload, headers={"Authorization": f"Bearer {self._api_key}"}
             ) as response:
@@ -317,21 +392,67 @@ class NativeTransport:
                         403: "permission-denied",
                         429: "rate-limited",
                     }.get(response.status_code, "http-error")
+                    if response.status_code in {408, 429, 500, 502, 503, 504}:
+                        raise RetryableNativeModelError(code)
                     raise NativeModelError(code)
                 if payload["stream"]:
-                    raw = self._stream_response(selection, response, max_bytes)
+                    fragments = self._stream_response(selection, response, max_bytes)
                 else:
                     body = bytearray()
                     for chunk in response.iter_bytes():
                         body.extend(chunk)
                         if len(body) > max_bytes:
                             raise NativeModelError("response-too-large")
-                    raw = _object(_json(bytes(body)))
-                if contains_credential(raw, self._api_key):
-                    raise NativeModelError("credential-in-response")
-                return parse_response(selection, raw)
+                    fragments = iter([_object(_json(bytes(body)))])
+                visible = ""
+                pending = ""
+                for fragment in fragments:
+                    if isinstance(fragment, str):
+                        pending += fragment
+                        if contains_credential(pending, self._api_key):
+                            raise NativeModelError("credential-in-response")
+                        # Hold only a suffix that could still grow into a credential,
+                        # including encoded variants, across arbitrary text fragments.
+                        held = max(
+                            (
+                                length
+                                for variant in self._credential_variants
+                                for length in range(1, min(len(pending), len(variant) - 1) + 1)
+                                if pending.endswith(variant[:length])
+                            ),
+                            default=0,
+                        )
+                        safe = pending[:-held] if held else pending
+                        pending = pending[-held:] if held else ""
+                        if safe:
+                            visible += safe
+                            yield AIMessageChunk(content=safe)
+                        continue
+                    if contains_credential(fragment, self._api_key):
+                        raise NativeModelError("credential-in-response")
+                    final = parse_response(selection, fragment)
+                    assert isinstance(final.content, str)
+                    if not final.content.startswith(visible + pending):
+                        raise NativeModelError("invalid-response")
+                    # The terminal may contain content when no deltas were sent.
+                    # Native state and usage appear exactly once to avoid chunk merges
+                    # concatenating opaque reasoning, identifiers or token counts.
+                    yield AIMessageChunk(
+                        content=final.content[len(visible) :],
+                        tool_calls=final.tool_calls,
+                        additional_kwargs=final.additional_kwargs,
+                        response_metadata=final.response_metadata,
+                        usage_metadata=final.usage_metadata,
+                        chunk_position="last",
+                    )
+                    return
+                raise NativeModelError("incomplete-stream")
         except NativeModelError:
             raise
+        except (httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError):
+            # Transport-level disconnection can recover. A successfully received but
+            # incomplete/invalid provider stream remains a permanent NativeModelError.
+            raise RetryableNativeModelError("transport-failed") from None
         except httpx.RequestError:
             raise NativeModelError("transport-failed") from None
         except (ValueError, TypeError, KeyError, IndexError, RecursionError):
@@ -363,13 +484,20 @@ class NativeTransport:
 
     def _stream_response(
         self, selection: ModelSelection, response: httpx.Response, max_bytes: int
-    ) -> dict[str, Any]:
+    ) -> Iterator[str | dict[str, Any]]:
         if selection.profile.protocol == "responses":
             added: dict[int, dict[str, Any]] = {}
             completed: dict[int, dict[str, Any]] = {}
             for event in self._events(response, max_bytes):
                 item = _object(_json(event))
+                if contains_credential(item, self._api_key):
+                    raise NativeModelError("credential-in-response")
                 kind = item.get("type")
+                if kind in ("response.output_text.delta", "response.refusal.delta"):
+                    value = item.get("delta")
+                    if not isinstance(value, str):
+                        raise NativeModelError("invalid-response")
+                    yield value
                 if kind in ("response.output_item.added", "response.output_item.done"):
                     index = item.get("output_index")
                     if type(index) is not int or index < 0:
@@ -403,7 +531,8 @@ class NativeTransport:
                         if terminal_output and terminal_output != outputs:
                             raise NativeModelError("invalid-response")
                         terminal_result["output"] = outputs
-                    return terminal_result
+                    yield terminal_result
+                    return
                 if item.get("type") in ("error", "response.failed", "response.incomplete"):
                     raise NativeModelError("incomplete-stream")
             raise NativeModelError("incomplete-stream")
@@ -420,8 +549,11 @@ class NativeTransport:
                         raise NativeModelError("invalid-response")
                     message["tool_calls"] = [calls[i] for i in sorted(calls)]
                 result["choices"] = [{"message": message, "finish_reason": finish}]
-                return result
+                yield result
+                return
             item = _object(_json(event))
+            if contains_credential(item, self._api_key):
+                raise NativeModelError("credential-in-response")
             if "error" in item:
                 raise NativeModelError("incomplete-stream")
             for key in ("id", "model", "usage"):
@@ -443,6 +575,8 @@ class NativeTransport:
                     if not isinstance(delta[key], str):
                         raise NativeModelError("invalid-response")
                     message[key] = message.get(key, "") + delta[key]
+                    if key == "content":
+                        yield delta[key]
             for partial in delta.get("tool_calls") or []:
                 partial = _object(partial)
                 index = partial.get("index")
@@ -471,9 +605,31 @@ class NativeTransport:
 class DmxNativeModel(BaseChatModel):
     """Small framework adapter; provider-specific opaque state stays in this layer."""
 
+    model_config = ConfigDict(validate_assignment=True)
+
     transport: NativeTransport = Field(exclude=True, repr=False)
     selection: ModelSelection
     use_stream: bool = True
+
+    @model_validator(mode="after")
+    def _current_profile(self) -> DmxNativeModel:
+        # These are effective application budgets, not certified vendor maxima.
+        object.__setattr__(
+            self,
+            "profile",
+            {
+                "name": self.selection.profile.model_id,
+                "max_input_tokens": (
+                    self.selection.profile.context_tokens - self.selection.output_tokens
+                ),
+                "max_output_tokens": self.selection.output_tokens,
+                "text_inputs": True,
+                "text_outputs": True,
+                "tool_calling": True,
+                "tool_call_streaming": False,
+            },
+        )
+        return self
 
     @property
     def _llm_type(self) -> str:
@@ -504,3 +660,21 @@ class DmxNativeModel(BaseChatModel):
         )
         result = self.transport.complete(self.selection, payload)
         return ChatResult(generations=[ChatGeneration(message=result)])
+
+    def _stream(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> Iterator[ChatGenerationChunk]:
+        if stop:
+            raise NativeModelError("unsupported-stop")
+        payload = request_payload(
+            self.selection, messages, kwargs.get("tools", []), stream=self.use_stream
+        )
+        for message in self.transport.stream(self.selection, payload):
+            chunk = ChatGenerationChunk(message=message)
+            if run_manager:
+                run_manager.on_llm_new_token(chunk.text, chunk=chunk)
+            yield chunk
