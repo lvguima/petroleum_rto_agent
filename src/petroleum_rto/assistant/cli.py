@@ -40,7 +40,7 @@ def _new_runtime() -> TerminalRuntime:
     )
     store: SessionStore | None = None
     try:
-        store = SessionStore(workspace / "runs/assistant/session.sqlite")
+        store = SessionStore(workspace / "runs/assistant/steady-session.sqlite")
         model = DmxNativeModel(
             transport=transport,
             selection=ModelSelection(model_profile(settings.model)),
@@ -78,13 +78,14 @@ def _run_repl(
         and input_stream.isatty()
         and output.isatty()
     )
-    if interactive:
+    if interactive and sys.platform != "win32":
         try:
             # Importing readline enables native editing for input(), not TextIO.readline().
             import readline  # noqa: F401
         except ImportError:
             _write_safe_error(error, "当前Python环境缺少终端行编辑支持，请使用包含readline的环境。")
             return 1
+    # Windows input() uses the native console editor without the Unix readline module.
     startup = getattr(runtime, "startup", None)
     if callable(startup):
         for message in startup():

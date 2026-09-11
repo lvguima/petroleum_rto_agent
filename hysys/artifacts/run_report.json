@@ -1,0 +1,26 @@
+{
+    "started_at": "2026-09-09T01:54:59.276393+00:00",
+    "case": "mjh_ATM.hsc",
+    "read_only": false,
+    "success": true,
+    "initial_status": {
+        "can_solve": true,
+        "is_solving": false,
+        "is_valid": true,
+        "column_converged": true
+    },
+    "mv_written": 24,
+    "final_status": {
+        "can_solve": true,
+        "is_solving": false,
+        "is_valid": true,
+        "column_converged": true
+    },
+    "counts": {
+        "mv": 24,
+        "cv": 36,
+        "stages": 73
+    },
+    "output": "data_read",
+    "elapsed_seconds": 3.687
+}

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-import fcntl
+import errno
 import json
 import math
 import os
 import sqlite3
 import stat
+import sys
+from contextlib import AbstractContextManager
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Self
@@ -17,7 +19,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Interrupt, Send
 
-DEFAULT_SESSION_PATH = Path(__file__).resolve().parents[3] / "runs/assistant/session.sqlite"
+DEFAULT_SESSION_PATH = Path(__file__).resolve().parents[3] / "runs/assistant/steady-session.sqlite"
 SESSION_THREAD_ID = "current"
 _APPLICATION_ID = 0x52544F41
 _DATABASE_VERSION = 1
@@ -156,6 +158,15 @@ class SessionJsonSerializer:
 
 
 def _private_file(path: Path) -> int:
+    if sys.platform == "win32":
+        from petroleum_rto._windows_files import UnsafeWindowsFileError, open_private_file
+
+        try:
+            return open_private_file(path, writable=True)
+        except UnsafeWindowsFileError as exc:
+            raise SessionError(
+                "unsafe-session-path", "会话文件必须是当前用户拥有的普通文件，且路径不能包含链接。"
+            ) from exc
     descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     try:
         info = os.fstat(descriptor)
@@ -175,16 +186,38 @@ class SessionStore:
         self.path = path.absolute()
         self._lock_fd: int | None = None
         self._connection: sqlite3.Connection | None = None
+        self._directory_guard: AbstractContextManager[None] | None = None
         self.saver: SqliteSaver
         try:
             for parent in (self.path, *self.path.parents):
                 if parent.is_symlink():
                     raise SessionError("unsafe-session-path", "会话路径不能包含符号链接。")
-            self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            if sys.platform == "win32":
+                from petroleum_rto._windows_files import UnsafeWindowsFileError, guard_directory
+
+                self._directory_guard = guard_directory(self.path.parent, create=True, private=True)
+                try:
+                    self._directory_guard.__enter__()
+                except UnsafeWindowsFileError as exc:
+                    self._directory_guard = None
+                    raise SessionError(
+                        "unsafe-session-path", "会话目录必须归当前用户所有、限制访问且不包含链接。"
+                    ) from exc
+            else:
+                self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
             self._lock_fd = _private_file(self.path.with_suffix(self.path.suffix + ".lock"))
             try:
-                fcntl.flock(self._lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError as exc:
+                if sys.platform == "win32":
+                    import msvcrt
+
+                    msvcrt.locking(self._lock_fd, msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(self._lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError as exc:
+                if exc.errno not in (errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK):
+                    raise
                 raise SessionError(
                     "session-in-use", "另一个助手进程正在使用本机会话；请先退出该进程。"
                 ) from exc
@@ -257,6 +290,9 @@ class SessionStore:
             if self._lock_fd is not None:
                 os.close(self._lock_fd)
                 self._lock_fd = None
+            if self._directory_guard is not None:
+                self._directory_guard.__exit__(None, None, None)
+                self._directory_guard = None
 
     def __enter__(self) -> Self:
         return self

@@ -1,0 +1,81 @@
+{
+  "schema_id": "agent-operating-readings-fix",
+  "schema_version": "1.0.0",
+  "date": "2026-09-11",
+  "status": "passed",
+  "root_cause": "The HYSYS snapshot contained all 60 readings, but the Agent tool projected only metadata and T-39; the model never received feed or product values.",
+  "change": "Add whitelisted readings fields and reading scope to the existing tool, tool contract 4.1.0; no change to snapshot, plan, result or session contracts.",
+  "validation": {
+    "focused_passed": 79,
+    "agent_and_steady_runtime_passed": 423,
+    "platform_skipped": 5,
+    "seconds": 118.49,
+    "junit": "runs/simulation/operating-readings-20260911/agent-regression.xml",
+    "ruff": "passed",
+    "format_files": 11,
+    "mypy_source_files": 9,
+    "model_wire_regression": "Synthetic feed and all five product readings reached the outbound model request with units; local paths, hashes, internal values and stages absent.",
+    "live_hysys_read": {
+      "status": "passed",
+      "tool_contract_version": "4.1.0",
+      "readings": 60,
+      "observed_at_utc": "2026-09-11T15:17:33.751030+00:00",
+      "source_files_unchanged": 22,
+      "solver_called": false,
+      "model_requests": 0,
+      "feed_and_products": {
+        "crude_oil.temperature_C": {
+          "value": 32.6,
+          "unit": "C"
+        },
+        "crude_oil.pressure_kPa": {
+          "value": 180.0,
+          "unit": "kPa"
+        },
+        "crude_oil.massflow_kg_h": {
+          "value": 400000.0,
+          "unit": "kg/h"
+        },
+        "Naptha.massflow_kg_h": {
+          "value": 12293.667585972546,
+          "unit": "kg/h"
+        },
+        "Kerosene.massflow_kg_h": {
+          "value": 9707.152570829683,
+          "unit": "kg/h"
+        },
+        "Diesel.massflow_kg_h": {
+          "value": 25261.752878960364,
+          "unit": "kg/h"
+        },
+        "AGO.massflow_kg_h": {
+          "value": 56452.12016235065,
+          "unit": "kg/h"
+        },
+        "Risedue.massflow_kg_h": {
+          "value": 299285.30680188694,
+          "unit": "kg/h"
+        }
+      }
+    }
+  },
+  "external_model_validation": "Not rerun; actual model-wire content checked with MockTransport and actual HYSYS read checked separately.",
+  "not_executed": [
+    "No variable writes or solver execution",
+    "No new external model request",
+    "No full simulation regression: physical reader/solver unchanged",
+    "No commit or push"
+  ],
+  "limitations": [
+    "No composition, phase or full boundary read added",
+    "Readings do not establish product qualification",
+    "Only T-39 write workflow remains open",
+    "Previous HYSYS repeatability and COM hard timeout limitations unchanged"
+  ],
+  "implementation_and_tests": {
+    "src/petroleum_rto/assistant/native_tools.py": "b43e6ce600f5c52dea9b9f3cffcbad4abbeef3717476d0b5477445f57d5b94bf",
+    "src/petroleum_rto/assistant/react.py": "9ba74e4db3206983ccb2626446a82d3cb54b1050e31d2e8f564724a8e8dbfbea",
+    "tests/domain_model/unit/test_react_agent.py": "1fdad6c31fd1e1576644e4d98359775b49c197d0c784e8a24043b8c2c5143be2",
+    "tests/domain_model/unit/test_optimization_tools.py": "aced0e3efc9f4a4f9d5ee66619a63ef8480ce9a958b3cb3787b2237b4a057121"
+  }
+}

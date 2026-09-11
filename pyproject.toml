@@ -5,9 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "petroleum-rto-agent"
 version = "0.1.0"
-description = "Offline petroleum RTO, CDU simulation, and local engineering assistant"
+description = "HYSYS steady simulation integration and local engineering assistant"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "pywin32==312; sys_platform == 'win32'",
+]
 
 [project.optional-dependencies]
 domain-model = [
@@ -17,8 +19,6 @@ domain-model = [
 ]
 
 [project.scripts]
-cdu-mini = "petroleum_rto.cdu.runtime.cli:main"
-rto-offline = "petroleum_rto.rto.runtime.cli:main"
 rto-chat = "petroleum_rto.assistant.cli:main"
 
 [dependency-groups]
@@ -33,10 +33,6 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-"petroleum_rto.cdu.runtime.data" = ["*.json"]
-"petroleum_rto.rto.data" = ["*.json"]
 
 [tool.setuptools.exclude-package-data]
 "petroleum_rto.domain_model" = ["dmx_api.json"]

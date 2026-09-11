@@ -5,30 +5,26 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from langchain.tools import ToolRuntime
 from langchain_core.tools import BaseTool, StructuredTool
 from langgraph.types import Command
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from petroleum_rto.rto import load_operating_context
-from petroleum_rto.rto.runtime import (
-    OfflineInspectionError,
-    OperatingContext,
-    OptimizationPreparationError,
-    build_chat_operating_status,
-    build_optimization_run_summary,
-    capabilities,
-    dump_prepared_optimization,
-    inspect_offline,
-    load_prepared_optimization,
-    prepare_optimization,
+from petroleum_rto.rto.runtime.steady import (
+    LIMITATIONS,
+    context_ref,
+    control_variables,
+    inspect_comparison,
+    load_prepared_comparison,
+    prepare_comparison,
+    read_context,
     render_confirmation,
 )
 
 CONFIRMATION_INPUTS = ("/confirm", "确认", "确认执行")
-TOOL_CONTRACT_VERSION = "3.0.0"
+TOOL_CONTRACT_VERSION = "5.0.0"
 CONFIRMATION_RULE = (
     "仅整条输入为"
     + "、".join(f"“{text}”" for text in CONFIRMATION_INPUTS)
@@ -41,26 +37,21 @@ class NoArguments(BaseModel):
 
 
 class ResultArguments(NoArguments):
-    workflow_id: str | None = Field(default=None, pattern=r"^offline-rto-[0-9a-f]{16}$")
+    workflow_id: str | None = Field(default=None, pattern=r"^steady-[0-9a-f]{16}$")
 
 
-class ObjectiveArguments(NoArguments):
-    metric_id: str
-    sense: Literal["minimize", "maximize"]
+class MVTarget(NoArguments):
+    variable_id: str = Field(
+        description="get_plant_info返回的MV精确标识；不接受CV、任意路径或属性。"
+    )
+    value: float = Field(allow_inf_nan=False, description="用户要求的绝对目标值。")
+    unit: str = Field(description="该MV目录中的显式单位，必须精确匹配。")
 
 
 class PrepareArguments(NoArguments):
-    snapshot_ref: str = Field(
-        description="read_operating_context返回的snapshot_ref，不是context_id。"
-    )
-    objectives: list[ObjectiveArguments] = Field(min_length=1)
-    decision_variables: list[str] = Field(
-        min_length=1, description="全部允许调整的available变量；可选子集，不能加入deferred变量。"
-    )
-    max_candidates: int = Field(
-        default=1,
-        ge=1,
-        description="返回方案总数（含推荐），默认1；上限见get_plant_info的preparation规则，不是搜索预算。",
+    snapshot_ref: str = Field(description="read_operating_context返回的snapshot_ref。")
+    changes: list[MVTarget] = Field(
+        min_length=1, max_length=24, description="选定MV的一个或多个设定值；只修改列出的变量。"
     )
     previous_plan_ref: str | None = None
 
@@ -80,7 +71,7 @@ def argument_error(schema: type[BaseModel], exc: ValidationError) -> dict[str, A
                 "json_pointer": "/" + str(e["loc"][0])
                 if e["loc"] and (e["loc"][0] in fields or e["loc"][0] == "constraints")
                 else "/",
-                "message": "prepare不接受constraints；系统门禁自动保留，额外业务限制不可忽略。"
+                "message": "当前支持MV稳态比较，不接受constraints，不能忽略用户额外限制。"
                 if e["loc"] and e["loc"][0] == "constraints"
                 else "参数不符合工具Schema；不改变用户目标与变量。",
             }
@@ -96,33 +87,55 @@ class AgentDomainTools:
         self.workspace = workspace.resolve()
 
     def plant_info(self, state: dict[str, Any]) -> dict[str, Any]:
-        context = load_operating_context(self.workspace / "configs/rto/contexts/case_20260604.json")
-        manifest = capabilities(repo_root=self.workspace)
         return {
             "status": "ok",
             "tool_contract_version": TOOL_CONTRACT_VERSION,
-            "provider_id": context.provider_id,
-            "process_type": "常压蒸馏（CDU）" if context.provider_id == "cdu-m7" else "未知",
-            "model_id": context.model_ref.object_id,
-            "claim_scope": context.claim_scope,
-            "capabilities": manifest,
-            "preparation": {
-                "constraints": "系统硬约束与发布改善门禁自动加入；prepare不接受constraints参数。额外业务约束尚不支持，应告知用户，不可静默忽略。",
-                "decision_variables": "只选择available变量的非空子集；不要求填写所有登记变量，deferred变量不可加入。",
-                "max_candidates": "最终返回方案总数，默认1；对应execution_routes的top_k为上限，maximum_m2_candidates是内部搜索预算。",
-            },
-            "available_execution": "读取工况、准备方案、确认后完整静态搜索和动态复核",
+            "process_type": "HYSYS常压蒸馏稳态仿真",
+            "model_id": "mjh_atm",
+            "control_variables": control_variables(),
+            "control_variable_count": 24,
+            "available_execution": "读取当前模型、选择一个或多个MV，准备并确认后比较基准与一个候选工况",
+            "available_readings": "当前已绑定变量的测量值与单位，包括原油进料、注水、产品流量及TBP点；读取范围不限于T-39。",
+            "limitations": list(LIMITATIONS),
         }
 
     def operating_context(self, state: dict[str, Any]) -> dict[str, Any]:
-        context = load_operating_context(self.workspace / "configs/rto/contexts/case_20260604.json")
-        state["snapshots"] = {**state["snapshots"], context.fingerprint: context.as_dict()}
+        context = read_context(self.workspace)
+        ref = context_ref(context)
+        state["snapshots"] = {**state["snapshots"], ref: context}
         return {
             "status": "ok",
-            "snapshot_ref": context.fingerprint,
-            "source": "configured_offline_case",
-            "context_id": context.context_id,
-            **build_chat_operating_status(context),
+            "tool_contract_version": TOOL_CONTRACT_VERSION,
+            "snapshot_ref": ref,
+            "source": "existing_hysys_memory",
+            "model_id": "mjh_atm",
+            "observed_at_utc": context["observed_at_utc"],
+            "solver_called": False,
+            "control_values": [
+                {k: r[k] for k in ("variable_id", "unit", "value", "can_modify")}
+                for r in context["variables"]
+                if r["role"] == "mv"
+            ],
+            "readings": [
+                {
+                    key: reading[key]
+                    for key in (
+                        "variable_id",
+                        "object_name",
+                        "property_name",
+                        "quantity_type",
+                        "unit",
+                        "value",
+                    )
+                }
+                for reading in context["variables"]
+            ],
+            "reading_scope": (
+                "readings均来自本次HYSYS观测；其中TBP是沸点曲线温度，不是物流出口温度。"
+                "物流总流量不等于合格成品产量；本工具未读取组分及相态，也未提供完整物料/能量衡算。"
+                "只有目录内的MV可进入调节方案，CV仅读取。"
+            ),
+            "limitations": list(LIMITATIONS),
         }
 
     @staticmethod
@@ -131,7 +144,6 @@ class AgentDomainTools:
             state["pending"] = {
                 **state["pending"],
                 "status": "revision_required",
-                "static": None,
                 "result": None,
             }
 
@@ -140,52 +152,23 @@ class AgentDomainTools:
         args = PrepareArguments.model_validate(kwargs)
         pending = state["pending"]
         if pending and args.previous_plan_ref != pending["ref"]:
-            raise OptimizationPreparationError(
-                [
-                    {
-                        "code": "stale-plan-reference",
-                        "json_pointer": "/previous_plan_ref",
-                        "message": "修改必须引用当前plan_ref。",
-                    }
-                ]
-            )
+            raise ValueError("修改必须引用当前plan_ref。")
         if not pending and args.previous_plan_ref is not None:
-            raise OptimizationPreparationError(
-                [
-                    {
-                        "code": "unexpected-plan-reference",
-                        "json_pointer": "/previous_plan_ref",
-                        "message": "当前没有旧方案，新建时省略previous_plan_ref。",
-                    }
-                ]
-            )
+            raise ValueError("当前没有旧方案。")
         if args.snapshot_ref not in state["snapshots"]:
-            raise OptimizationPreparationError(
-                [
-                    {
-                        "code": "unknown-snapshot-reference",
-                        "json_pointer": "/snapshot_ref",
-                        "message": "先读取工况并使用其snapshot_ref。",
-                    }
-                ]
-            )
-        prepared = prepare_optimization(
-            repo_root=self.workspace,
-            context=OperatingContext.from_mapping(state["snapshots"][args.snapshot_ref]),
-            objectives=[item.model_dump() for item in args.objectives],
-            decision_variables=args.decision_variables,
-            max_candidates=args.max_candidates,
+            raise ValueError("先读取工况并使用其snapshot_ref。")
+        prepared = prepare_comparison(
+            state["snapshots"][args.snapshot_ref], [change.model_dump() for change in args.changes]
         )
         version = state["plan_version"] + 1
-        ref = f"plan-{version}-{prepared.problem.fingerprint[:12]}"
+        ref = f"plan-{version}-{prepared.fingerprint[:12]}"
         state["plan_version"] = version
         state["pending"] = {
             "ref": ref,
             "version": version,
-            "prepared": dump_prepared_optimization(prepared),
+            "prepared": prepared.as_dict(),
             "displayed_turn": None,
             "status": "awaiting_display",
-            "static": None,
             "result": None,
         }
         return {
@@ -212,11 +195,7 @@ class AgentDomainTools:
         directory = root / str(args.workflow_id)
         if any(path.is_symlink() for path in (root.parent, root, directory)):
             raise ValueError("result directory must not be a symbolic link")
-        try:
-            result = build_optimization_run_summary(inspect_offline(directory)).as_dict()
-        except OfflineInspectionError as exc:
-            raise ValueError("result evidence could not be verified") from exc
-        receipt = {"status": "ok", "workflow_id": workflow_id, "result": result}
+        receipt = inspect_comparison(directory)
         state["last_result"] = receipt
         return receipt
 
@@ -225,12 +204,12 @@ class AgentDomainTools:
         pending = state["pending"]
         plan = None
         if pending is not None:
-            plan = {key: pending[key] for key in ("ref", "version", "status", "static", "result")}
+            plan = {key: pending[key] for key in ("ref", "version", "status", "result")}
             plan["plan_ref"] = pending["ref"]
             plan["confirmation_status"] = pending["status"]
             plan["confirmation_available"] = pending["status"] == "awaiting_confirmation"
             plan["authorized"] = pending["status"] in {"approved", "completed"}
-            plan["summary"] = load_prepared_optimization(pending["prepared"]).summary()
+            plan["summary"] = load_prepared_comparison(pending["prepared"]).summary()
         return {
             "tool_contract_version": TOOL_CONTRACT_VERSION,
             "user_turn_id": state["turn_id"],
@@ -249,19 +228,19 @@ class AgentDomainTools:
                 "get_plant_info",
                 self.plant_info,
                 NoArguments,
-                "读取装置身份及可用目标、变量、系统门禁。",
+                "读取当前稳态联调能力、唯一变量和限制。",
             ),
             (
                 "read_operating_context",
                 self.operating_context,
                 NoArguments,
-                "读取配置工况和固定snapshot_ref，不仿真。",
+                "只读当前HYSYS工况及snapshot_ref，返回进料、产品流量、TBP等已绑定变量的readings与单位；不写入或求解。",
             ),
             (
                 "prepare_optimization",
                 self.prepare,
                 PrepareArguments,
-                "只构造待审批方案；只选用户允许的available变量。系统门禁自动保留，不接受constraints，额外限制不可忽略。max_candidates是返回数量，不是搜索预算；修改必须引用当前previous_plan_ref。",
+                "准备目录内一个或多个MV的稳态比较；changes包含精确标识、目标值和单位，不运行优化搜索；修改必须引用previous_plan_ref。",
             ),
             (
                 "cancel_optimization",
@@ -298,13 +277,6 @@ class AgentDomainTools:
                 except ValidationError as exc:
                     status = "error"
                     result = argument_error(schema, exc)
-                except OptimizationPreparationError as exc:
-                    status = "error"
-                    result = {
-                        "status": "error",
-                        "code": "optimization-preparation-rejected",
-                        "issues": exc.issues,
-                    }
                 except (ValueError, TypeError, KeyError, OSError):
                     status = "error"
                     result = {

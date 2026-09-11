@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import json
-import shutil
 import subprocess
 import sys
 from dataclasses import replace
@@ -34,7 +33,6 @@ _BOOTSTRAP = (
 @pytest.fixture
 def summary_workspace(tmp_path: Path, repo_root: Path) -> Path:
     workspace = tmp_path / "workspace"
-    shutil.copytree(repo_root / "configs/rto", workspace / "configs/rto")
     return workspace
 
 
@@ -56,8 +54,7 @@ def _prepared_with_page(
         effects.append("unrequested-computation")
         raise AssertionError("summary acceptance must not run physical computation")
 
-    monkeypatch.setattr(react, "solve_prepared_optimization", unexpected_stage)
-    monkeypatch.setattr(react, "verify_prepared_optimization", unexpected_stage)
+    monkeypatch.setattr(react, "execute_comparison", unexpected_stage)
     domain = AgentDomainTools(workspace)
     plant_info = domain.plant_info
 
@@ -195,8 +192,7 @@ def _restore_worker() -> None:
         effects.append("unrequested-domain-effect")
         raise AssertionError("restoring summary or paging must not repeat domain work")
 
-    react.solve_prepared_optimization = unexpected
-    react.verify_prepared_optimization = unexpected
+    react.execute_comparison = unexpected
     domain = AgentDomainTools(workspace)
     domain.plant_info = unexpected  # type: ignore[method-assign]
     runtime = ReactAgent(
@@ -251,7 +247,6 @@ def _restore_worker() -> None:
                     "page": json.loads(str(page.content)),
                     "expected_page": text[-80:],
                 },
-                ensure_ascii=False,
             )
         )
     finally:

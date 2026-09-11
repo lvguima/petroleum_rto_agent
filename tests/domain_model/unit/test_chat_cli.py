@@ -268,8 +268,8 @@ def test_interactive_progress_is_visible_before_final_output(
             assert message == "确认\n"
             assert on_progress is not None
             assert on_text is not None
-            on_progress("M2搜索：已评价候选1。")
-            assert "M2搜索：已评价候选1。\n" in output.getvalue()
+            on_progress("HYSYS：正在计算候选点。")
+            assert "HYSYS：正在计算候选点。\n" in output.getvalue()
             assert "模型> 最终回答" not in output.getvalue()
             return AgentTurn(outputs=("模型> 最终回答",), should_exit=True)
 
@@ -279,7 +279,7 @@ def test_interactive_progress_is_visible_before_final_output(
     monkeypatch.setitem(sys.modules, "readline", object())
 
     assert cli._run_repl(Runtime(), input_stream=source, output=output, error=error) == 0
-    assert output.getvalue() == ("输入 /help 查看命令。\nM2搜索：已评价候选1。\n模型> 最终回答\n")
+    assert output.getvalue() == ("输入 /help 查看命令。\nHYSYS：正在计算候选点。\n模型> 最终回答\n")
     assert error.getvalue() == ""
 
 
@@ -343,6 +343,7 @@ def test_missing_terminal_editor_stops_before_reading_input_and_closes_runtime(
     monkeypatch.setattr(sys, "stdout", output)
     monkeypatch.setattr(sys, "stderr", error)
     monkeypatch.setitem(sys.modules, "readline", None)
+    monkeypatch.setattr(sys, "platform", "linux")
 
     assert cli.main([]) == 1
 
@@ -350,6 +351,46 @@ def test_missing_terminal_editor_stops_before_reading_input_and_closes_runtime(
     assert source.tell() == 0
     assert runtime.closed
     assert "缺少终端行编辑支持" in error.getvalue()
+
+
+@pytest.mark.parametrize("ending", [EOFError, KeyboardInterrupt])
+def test_windows_terminal_uses_input_without_readline_and_closes(
+    monkeypatch: pytest.MonkeyPatch, ending: type[BaseException]
+) -> None:
+    session = _FakeSession()
+
+    class Runtime(_FakeRuntime):
+        closed = False
+
+        def handle(self, message: str, **kwargs: object) -> AgentTurn:
+            assert callable(kwargs["on_progress"])
+            assert callable(kwargs["on_text"])
+            return super().handle(message)
+
+        def close(self) -> None:
+            self.closed = True
+
+    runtime = Runtime(session)
+    source, output, error = _TTYStringIO(), _TTYStringIO(), io.StringIO()
+    submitted = iter(["", "已编辑中文"])
+
+    def native_input(prompt: str) -> str:
+        try:
+            return next(submitted)
+        except StopIteration:
+            raise ending from None
+
+    monkeypatch.setattr(cli, "_new_runtime", lambda: runtime)
+    monkeypatch.setattr(sys, "stdin", source)
+    monkeypatch.setattr(sys, "stdout", output)
+    monkeypatch.setattr(sys, "stderr", error)
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setitem(sys.modules, "readline", None)
+    monkeypatch.setattr("builtins.input", native_input)
+    assert cli.main([]) == 0
+    assert session.messages == ["", "已编辑中文"]
+    assert runtime.closed
+    assert error.getvalue() == ""
 
 
 @pytest.mark.parametrize("failure", [False, True])
@@ -506,7 +547,7 @@ def test_runtime_startup_failure_closes_transport_and_releases_session(
         return transport
 
     monkeypatch.setattr(native, "NativeTransport", make_transport)
-    session_path = tmp_path / "runs/assistant/session.sqlite"
+    session_path = tmp_path / "runs/assistant/steady-session.sqlite"
 
     def fail_agent(model: native.DmxNativeModel, tools: Any, **kwargs: Any) -> None:
         assert model.use_stream is True

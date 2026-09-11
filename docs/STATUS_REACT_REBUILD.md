@@ -1,6 +1,6 @@
 # Petroleum RTO Agent — ReAct改造项目状态与实施规划
 
-_建立：2026-09-09；最后更新：2026-09-11（Asia/Shanghai）｜状态：LC1–LC7及结果展示改进已验证；HYSYS稳态替换仍在规划；用户已明确确认公开发布，当前Agent与规划已推送GitHub并核对远端，可在Windows接续开发；回退点105e5b8，规划基线66993db；保留五模型双协议_
+_建立：2026-09-09；最后更新：2026-09-12（Asia/Hong_Kong）｜状态：24项MV单项/组合调节已接入Agent；代表性三项组合真实HYSYS比较与恢复、会话重载通过。全仓958测试、17子测试通过，5项Windows跳过。首轮候选塔底温度未定义而失败，后续同组合通过，原因未解决；既有ABBA重复性问题保留。本轮未提交或推送。_
 
 ---
 
@@ -12,17 +12,193 @@ _建立：2026-09-09；最后更新：2026-09-11（Asia/Shanghai）｜状态：L
 
 | 项目 | 当前事实 |
 | --- | --- |
-| 本轮交付 | 58文件检查、代码/规划基线35c317f及交接记录9c0c896已推送到公开仓库feat/react-agent，远端完整哈希核对一致；忽略规则和Windows接续说明已交付。本轮追加发布完成记录 |
-| 用户已确认 | 用户要求先检查gitignore，再提交到GitHub以便Windows继续开发；明确桌面hysys_moni不必考虑，Windows已有；获知公开目的地及58文件范围后明确“允许提交吧”。仅交付当前仓库及必要忽略/交接修正，不迁入外部模型，不实施H1–H6或删除旧CDU |
-| 本轮执行范围 | 已检查、提交并公开推送当前Agent、测试、规划和报告；补.gitignore/README/本状态，无新增生产源码修改、HYSYS迁入或旧CDU删除。此前审批阻塞在用户明确确认后解除，正常推送完成 |
-| 后续阶段 | H0分析及范围细化完成；H1仿真模块与资料、H2读取/单点与Windows适配、H3稳态RTO、H4Agent/恢复切换、H5旧模型删除、H6Windows优化总验收均未实施；变量语义/范围及实际Windows连接仍需验证 |
-| 当前源码基线 | feat/react-agent；代码与规划基线35c317f0bf3ffa45bab010281662028b333c045e已发布；交接提交9c0c896c4bf3010a787fd8a3e1ff5622151cf58c已完成首次远端核对。本轮完成记录单独提交，最终HEAD以git log及远端核对为准。main未改，未强推 |
-| 改造代码 | 单一图状态、五个领域工具和分页工具、SQLite恢复、真实输入审批、固定M2/M4、正文流、公共摘要逐批保存及普通有限重试已实现；旧manage/solve/verify模型入口已删除，工具合同3.0.0 |
+| 本轮交付 | 24项MV单项/组合调节已完成接入，958测试/17子测试通过、5项Windows跳过；真实三项组合完整Agent比较/恢复/重载通过，保留首轮边界失败证据及未解原因 |
+| 用户已确认 | 首轮T-39链路完成后，现明确授权将24项MV接入单项/多项调节；每项核对绑定与单位，实际联调只选代表变量，不全量逐项计算。不运行旧CDU、不扫描失收敛范围，保留hysys来源和base_files |
+| 本轮执行范围 | 24项MV按目录及单位接入，方案/确认/单点/结果一并升级；只对T-39、原油压力和Water1流量做组合实测，无外部模型请求 |
+| 后续阶段 | 当前单项/多项MV Agent程序链及代表组合真实HYSYS已验证；本轮模型使用本地替身，真实模型选择的既有证据仅覆盖早期T-39。重复性、间歇边界缺失及优化/质量合同仍未解决，不宣称H3–H6全部完成 |
+| 当前源码基线 | feat/react-agent，HEAD仍为bca48bab717d2064dc64c46637a5cc0a501af3ce；保留此前.gitignore修改，新增探查/Windows兼容代码、测试及依赖锁变更；hysys/来源原件保留且尚未跟踪，未暂存、提交或推送 |
+| 改造代码 | 单一官方create_agent保留；移除M2/M4中间件、static槽位、旧目标/变量/返回数量参数及旧结果视图；工具5.0.0、会话2.0.0；新方案/结果2.0.0、MV单点1.0.0，历史T-39证据继续严格读取，默认steady-session.sqlite保留旧库原件 |
 | 真实模型验证 | 当前五个精确ID保持原Chat/Responses映射，20种不同请求配置的SSE工具往返、五默认摘要、真实Agent帮助/切换及工具回填通过；全部62次HTTP为200。供应商自报别名与请求ID区分记录；旧Responses统一迁移失败仅作历史事实 |
 | 技术路线 | LangChain 1.4.0 / langchain-core 1.6.2 / LangGraph 1.2.11；httpx原生传输，domain-model extra和uv.lock锁定；摘要公共接口关闭预裁剪，仅结构化临时错误每批最多3次尝试 |
-| 本地启动准备 | 两种CLI入口共用桌面ReactAgent；新会话默认gpt-5.6-sol-cdx，默认开启思考并实际发送low，/help如实展示。已有会话优先恢复保存的选择，可用/model 3切换；本轮未改用户当前会话库或本机凭据 |
-| 已有计算底座 | 复用严格业务意图、受信工况、确定性问题构造、求解和M2/M4配对评价 |
-| 当前下一步 | Windows拉取feat/react-agent，阅读本状态与simulation稳态规划，使用Windows已有HYSYS目录；下一开发批次从H1仿真模块及资料合同开始，H2处理Windows兼容及真实连接验证 |
+| 本地启动准备 | 两种CLI入口共用桌面ReactAgent；新会话默认gpt-5.6-sol-cdx，默认开启思考并实际发送low，/help如实展示。已有会话优先恢复保存的选择，可用/model 3切换；本轮已安装用户提供的本机凭据并验证私有权限；使用独立验收会话，未改用户日常会话库 |
+| 已有计算底座 | 当前Agent消费runtime/steady、HYSYS适配器和文件锁；旧CDU、M2/M4、D0、搜索/策略实现及cdu-mini、rto-offline已退役，启动不再加载CDU |
+| 当前下一步 | 重启现有CLI，用新工具查询24项MV并准备单项/组合方案；继续交互开发时诊断已记录的间歇边界缺失，不扩大为全量扰动或失收敛扫描 |
+
+### GitHub发布（2026-09-12，用户已授权，执行中）
+
+- 用户要求提交GitHub，范围为此前已验收且尚未提交的Windows适配、HYSYS接入与来源资料、旧CDU退役、工况查询及24项MV调节，连同源码、配置、测试、说明和验收摘要。继续忽略base_files、密钥、会话、环境与runs内运行副本。
+- 已读取远程，origin/feat/react-agent与本地提交基线一致，无需合并或强制推送。沿用本批958测试、17子测试通过及5项Windows跳过的验证证据；发布不重新计算HYSYS或请求模型。
+- 本轮仅补正架构说明中的单点合同版本，无业务源码变化；已有重复性及间歇边界缺失限制保留。下一步检查暂存内容，创建提交并正常推送，再核对远程提交与工作树。
+
+### 24项MV调节接入（2026-09-11至09-12，本批完成，保留间歇边界问题）
+
+- **实施进展（跨日至09-12）：** 通用MV写入共用原工作案例生命周期；Agent工具5.0.0接收changes，方案/结果2.0.0冻结变量目录，新单点hysys-mv-point/1.0.0。准备、执行、重载核对目标/单位/绑定/目录及同次边界。现行模块说明已同步；无新增依赖、删除、提交或推送。
+- **离线结果：** 相关回归107通过；全仓958通过、5项Windows跳过、17子测试通过（151.95秒），JUnit为runs/simulation/mv-controls-20260911/full.xml。Ruff源码/测试/脚本检查通过，mypy 34源码通过；首次测试夹具覆盖写入和旧target_c断言失败已修正，补测试时的导入/插入位置错误及混合换行已修正。测试数量不累计重复子集。
+- **真实首轮：** 模型使用MockTransport，HYSYS为真实现有应用。Agent三项组合计划、确认、两点执行、落盘、会话重启及/result零请求重载完成。steady-da49aea7fcf5ae56的基准passed，候选T-39=156.9℃、Water1=2201kg/h、原油压力180.1kPa均写入/读回通过，未选输入及规格无漂移，实际温度156.90047961056524℃；但读候选边界时Risedue.Temperature未定义，因此结果正确保留evaluation_error，未输出有效物料/能量比较。源观测与零差恢复通过。
+- **真实复查与最终验收：** 同组三項目标的单点诊断passed，Run后各产品温压/流量/焓均立即已知，未触发额外求解开关；随后不带诊断包装的正式Agent流程重跑，steady-63aa8dfbde0106f3的两点均passed，comparison_only，12项同次物料/能量差值形成，确认、严格重建、独立会话重启及/result零请求读取通过。模型使用httpx.MockTransport，无真实模型请求。首轮Risedue温度未定义未稳定复现，根因未解决，不添加自动重试或放宽缺失值检查。
+- **最终完整性：** 全部24项MV在本次真实基准的绑定、单位换算、活动规格与可写标志核对通过；仅三项实际变更，不将其余21项声明为逐个实测。22份hysys来源哈希不变，两个历史T-39结果及新失败/成功结果严格读取通过。Ruff检查、73文件格式、mypy 34源码及Git差异检查通过；9份说明本地链接全部有效（历史已退役路径改为文字，保留历史事实）。未暂存、提交或推送。
+- **报告、风险与下一步：** [MV接入验收报告](../reports/simulation/hysys_mv_controls_20260912.json)记录当前实现哈希、958项全仓回归、真实组合结果和首次失败。未逐项真实写入24项，未请求外部模型、扫描范围或执行优化/质量验收；未消除既有ABBA重复性问题与COM硬超时限制。当前支持MV设定比较，不能将接口可写解释为任意数值均可收敛。下一步重启CLI进行新MV工具交互，遇到边界缺失按保存证据继续定位。
+- **状态变化：** 从“仅T-39两离散点”更新为“24项MV可选单项/组合、真实代表组合链路通过”；首次边界失败仍保留。当前批次无删除或新依赖，原模型、工作树已有清理改动及用户会话保留。
+
+
+- 最新授权覆盖已识别24项MV，替代先前唯一T-39的阶段限制。支持按MV标识及显式单位准备一个或多个绝对设定值，统一暂停、写入、读回核验、求解及恢复；不开放CV或模型自由路径，不预设工艺区间或质量条件。
+- 已核对现有目录和最近真实快照：24项均state=1、CanModify=true；10项关联活动塔规格，质量流量内部单位与对外kg/h不同。保留已用真实证据的历史T-39读取，当前生产方案及多MV单点显式升级合同，不能把旧确认静默扩展为多变量授权。
+- 已实现共用工作副本生命周期及通用MV写入，并接入Agent方案/确认/结果；离线验证绑定、单位、部分写入失败、未选MV漂移与严格恢复边界。真实只选代表性变更，不将接口覆盖声明为全部变量逐项实测通过。
+
+### 工况查询丢失进料/产出信息修复（2026-09-11，已完成）
+
+- **已执行验证：** 两组相关用例79通过；新回归直接检查模型请求中的工具内容含进料与五条产品物流数值/单位，且无路径、磁盘哈希、内部值和塔板数据，原完整快照仍保留本地。真实HYSYS只读验证返回60项readings，含原油400000kg/h、32.6℃、180kPa及五条产品流量；22份来源文件未变，未求解、未调用外部模型。原始摘要与只读记录在runs/simulation/operating-readings-20260911。Ruff/格式11文件与mypy 9源码通过；最终Agent及稳态运行时回归423通过、5项Windows平台跳过（118.49秒），JUnit为runs/simulation/operating-readings-20260911/agent-regression.xml。79项为相关子集，不累计计数。
+
+- 用户反馈查询“入料和常压塔的产出情况如何”后模型只知道T-39。核对发现底层已读取60项变量，但AgentDomainTools.operating_context仅返回案例、时间、T-39等元信息，遗漏所有变量数值；不是COM未读取，也不是旧CDU清理造成。
+- 已在原只读工具中增加同次观测readings，保留变量标识、对象、属性、量纲、单位和数值，不外发路径、磁盘哈希、内部值、塔板明细或写入权限。无新增读取、变量写入或求解；工具合同新增字段升级4.1.0，方案/结果/会话合同不变。提示词明确读取范围不等于T-39写入范围；TBP不当成出口温度，未读取的组分/相态及完整衡算如实标注。
+- **完成与限制：** 已验证真实HYSYS读取与模型请求内容，准备/确认及恢复相关回归通过；只读查询不扩大写入。没有重新请求外部模型；模型回填使用MockTransport验证，真实HYSYS读取单独实测。物理读写代码未变，本轮未重复全部仿真测试；此前清理全仓验收保持其原范围。初次格式检查提示编辑产生混合换行，统一格式后通过。无删除、依赖变更、Git提交或推送。验收见[工况查询修复报告](../reports/simulation/agent_operating_readings_20260911.json)。
+- **状态变化与下一步：** 从“底层已读但模型只收到T-39摘要”更新为“模型可收到本次60项测量值及单位”。用户需退出旧进程并重启Agent，再查询进料与产出；旧会话保留，新读数以新工具结果为准。当前仍未开放其他变量写入，重复性和质量边界限制不变。
+
+### 旧Python仿真退役实施（2026-09-11，已完成）
+
+- **授权与变更：** 用户在清理盘点后明确“OK 开始清理吧”。收窄rto/runtime/adapters包初始化，删除自编CDU及无当前消费者的旧RTO能力、合同、D0通信、编译/求解、M2/M4评价、策略、编排及旧CLI；同步删除专用配置、测试、CDU基准脚本、旧构建物和数据夹具。保留当前steady运行时、HYSYS适配器及文件锁。未修改HYSYS物理计算协议、引入新依赖或扩大变量。
+- **备份与资料：** 517份文件（含缓存与构建产物）删除前全部写入runs/simulation/legacy-cleanup-20260911/legacy-files-before-cleanup.zip，并逐文件读回验证SHA-256；清单和依赖证明在同目录。另移除空runs/cdu/.gitkeep及1份孤立旧集成测试缓存，清除空旧目录。data/cdu索引/观测与gold、reports/cdu、历史说明及既有runs证据保留；历史文档原位标记退役，旧RTO综合说明另归档。当前主说明和导航已重写为HYSYS路径。
+- **审批与依赖证明：** 首次批量删除因通用RTO范围证明和备份不足被自动审批拒绝，未执行；补全ZIP逐文件备份和保留源码AST依赖检查后，受控清单删除获批并执行。当前无审批阻塞。Agent实际导入CDU由58个降至0个，RTO仅加载6个当前模块；保留源码对待删模块引用为0。
+- **安装与兼容变化：** 已卸载旧petroleum-rto-cdu-model分发包，离线重装当前项目；只注册rto-chat，旧cdu-mini/rto-offline命令已消失。pyproject移除旧入口与内置JSON打包项，uv锁核对通过；无新增依赖。旧公共离线API明确退役，不提供空壳兼容；当前HYSYS方案/结果及会话合同未改变。
+- **测试与修复：** 首轮相关测试37通过、1失败，定位为恢复测试仍操作旧配置；改为修改/移除隔离工作区的HYSYS配置后通过。同步去除重试/摘要夹具中的无用旧配置复制，终端进度替身改为HYSYS文本；新增新进程禁止导入旧链路的回归。最终全仓939通过、5项Windows跳过、17子测试通过（142.17秒），JUnit为runs/simulation/legacy-cleanup-20260911/full.xml。跳过为1项Unix PTY及4项账户不能创建符号链接；没有忽略失败测试。Ruff检查/格式77文件通过，mypy 33源码通过；初次Ruff缺少显式check=False已修复。
+- **当前链路保护：** 已安装入口在独立会话、假测试凭据和禁止网络条件下完成/help与/exit，未读用户密钥或日常会话。首次传--help按现有合同被拒，按文档改为交互/help后通过。两个已验收steady结果严格重载成功，64份结果文件未变；22份hysys来源哈希与接收清单一致。7份现行说明本地链接检查及Git差异检查通过。最终清单核对初次误把自动再生成的当前模块pyc当成遗留文件，已按源码/生成缓存区分修正。验收见[清理报告](../reports/simulation/legacy_cdu_cleanup_20260911.json)。
+- **未执行与限制：** 本轮未重算HYSYS、调用外部模型或执行旧CDU实验；历史验收仍是此前实算证据。未暂存、提交或推送，保留其余既有修改。重复性失败、质量约束缺失、未开放优化搜索及COM硬超时限制未消除。
+- **状态变化与下一步：** 从“Agent业务已换HYSYS但旧库残留”更新为“旧库及启动依赖已退役，当前流程离线回归通过”。下一步继续唯一T-39的Agent交互开发，进入优化排序前诊断已有重复性差异；不扩展全变量写入或扫描失收敛范围。
+
+### 旧Python仿真清理盘点（2026-09-11，仅核查，未删除）
+
+- **范围与状态：** 用户询问旧Python仿真的组成及可清理范围，本轮只核查文件、入口、跨模块引用和实际导入；没有运行旧CDU实验、连接HYSYS或请求模型，没有删除代码、配置、产物或新增依赖。单变量HYSYS链路的既有验收状态不变。
+- **旧模型主体：** src/petroleum_rto/cdu共86份非缓存文件，包含物性/设备/稳态回流、开环动态、PI闭环、校准/数据协调、验证和M7运行接口及内置JSON；配套configs/cdu 14份、data/cdu 4份、scripts/cdu 3份、tests/cdu 68份。停止支持CDU后可整组下线，但必须先解除下述入口和导入引用。
+- **旧调用链：** rto/adapters/cdu_m7.py，runtime/api.py、staged.py、chat_summary.py、cli.py及其旧入口，evaluation/m2.py、m4.py，以及相应M2/M4集成测试、CDU能力/工况/意图配置属于旧流程。pyproject.toml仍注册cdu-mini和rto-offline，并打包CDU内置数据。旧求解/编译/策略/通信合同还有旧CLI及测试消费者，不能仅按目录名认定为无依赖；应随旧入口退役核查剩余可达性，不为假想未来用途保留休眠链路。
+- **发现的实际耦合：** 在本地仅导入petroleum_rto.assistant.react，sys.modules中出现58个CDU模块，没有调用仿真。rto/__init__.py仍导出旧评价/编排；runtime/__init__.py导入api/staged，adapters/__init__.py导入cdu_m7。因此“Agent业务执行已换HYSYS”成立，但“启动已与CDU完全解耦”不成立；直接删除cdu目录会破坏当前导入。清理首步应收窄这些包初始化导出，并验证Agent导入不再加载CDU。
+- **保留边界：** simulation/、configs/simulation/、scripts/simulation/及相关测试是当前Python编写的HYSYS接入，必须保留；rto/runtime/steady.py、adapters/hysys_steady.py和_file_lock.py是实际当前依赖。assistant/、domain_model/、_windows_files.py及LangChain、HTTP、SQLite检查点、pywin32依赖仍有消费者。hysys/原件、base_files/用户资料、私有凭据和会话不属于旧CDU可删除代码。
+- **文档与产物：** reports/cdu 10份、docs/cdu 13份为旧模型说明/证据，优先归档；data/cdu内来源索引、观测和协调结果需区分原始资料与可再生产物。旧M7构建目录及dist中的petroleum_rto_cdu_model轮子可作为再生构建产物清理；runs按清单识别，不能整体删除。当前runs/rto的两个steady结果均是已验收HYSYS证据，应保留；失败的HYSYS顺序复现证据也保留。发现架构目录说明及RTO主文档正文仍有“当前Agent执行M2/M4”的陈旧表述，后续清理须同步修正文档。
+- **验证与未执行：** 已完成目录计数（排除__pycache__和pyc）、源码引用检索、当前Agent实际导入及工作树复核；未测试删除后的启动/会话恢复，因为本轮未实施删除，也未重跑数值或外部验收。仅更新本状态记录，不覆盖已有修改，未暂存、提交或推送。
+- **下一步：** 当前可交付清理分组与依赖前置条件。若进入实施，先解除旧包初始化引用，再成组退役CDU及旧CLI/专用M2/M4链路，同步清理入口、测试和文档，验证当前Agent启动、准备/确认及已保存HYSYS结果严格重载；不自动扩大为真实HYSYS重算。
+
+### 真实模型与HYSYS贯通重试（2026-09-11，已通过）
+
+- 用户已提供dmx.txt并授权移动到程序凭据位置及重试；此前DMXAPI仿真摘要外发授权继续有效，不发送.hsc文件。
+- 已将用户提供的密钥迁入src/petroleum_rto/domain_model/dmx_api.json，复用Windows文件保护设置私有DACL，并通过正式读取器校验；验证成功后移除dmx.txt。固定凭据及临时输入均被Git忽略。未输出密钥、未增加依赖、变量或旧CDU实验。
+- **真实验证通过：** 使用已配置gpt-5.6-sol-cdx，经DMXAPI完成4次模型请求；模型自行调用get_plant_info、read_operating_context、prepare_optimization。程序展示后按本轮明确授权执行/confirm，真实HYSYS分别重算156.8/156.9℃，结果steady-e9f7a90c8d21e45d为comparison_only，两点均通过且各有自身物料/能量边界。随后同模型完成文字说明，保留重复性和质量/收益限制。
+- **持久化与来源核验：** 严格结果重建、独立私有会话重启及/result读取均通过；重启与读取新增模型请求为0，没有重新计算。22份hysys来源文件与接收哈希一致，两点源观测/磁盘/工作文件保护均为true；报告及结果经内存检查不含密钥。详细记录见[真实模型与HYSYS验收](../reports/simulation/hysys_real_agent_20260911.json)，原始报告在runs/simulation/agent-steady-live-20260911/report.json。
+- **变更与验证边界：** 本轮只迁入私有凭据、移除已验证的临时dmx.txt、补忽略规则和状态/验收记录；应用源码、依赖和计算协议与上一批一致。上一批935测试、17子测试通过和5项Windows平台跳过仍为原范围证据，因此没有重复运行全套离线测试。无Git暂存、提交或推送；既有HYSYS文件、旧CDU核心和用户日常会话库未修改。
+- **限制和下一步：** 密钥阻塞已解除。本次覆盖一个真实模型、一个基准/候选对及其说明/恢复，不等于所有模型或自然语言场景全部验证。既有重复性失败没有重跑或消除，eligible保持false；质量约束、最优排序和COM硬超时仍未完成。下一步可在现有CLI开展唯一T-39交互开发，进入优化评价前处理重复性差异。
+
+### 关键变量与后续评价范围澄清（2026-09-11）
+
+- **上一批代码与本地验收：** 已实现并实测单点v2同次边界、稳态比较运行时和HYSYS适配器；Agent准备、确认、执行、进度、结果展示及恢复均已替换旧M2/M4，保留单一SteadyComparison节点。边界/单点/证据相关236项先通过，新增运行时/单点146项通过；最终simulation＋domain_model/unit为935通过、5项Windows平台跳过、17子测试通过（145.66秒），JUnit为runs/simulation/dependency_setup_20260911/steady-final.xml。59文件Ruff/格式、21源码mypy通过；历史测试失败留在下列验证记录。无新依赖、Git提交或推送。
+- **本轮真实本地贯通通过：** runs/simulation/agent-steady-local-20260911-v2/report.json为passed；模型响应使用httpx.MockTransport且无网络，HYSYS与Agent图/SQLite均为真实执行。结果steady-d59fa79bb2c99ea1以同一新冻结基准重算156.8/156.9℃，两点通过且各有自身B_boundary；严格结果重建、会话重启及零模型请求/result均通过。AGO总流量差值约878.18kg/h；基准/候选能量余额约-4.37/-4.28kW，仅展示观测，不定义工程合格阈值。结果comparison_only、eligible=false，没有声称优化成功或消除旧ABBA差异。
+- **失败与未执行：** Agent首轮375通过/27失败/8准备错误，主要是旧入口与旧字段的测试替身未迁移，另有Windows子进程编码问题；补齐后401通过/9失败，最后9项为重复确认时缺少严格结果读取替身，修正后相关24项通过。首次本地实测在会话目录初始化报SessionError，未进入HYSYS；改用SessionStore创建私有子目录后上述实測通过，失败记录保留。真实模型验证最初因DMXAPI工况数据外发未授权被自动审批拒绝；用户随后明确“可以”，已授权向https://www.dmxapi.cn/v1、gpt-5.6-sol-cdx发送本次工况摘要/目标/比较结果，不发送.hsc。该授权无需重复请求，但上一批时配置文件src/petroleum_rto/domain_model/dmx_api.json尚不存在，读取器在普通与当前用户环境均报密钥缺失，所以尚未发出本轮真实模型请求。
+- **上一批待办与边界（密钥及单次真实LLM验证已由上节解除）：** 当时已请用户仅在本机配置密钥，不在对话中发送；共享HYSYS进程、COM硬超时、重复性原因、更多变量、质量约束及优化排名均未解决。旧CDU库与CLI暂保留，不能把本轮Agent替换表述为全仓M2/M4代码已删除。
+- **本轮收尾：** 22份hysys来源哈希与接收清单全部一致，两点运行记录的源保护均通过；8份文档的本地链接及围栏检查通过。首次链接检查漏处理尖括号包围的Windows绝对路径，修正检查器后原链接均有效，没有修改这些原始链接。Git差异检查通过、暂存区为空、base_files忽略有效；保留此前用户/Windows修改，未提交或推送。完整交付记录见[单变量Agent稳态验收](../reports/simulation/hysys_agent_steady_20260911.json)。状态从“逐点边界与Agent待接入”更新为“本地Agent＋真实HYSYS贯通，真实LLM待密钥”；本轮删除的是Agent旧节点、参数、槽位与展示逻辑，没有删除HYSYS原件或旧CDU核心文件。
+- **原控制脚本核对：** 已读取hysys/artifacts/original/hysys_control.py、原main.py及hysys/改进版和测试。suspend/resume通过Solver.CanSolve暂停/恢复计算；它们不保存副本。正式单点使用相同底层开关并保留此前已实测的塔Reset/Run与目标跟随检查。界面将“冻结”改称“保存基准副本”，不直接复用原set_mv按JSON顺序批量写24项的逻辑。原脚本没有修改。
+
+- **用户最新范围：** 首版明确只用T-39一个调控变量贯通整个Agent工作流程，取代此前“首轮1–2项”的宽泛表述。其余变量维持当前设定，不是首版必须补测或开放的任务。已完成的60项核对属于读取，真实写入目前只有T-39。
+- **端到端目标：** 复用现有Agent的意图理解、方案展示/确认、工具执行、结果解释和持久化，接入T-39的HYSYS工作副本计算及同次物料/能量证据。首轮联调可沿用已实测156.8℃和156.9℃两个离散目标，不据此推导连续工艺区间；这两个点不被包装成已认证上下限。正常结果、重复性未通过及执行失败均须真实回传，未解决重复性时不能宣称可靠最优排名。
+- **范围含义：** 后续“变量范围”指具体任务约定的搜索区间，不计划通过持续调整直到HYSYS不收敛来推断上下限。不收敛是该次求解失败，收敛也不自动证明质量要求满足；需要更宽搜索区间时依据用户工艺要求和模型明确限制单独定义。流程联调无需先完成极限探查或全面产品约束。
+- **实施顺序：** 当前继续定位T-39重复重算差异，并把工作副本计算后、恢复前的物料/能量观测与该次目标和结果一起保存。复用现有边界读取与严格证据合同，不另建仿真器或平行评价框架；源案例边界不能替代候选自己的结果。
+- **评价边界：** 变量上下界只用于限定后续优化搜索范围，产品约束只用于判断该优化任务的结果是否满足指定条件；两者不是只读连接或单点接入的前置任务。进入具体优化任务时，仅定义被选中关键变量的范围和实际需要的指标/约束，依据模型已有明确限制及用户工艺要求，不从基准自动生成范围、不自定成品限值、不照搬旧CDU指标。缺少条件时仍可读取和展示仿真结果，不宣称合格最优。
+- **上一轮范围澄清记录：** 仅将状态和首版规划收敛为唯一T-39贯通Agent，未改源码、配置、依赖或HYSYS案例，未删除文件或提交；既有508项及17子测试证据保持其原范围，本轮无需重跑计算测试。重复性失败仍保留；下一步补同次计算证据及必要诊断，再贯通单变量流程，不扩展全变量实验或寻找失收敛极限。
+
+### HYSYS顺序复现与物料/能量边界（2026-09-11，本批已交付；重复性验收未通过）
+
+- **授权与范围：** 用户继续推进仿真接入；本批补固定T-39两点A→B→B→A顺序复现，并只读核定模型物料、组分、相态和能量边界。保持原模型及源案例不变，不运行旧CDU，不开放优化范围或现场能力。
+- **已读取事实：** 已有实例只读导出18条主流程物料流、8条主流程能流、44组分Peng-Robinson物性体系及三条温度规格真实塔级绑定，源前后核心观测、COM身份和磁盘均不变。四外进/五外出由连接核对；原油本身含H2O约600kg/h，另加水3000kg/h；Naptha出口汽化分率0.99999999且含水约3491.92kg/h，不能将总流量直接命名液体成品收率。原始记录位于runs/simulation/boundary_probe_20260911。
+- **边界补全：** 单看主流程能流与物流焓差有约16.6538MW缺口，进一步只读取得塔内两条PA冷却流及煤油侧线再沸器输入；TopPA在主/子流程均出现，计算只计一次。11条物理能流的8入为107.287639942MW、3出为19.080437242MW，物流焓升88.207100012MW，实际余额0.102688478kW，不定义工程合格阈值或宣称精确闭合。44组分逐项质量残差最大约2.64e-11kg/h；SSDuties中的两个-32767为未定义哨兵，不作为热负荷。假组分账不等同真实原油化验或元素验证，此边界不直接称为燃料消耗或现场验证。
+- **顺序实测失败：** verify_t39_order.py的27项替身单点加真实严格读取测试、Ruff/格式及mypy通过；实际A→B→B→A在runs/simulation/hysys-order-20260911完成，总体failed。四点各自passed，目标残差、冻结初值、恢复和源保护均通过，输入/状态无差异；但A/A和B/B各有296项输出差异。相同A的AGO流量相差71.470121695kg/h，相同B相差17.190029979kg/h，超过简单末位舍入差。没有追加重试或放宽零容差；这证明本次重复重算不完全复现，不足以单独断定执行顺序是原因，当前不可宣称候选顺序独立或可靠排序。
+- **实际实现与复核：** 新增boundary.py、mjh_atm_boundary.json及对应测试；提供read_current_boundary/write_boundary_snapshot/read_boundary_snapshot。快照内含完整不可变边界定义、规范哈希、前后核心观测与双样本，历史读取不依赖当前配置；完整设备/物流库存拒绝新增或漂移边界。独立复核补齐九物流及原油温压与核心快照的同物理量交叉校验，避免两样本同样错误仍标记一致；产品TBP不误匹配为出口温度。无新依赖、文件删除、提交或推送。
+- **自动验证：** 全部simulation 508项及17子测试通过（17.80秒），JUnit为runs/simulation/dependency_setup_20260911/simulation-order-boundary-final.xml；24文件Ruff/格式、13源码mypy通过。边界80项及顺序27项均为该全模块子集。边界首轮65通过/2失败发现异常traceback循环延迟释放COM，清空已结束异常帧后回归通过；该失败来自离线替身，没有发生真机边界读取错误。未运行旧CDU或扩大其他模块回归。
+- **边界正式实测通过：** 只读接口成功采集9外部物料/11独立能流/44组分，双样本一致、严格重载对象相等、源核心观测/身份/磁盘保护通过。目录runs/simulation/hysys-boundary-20260911，快照SHA为ef179995273929a0114d481d08405b29946282b247e8b4a50c0e56a72a28a116。与此前原始清单的对应物料、相态和组分逐项相等，复核22份来源文件哈希全部保持一致；完整本批记录见[顺序及边界验收](../reports/simulation/hysys_order_boundary_20260911.json)。能量余额如上，未把读取通过等同物理或产品合格。
+- **未解决事项与下一步：** ABBA的296差异是字段计数（包括CV显示值与内部值各一次），不是296个独立测点；同目标重算差异的原因未确定。下一批在独立工作副本维持原协议/容差，记录已核定求解状态和间隔只读观测，区分触发、结束与采样问题；不以重试择优或放宽比较掩盖失败。当前边界仍属于原源内存，尚未嵌入Reset/Run后的基准与候选结果，不可混用为候选评价。其他MV仅核定读取，范围/质量/公用工程指标、RTO/Agent、独立进程与COM硬超时仍未完成，eligible保持false。
+- **收尾与状态变更：** 本批从“顺序及边界待验证”更新为“正式边界通过、重复重算验收失败”。6份现行文档130个本地链接/围栏检查通过，报告记录的26份实现/测试/配置及22份来源哈希匹配；记录为runs/simulation/dependency_setup_20260911/simulation-order-boundary-static.json。工作树仍为feat/react-agent、HEAD未变、暂存区为空、base_files忽略有效、Git差异检查通过；保留此前Windows/依赖修改与hysys来源，未删除文件或提交。下一步保持上述重复性诊断，不进入优化搜索。
+- **收尾检查说明：** 一次临时使用core.autocrlf=false的只读差异检查把原有CRLF行尾列为空白问题；按仓库原设置复检退出0、无差异检查错误。未修改Git设置或批量转换文件换行。
+
+### HYSYS正式单点接口（2026-09-11，本批实现与实测完成）
+
+- **授权与范围：** 用户在基准/单变量通过后再次明确继续；本批把已验证生命周期迁入正式单点接口与严格结果读取，仅支持已核定T-39规格、显式℃目标及固定跟随判据，不添加LLM/RTO调用、优化范围或新依赖。
+- **实施决策：** 允许可信调用方提交有限目标；同目标请求使用相同Reset/Run协议重算基准，避免基准与候选采用不同求解方式。任意有限数不等同有效工艺范围，当前真机验证仍只用原目标156.8℃和已验证156.9℃。移除旧诊断中的重复执行逻辑，保留薄命令入口；结果必须离线重算输入/跟随/恢复及源保护结论，不能信任报告的成功标签。
+- **实际变更及删除：** 新增point.py及point_evidence.py；前者复用现有案例清单/身份和基准保护，后者维护共享资格、目标投影及容差，写入并严格重载hysys-t39-point/1.0.0证据。旧probe仅保留+0.1℃薄入口，删除其重复生命周期，旧test_single_change_probe.py覆盖迁入test_point.py，另加证据篡改及CLI转发测试。此前实测用脚本与测试已在runs留档；没有删除HYSYS来源、旧CDU或用户数据，没有新增依赖、提交或推送。
+- **代码复核与自动验证：** 独立复核补齐工作案例被同路径对象替换时拒绝写入/关闭、输入目录字节一致性、前置基准资格、运行规格诊断与A/B快照一致性，以及成功动作声明校验。全部simulation 401项及17子测试通过（11.08秒），JUnit为runs/simulation/dependency_setup_20260911/simulation-point-final.xml；20文件Ruff/格式、11源码mypy通过。迁移首轮40通过/28失败源于替身T-39仍声明ColumnFlowSpec，改为真实ColumnTemperatureSpec后通过；不是HYSYS实测失败。单点/证据129项是该全模块子集，不累计计数。无旧CDU实验。
+- **真实两点通过：** 同一冻结基准runs/simulation/hysys-baseline-20260911-final下，原目标156.8℃和156.9℃分别经正式run_t39_point及read_point_result通过。前者Current=156.80060827962535℃；后者实际值和精确残差见[正式单点验收](../reports/simulation/hysys_t39_point_20260911.json)。两点均恢复A零差、源完整观测及文件不变、无执行/恢复/清理错误；目标跟随、其余输入与稳定状态独立复算通过。再次复核22份来源文件与接收哈希一致。新接口采用同应用独立案例，未使用COM替身替代这两次实算。
+- **限制与下一步：** 仅T-39已形成正式单点，降低目标只做离线测试；其他MV、候选顺序、工艺范围、完整物料/能量及质量条件、RTO/Agent切换、独立进程、阻塞COM硬超时和结果目录重定位未验证。eligible始终false；报告离线重算能验证可见证据，不能重新证明历史COM操作或身份授权。下一步在现授权范围核实下一项候选变量、重复性/顺序及评价边界，再推进稳态RTO合同；先不将其他23项MV全部开放为决策。
+- **收尾核对：** 6份现行文档122个本地链接及围栏检查通过；正式单点报告中的当前源码/测试哈希、22份来源哈希全部匹配，记录为runs/simulation/dependency_setup_20260911/simulation-point-static.json。工作树复核仍在feat/react-agent、HEAD未变、暂存区为空，base_files忽略有效、Git差异检查通过；保留此前Windows兼容和依赖修改及hysys来源目录，未提交或推送。本批无已知未修复的单点实现阻塞，前述范围限制继续保留。
+
+### HYSYS基准副本与单变量恢复（2026-09-11，本批实现与实测完成）
+
+- **授权：** 用户了解基准副本、恢复及单变量修改用途后明确继续；本批在保留hysys源文件和用户源案例的前提下推进独立副本，不扩展优化搜索或旧CDU实验。
+- **已核对：** 已打开源案例仍为指定mjh_ATM.hsc、IsDirty=true。只读本机类型库确认SaveCopyAs(NewName,Overwrite)，帮助说明为保存案例副本；普通SaveAs改变文档语义，暂不采用。首次元数据枚举使用错误计数字段得到空列表，已改正并取得完整签名，未据空列表判定API缺失。原始记录在runs/simulation/baseline_probe_20260911。
+- **保存与重开实测：** SaveCopyAs新文件成功，源路径、IsDirty=true、完整观测和原件哈希未变。新建COM实例仍在Open或Visible阶段失败，STRGXI2.dll记录0xc0000409；正常程序启动的新实例PID36788停在Licensing error且工作文件45秒未注册，已核对身份后仅清理该任务进程。窗口标题是实际证据，未取得具体许可错误正文，不推断许可证类型或数量；当前会话缺少技能所需的node_repl原生Windows入口，未操作许可设置。
+- **可行路径：** 在已有HYSYS实例中打开独立工作文件成功，确认工作与源案例为不同COM对象、文档数1→2；完整输入、输出和状态零容差比较均0差异。仅Close(False)工作案例后文档数恢复1，源观测及原件/基准/工作文件哈希保持不变。记录为shared-app-reopen-report.json。采用案例/文件隔离和串行调用，不宣称进程隔离；共享进程故障仍可能影响源会话。
+- **正式接口实测：** capture_baseline/read_baseline已成功，目录runs/simulation/hysys-baseline-20260911-formal；冻结模型SHA为9bc72bc7438262ccc1133de321a0a65280dcf1306823da155bfb941eddd65a7f。verify_baseline实测status=verified、errors为空，比较0差、源三项保护为true，报告位于runs/simulation/hysys-recovery-20260911-formal。捕获manifest保持reopen_verified=false，后续验证结论写独立报告，不回写捕获记录。
+- **首个单变量真实失败：** runs/simulation/hysys-single-change-20260911中，工作案例T-39 Goal从156.8变为156.9℃；ImportedVariable.SetValue后恢复CanSolve并调用ColumnFlowsheet.Run，但Current为156.79999949099715℃，几乎未离开起点156.79999949345017℃。虽然IsValid/CfsConverged及双样本均通过，固定0.01℃跟随判据拒绝成功；297项输出变化仅为小幅更新，不宣称Run未执行。随后关闭工作案例并从基准重开，A完整恢复零差、源观测/磁盘及基准/工作文件均未变，恢复过程无错误。原报告和当时脚本保留。
+- **阶段验证记录：** 仿真相关309项及17子测试通过（4.36秒），16文件Ruff/格式、9源码mypy通过，此证据对应首次B写法。复核本机官方Customization_FAQ使用ColumnSpecification.GoalValue赋值，类型库确认PROPERTYPUT；第二次仅更换为该拥有者setter，在固定内部℃资格检查后执行，Run/0.01℃跟随/零容差恢复均不变；结果仍未跟随，见下条。诊断幅度不作为安全范围、优化步长或现场建议。
+- **后续排查：** 拥有者GoalValue版本48项单测通过；真实第二轮报告为hysys-single-change-20260911-owner，Specs和ActiveSpecs目标均156.9℃，Current与首轮完全相同，故更换setter未解决跟随；恢复及源保护仍通过。只读读到T-39 AbsoluteToleranceValue=1.0、WeightedToleranceValue=0.01、塔HeatSpecErrorTolerance=0.0005；官方说明整体收敛与个别规格容差不同，绝对容差还取决于开关。容差可能允许0.1℃残差，但启用状态和归一化映射未完整核定，不直接归因于写入通知错误。首两版脚本和失败证据保留。第三版仅在工作塔写后调用Reset再Run，按官方“小改先Run、必要时Reset”说明清除旧解/估计，不改原生容差和诊断幅度，验证结果见下条；独立复核补上结束时原源案例COM身份校验。
+- **最终单变量通过：** 第三轮hysys-single-change-20260911-reset的status=passed：工作塔GoalValue写入156.9℃后Reset/Run，Current=156.90049807320577℃，实际变化0.10049857975559462℃，目标残差0.0004980732057617843℃，通过固定0.01℃跟随。其余输入/规格无意外变化、状态有效稳定；随后A恢复完整比较0差，源身份/观测/磁盘与基准/工作文件保护均通过，无恢复或清理错误。该实测只证明此变量此点，前两次未跟随不据此归因于setter或唯一根因，诊断不修改原生容差。
+- **最终实现与验证：** 独立复核修复捕获前后源COM身份漂移、诊断终态源身份遗漏及未尝试Open时的清理边界；对应回归通过。仿真相关322项及17子测试通过（4.92秒），JUnit为simulation-baseline-final-v2.xml；16文件Ruff/格式和9源码mypy通过。中途在Reset替身尚未更新时运行曾11失败/37通过，均为夹具缺Reset导致，更新后整模块通过，不记为真实HYSYS失败。没有重跑旧CDU。正式捕获加固后另在*-20260911-final新目录复核，结果与实现哈希记录在baseline_probe_20260911/final-interfaces.json。
+- **交付范围与剩余：** 本批新增baseline/comparison/recovery三个模块及固定诊断，更新现行说明、规划、导航与架构；无新增依赖、文件删除、Git提交或推送，原hysys及base_files保留。报告为[基准恢复与诊断验收](../reports/simulation/hysys_baseline_recovery_20260911.json)。没有执行通用单点、多变量/候选顺序、优化、RTO/Agent替换或现场验证；缺少通用合同、已确认范围及质量/完整能量边界，eligible始终false。串行案例隔离已实测，独立进程启动和阻塞COM硬超时仍未解决。下一步在现授权范围实现正式单点及结果严格重载，继续保留实际跟随、恢复和源保护门禁。
+
+### HYSYS变量与正式读取（2026-09-11，本批实现与实测完成）
+
+- **范围：** 用户要求直接继续仿真接入；只读附着同一已打开模型，新增simulation纯Python快照合同、HYSYS读取器和实际消费的变量目录。未写变量、改变规格、保存或重开案例，不启动旧CDU实验。
+- **实测：** 通过实际TypeInfo和ImportedVariable确认60行均绑定真实变量；24MV为vsSpecified且CanModify=true，36CV为vsCalculated且CanModify=false。逐项GetValue按真实单位读取全部成功。温差代码24、压差45、percent64、无量纲65等由本机类型库枚举核实；C22为无量纲再沸比0.5，不是表单D列所写0.5%。C-1102有20条规格、10条活动规格，DegreesOfFreedom直接读取为0，三组PA分别是流量及返回温度，另有再沸比和三条塔温规格。
+- **证据与限制：** 原始元数据及显式单位读取位于runs/simulation/hysys-bindings-s7ysugcv、hysys-bindings-19swjdjz、hysys-bindings-9nvsq05k。源磁盘哈希保持不变；当前IsDirty=true，不能把内存状态绑定磁盘模型。探查未连接的ExportedVariable及未定义的非活动规格GoalValue返回COM错误，保留诊断；正式读取采用实际ImportedVariable和IsKnown判断，不对这些无值属性强行读取。
+- **实际实现：** 新增src/petroleum_rto/simulation下纯Python不可变快照、HYSYS读取器和命令入口，新增configs/simulation/mjh_atm_variables.json并由读取器实际消费。逐项核对真实属性、物理量与活动规格；连续两份完整采样和前后状态检查，记录20规格及0自由度。配置只存绑定/单位；快照保存观测值、来源、求解状态及IsDirty，不依赖RTO/Agent/LangChain。
+- **真实验收：** `.venv/python.exe -B -m petroleum_rto.simulation --case hysys/mjh_ATM.hsc`成功；补齐规格Current/Goal物理量一致性后再次运行成功，最终目录runs/simulation/hysys-snapshot-9jj2h2mq。60变量、73级、20规格，observed_stable且严格落盘重载相等；snapshot SHA-256为61fb527b20bb1325196e5686b59704a2985ce60b1ea9177e782bcd20cee9be30。完整证据见[变量与正式读取验收](../reports/simulation/hysys_binding_qualification_20260911.json)。22份hysys来源文件复核仍与接收哈希一致。
+- **针对性验证：** tests/simulation共131项及17个unittest子测试通过（0.66秒），其中快照68项、正式读取器42项、早期探查21项；JUnit为runs/simulation/dependency_setup_20260911/simulation-reader-final.xml。覆盖单位/绑定/规格漂移、严格JSON和完整性、双样本不一致、磁盘来源变化、案例精确匹配，以及成功/错误/KeyboardInterrupt时COM对象在CoUninitialize前释放。复核发现规格目标与当前值可能同为C但物理量不同，已新增拒绝与回归；本次只运行仿真接入测试，无旧CDU运行。
+- **文档与范围：** 更新仿真当前说明、规划、项目导航和架构目录；旧探查保留为早期连接故障诊断，原模型与历史导出不迁移或改写。本批没有删除文件、Git提交或推送。Windows安装及兼容验证沿用下节证据，不重复扩大旧模型回归。
+- **收尾检查：** 新仿真模块、测试及探查的Ruff通过，8文件格式检查通过（修正包初始化文件多余空行后复检），4个仿真源模块mypy通过。8份相关文档的137个本地链接及代码围栏通过，验收报告记录的实现哈希与当前源码/测试一致；记录位于runs/simulation/dependency_setup_20260911/simulation-final-static.json。工作树复核仍在feat/react-agent、暂存区为空、base_files/忽略有效，Git差异检查通过。
+- **限制与下一步：** 该快照始终eligible_for_optimization=false；IsDirty=true，磁盘哈希不绑定内存状态，两次一致也不是原子快照。未执行基准冻结/重开、MV写入、求解、A→B→A、RTO/Agent替换、真实LLM链或现场验证；原因是自动副本Open尚未解决且基准与变量范围未形成。下一批处理可重建基准及副本隔离，再进入有明确范围的单点。H1/H2部分完成，不宣称完整稳态接入完成。
+
+### Windows连接与运行基础（2026-09-11，已交付相关验证，旧CDU重型实验由用户取消）
+
+- **授权与实际变更：** 用户允许逐步实施并安装LangChain等依赖。新增独立HYSYS读取探查及离线测试；pyproject/uv.lock加入Windows限定pywin32；适配现有会话、单写锁、凭据及终端。原hysys/与base_files/保留，无MV写入、保存/关闭用户案例、扰动、优化或旧CDU删除。
+- **依赖：** 保留现有Conda形式的.venv/python.exe（Python3.12.13 x64），按uv.lock导出带哈希依赖后定向安装，并可编辑安装本项目；LangChain1.4.0、langchain-core1.6.2、LangGraph1.2.11、pywin32312及开发依赖已就绪。COM/框架导入通过，pip check无损坏依赖。初次默认缓存访问及环境文件替换遭沙箱权限限制，使用项目缓存/获准扩大权限后完成，未重建或删除环境。
+- **HYSYS成功实测：** 用户手动打开项目hysys/mjh_ATM.hsc并保持打开后，--attach-existing通过GetActiveObject精确匹配FullName；项目3.12读取24MV/36CV/73级，两份完整采样完全一致，四次求解状态读取一致、无正在求解且有效/收敛。运行2.775秒，report及snapshot位于runs/simulation/hysys-read-6oktr5jg；源文件前后SHA-256均为f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741。
+- **保留的真实失败：** 自动打开唯一磁盘副本两次均在SimulationCases.Open失败，报告分别为hysys-read-cu5l7775和hysys-read-wlsqp41o；Windows事件记录对应HYSYS进程在STRGXI2.dll中异常退出（0xc0000409）。恢复文件提示由用户自行处理；第二次失败后不再自动Open。用户手动打开正常且附着读取成功，故不判模型损坏或许可失败，根因仍未查明。新增结构化EXCEPINFO记录，原失败报告不改写。
+- **Windows实际修复：** 采用本机字节锁、私有DACL及持有目录句柄，拒绝重解析点/硬链接与尾随点/空格路径别名；凭据只校验而不改权限。终端改用Windows原生输入；真实Ctrl-C先向线程安全RunControl请求停止后续工作，再交还Python默认处理并在结束时恢复。RTO保留逐文件flush/fsync，Windows跳过不支持的POSIX目录fsync，不声明同等断电目录项持久性。旧CDU物理源码不改。
+- **当前验证：** [Windows运行验证报告](../reports/domain_model/windows_runtime_20260911.json)记录安装版本、源码哈希和JUnit。领域回归427通过、5跳过（141.13秒，排除完整CDU重启恢复1项）；RTO全模块首轮231通过、2失败，两个平台夹具修正后该模块32通过、2跳过（63.74秒），合并替代结果为231通过、2跳过，不累计重复测试。探查21项及17个unittest子测试通过（0.27秒），全src/tests/scripts/simulation Ruff、163源文件及探查脚本mypy、17个改动Python格式检查通过。
+- **用户取消与范围修正：** 额外旧CDU重型恢复测试已走完主计算/保存，并观察到取消后的pending=None、保留last_result；未取得整项终态结果，不能计作通过。用户明确不需要旧CDU实验，停止后已核实原进程PID36956不存在，未重跑；只保留中止记录。该测试范围偏大，不再作为HYSYS接入的前置条件，后续只验证当前仿真接入实际受影响的路径。
+- **失败与修复证据：** 首次领域417通过、5跳过、5失败：四项因POSIX信号API，一项为目录fsync。真实Windows取消测试初版等待到屏障超时才释放，强化断言后复现失败，原生Ctrl-C通知修复后7项通过，未把初版误通过当作证据。独立复核发现Windows尾随点/空格会导致同数据库异锁名，新增4种真实路径拒绝检查。RTO原两项失败仅为mkfifo不可用及符号链接创建权限不足，分别显式跳过；所有7项跳过具体范围为1个Unix PTY、5个缺权限符号链接、1个FIFO。链接检查发现7个历史Mac来源链接在Windows不可用，已改为本机同哈希资料；收尾误用Git行尾选项曾扩大只读格式检查，恢复原配置后只格式化本批17文件，没有改动旧CDU。
+- **历史探查限制：** 该早期探查的Table保存原始CellValue和未核定标签，eligible_for_prepare始终为false；它不替代上节已完成的正式读取器及单位核定。两种观测均不证明原子快照或内存绑定磁盘。基准冻结/重开、MV扰动、A→B→A、稳态Agent链、真实LLM请求和现场验证仍未执行；自动副本打开和可重建基准是进入写入单点的前置条件。
+
+### Windows后续工作细化（2026-09-11，仅计划）
+
+- **本轮变更：** 按用户询问，在[接入规划第8节](simulation/01_HYSYS稳态仿真接入规划.md)补充小批次顺序：连接读取→变量/资料合同→基准重建及副本单点；Windows运行基础同步推进，之后稳态RTO与Agent协调切换、旧模型删除和真实总验收。
+- **条件与限制：** 第一批区分磁盘模型与未保存的内存案例，保留案例身份和独立输出；3.11只用于已有脚本探查，项目3.12需尽早验证。扰动前确认变量属性/独立规格、单次扰动依据及失败处置；未确认目标/约束不默认开放，超时不视为COM调用已结束。
+- **验证与下一步：** 已复核现行状态/规划/工作树并完成计划依赖复核，文档差异检查通过；本轮无代码变化，不重复项目测试、环境探测或HYSYS运行。此前10项离线测试保持原证据范围，H1–H6仍未实施。下一批只交付最小连接与状态读取验证，不进入优化搜索。
+
+### Windows资料接收与离线检查（2026-09-11，第一批完成）
+
+- **授权与过程：** 用户要求逐步开始后，曾要求暂停以便复制资料；暂停时停止检查，状态写入工具被用户中断，复查确认未落盘。用户随后提供项目hysys/，据此恢复第一步接收核对，不推断已授权任意工况或全变量优化。
+- **资料完整性：** 新增[Windows接收核对报告](../reports/simulation/windows_hysys_intake_20260911.json)。22个非缓存/系统文件与旧26项清单逐项哈希一致，包括1,773,263字节的mjh_ATM.hsc；排除项为2个.DS_Store和2个字节码缓存。8份JSON拒绝重复键及非有限常量后解析通过，5份现行Python使用项目3.12语法解析通过；60条映射唯一并与导出匹配。
+- **快照事实：** 正确data_read及before均为24 MV、36 CV、73级、352个有限标量，无气液完全重复记录；data_write和original/data_read仍有73级气液重复，只作输入/历史参考，不能作为输出证据。旧分析4份源哈希一致，前/后/输入MV相同，仍仅证明历史同工况重算，不是本机扰动。
+- **环境事实：** HYSYS程序位于D:/aspen/aspen/Aspen HYSYS V12.0/aspenhysys.exe，文件/产品版本38.0.0.380、x64；64位HYSYS.Application注册指向该程序及/Automation。已有D:/anaconda3/python.exe实测Python3.11.15 x64，pywin32 312，pythoncom/win32com.client导入通过；py启动器的3.8标签不代表该解释器实际版本。项目.venv/python.exe仍为3.12.13且缺COM依赖。未安装或更改任一环境；注册存在不等于许可及连接可用。
+- **离线验证：** 使用已有Anaconda解释器在hysys/执行现有unittest，10项通过（测试框架计时0.022秒），覆盖换算、映射、写前校验、局部回滚、状态判断、轮询超时及导出保护。测试绕过COM构造，不连接HYSYS；运行后22份来源文件哈希仍一致。报告结构和文档差异检查通过。
+- **脚本复核与风险：** main --read-only及inspect仍Dispatch/打开/激活源模型，默认输出会覆盖历史文件；现有回滚只覆盖写入失败，求解失败不会自动重建原基准。运行时未严格校验快照完整性/一致性，输入未拒绝重复键，单位依赖表单标签。后续使用独立输出、明确实例与案例拥有权，先只读探查，再补副本单点与恢复；不直接把现有入口作为生产适配器。
+- **未执行与下一步：** 本轮未启动HYSYS、激活COM、核验许可、读取当前工况、修改变量、冻结/恢复基准或优化；未运行全项目回归，因为仅接收资料且生产源码未改。H1正式模块及H2–H6仍未实施，Windows锁/会话/终端兼容仍待处理。下一批进行最小连接与状态/属性探查，随后在副本中验证A→B→A；无删除、提交或推送。
+
+### Windows平台接入规划复核（2026-09-11，仅评估）
+
+- **授权与范围：** 用户要求先阅读此前接入规划并谈看法；本轮读取规划、架构/RTO主文档、核对报告和相关源码，检查本地Python模块可用性，只更新本状态。无模型复制、HYSYS读写/求解、依赖安装、源码修改或删除。
+- **已核实事实：** simulation实现目录尚不存在；RTO装配仍直接使用CduM7，Problem仍强制动态复核，当前M2将数值未收敛归入process_infeasible。assistant/session仍直接导入fcntl并使用POSIX文件保护，RTO锁拒绝非POSIX，交互CLI缺readline会退出。规划所述迁移范围仍成立。
+- **本机环境核查：** 项目.venv/python.exe实测为Python3.12.13、64位；该解释器未找到pythoncom、win32com、langchain、langgraph、httpx及readline，相关已安装发行版查询为空。PATH默认python指向D:/anaconda3/python.exe，py启动器仅列出3.8；因此后续须明确使用项目解释器，不能把系统Python列表当作项目环境事实。未修改现有环境。
+- **评估建议（未实施）：** 保留单一HYSYS稳态后端和simulation/RTO/Agent分责；将H2中的真实变量属性/单位核对、基准冻结和隔离副本A→B→A试验提前，与H1合同设计交叉推进。Windows会话/锁/终端适配可独立验证；单点重复性成立后再同步改稳态合同、指标、Agent与恢复，切断依赖后删除旧CDU。首批仅开放具备语义、范围及约束依据的1–2个变量。
+- **证据限制与待决：** 24/36/73映射及同工况3.687秒来自既有静态核查，不是本机扰动实测；能耗边界、含水收率、质量条件及可重建当前内存基准仍待核实。仓库与base_files定向搜索未找到.hsc或接入脚本；既有Mac来源路径不可用于Windows，默认用户Desktop目录不存在，已询问用户Windows实际目录，未据此判定模型未安装。
+- **验证与下一步：** 已执行只读源码/环境检查，并核对Python fcntl与Microsoft COM线程官方说明；未运行项目回归、启动Agent、连接或求解HYSYS，因为本轮只评估且项目依赖尚未就绪。下一步取得Windows案例目录后核对已有模型与脚本，细化第一批单点验证范围；H1–H6状态保持未实施。
+
+### 本地原始资料忽略（2026-09-11）
+
+- **授权与变更：** 用户明确base_files/不提交；.gitignore新增根目录规则/base_files/，保留资料原件，不删除文件，不改业务代码，未提交或推送。
+- **验证：** 修改前确认该目录没有已跟踪文件；修改后check-ignore确认目录及子目录命中新规则，未忽略的未跟踪文件清单不再包含base_files/，目录仍存在。工作树仅显示.gitignore与本状态修改，差异空白检查通过。
+- **限制与下一步：** 无业务代码变化，未运行项目测试或HYSYS；无新增阻塞，既有Windows兼容风险不变。下一步继续在feat/react-agent核对稳态规划及本地资料，资料保持本地忽略。
+
+### Windows开发基线获取（2026-09-11）
+
+- **执行与验证：** 远端仅有main与feat/react-agent，无精确名feat/react的分支。fetch成功；HEAD、远端跟踪引用、FETCH_HEAD及ls-remote所见完整提交一致。本地原已处于feat/react-agent，无已跟踪文件修改；未跟踪base_files/保持原样。
+- **环境与异常：** 初次Git读取因沙箱用户与目录所有者不同被拒绝，后续仅对当前命令指定本仓库safe.directory，未改全局配置。首次fetch因沙箱禁止写入.git/FETCH_HEAD失败，获准扩大权限后重试成功。
+- **范围与限制：** 仅获取和核验仓库基线、更新本状态；无源码变更、文件删除、依赖安装、提交或推送。未运行测试或启动Agent/HYSYS，因为本轮未变更运行代码；既有Windows兼容与连接风险仍待验证。
+- **状态变更与下一步：** Windows接续从待拉取变为已获取并核对最新基线，无分支同步阻塞；下一步阅读稳态规划并核对本地HYSYS资料，继续使用feat/react-agent开发。
 
 ### GitHub基线与Windows交接（2026-09-11，公开发布已确认，代码与规划已推送）
 
@@ -407,8 +583,8 @@ LC0计划交接验收：独立复核正式计划未发现实质问题；338个�
 | runtime.py（P6已删除，历史实现见基线Git） | 工况本地回复不进入Chat历史；待确认时进入专用小分类 | 装置身份问答偏题，跨轮指代和任务中查询受限 |
 | 同上 | 修改失败保留原草案及其可确认资格 | 用户排除压力后，仍可能被引导确认原双变量方案 |
 | chat.py（P6已删除，历史实现见基线Git） | 64条消息、128 KiB历史等固定限制；无自动摘要 | 限制不依据实际模型；历史提交可能发生在响应之后并失败 |
-| [RTO运行入口](../src/petroleum_rto/rto/runtime/api.py) | 确认后读取Context并构造Problem | 新设计需把审阅方案绑定到确认前读到的明确快照 |
-| [求解编排](../src/petroleum_rto/rto/orchestration/service.py) | 求解器调用M2评价服务，之后对短名单做M4 | 应按真实阶段拆工具，不能误拆成独立线性的“求解→仿真→评价” |
+| RTO运行入口（已退役，历史路径：`../src/petroleum_rto/rto/runtime/api.py`） | 确认后读取Context并构造Problem | 新设计需把审阅方案绑定到确认前读到的明确快照 |
+| 求解编排（已退役，历史路径：`../src/petroleum_rto/rto/orchestration/service.py`） | 求解器调用M2评价服务，之后对短名单做M4 | 应按真实阶段拆工具，不能误拆成独立线性的“求解→仿真→评价” |
 
 先前本地替身已复现：默认有system消息时，31轮短问答留下63条历史；第32次模型替身返回后，提交65条历史失败。该记录不是本轮重新测试，也不是供应商故障。
 
@@ -645,7 +821,7 @@ P0–P4代码及本地验收完成；P3/P4定向、真实最小案例与全仓10
 | P3 工况、问题与确认 | 在公共运行边界提供快照与问题准备；实现草案版本、修改失效、取消和确认；关键摘要由程序产生 | 确认前零求解/零物理仿真；只调温度；失败后旧版本不能执行；待确认可闲聊、查询和/model；目标不被猜造 |
 | P4 分阶段RTO工具 | 提取公共静态求解与动态复核入口，复用现有核心；记录阶段引用和实际完成状态，明确重复请求行为 | 同问题同快照、基准配对、完整短名单复核、缺失阶段如实展示、结果引用和关键事实准确；公共CLI行为保持受支持 |
 
-P4已核对并复用现行[ProblemBuilder](../src/petroleum_rto/rto/problem/builder.py)、[编排服务](../src/petroleum_rto/rto/orchestration/service.py)、[M2](../src/petroleum_rto/rto/evaluation/m2.py)及[M4](../src/petroleum_rto/rto/evaluation/m4.py)的真实调用关系。不要复制一套solver/evaluator，也不要从Agent直接导入CDU内部类型。
+P4已核对并复用现行ProblemBuilder（已退役，历史路径：`../src/petroleum_rto/rto/problem/builder.py`）、编排服务（已退役，历史路径：`../src/petroleum_rto/rto/orchestration/service.py`）、M2（已退役，历史路径：`../src/petroleum_rto/rto/evaluation/m2.py`）及M4（已退役，历史路径：`../src/petroleum_rto/rto/evaluation/m4.py`）的真实调用关系。不要复制一套solver/evaluator，也不要从Agent直接导入CDU内部类型。
 
 ### P5—P6：完成长对话与替换验收
 
@@ -696,9 +872,9 @@ P1/P2就应有基础容量预检和合法协议消息，不能等P5才避免请�
 
 真实接口探针先使用合成数据：每个精确ID测试普通问答，再测试两次有依赖的工具调用，第二步必须使用第一步返回的随机标记，证明结果确实进入模型上下文。分别核实合法thinking开关/强度、流式参数完整接收、正常结束及中断处理；先验证最小Schema，再核实`strict`支持。失败不降级成正文猜工具，也不自动替换模型。记录安全的请求关联信息和字段/usage情况，不保存凭据。
 
-新入口验收：[上下文压缩与分页](../tests/domain_model/unit/test_context_compaction.py)、[原生Agent](../tests/domain_model/unit/test_react_agent.py)、[模型协议](../tests/domain_model/unit/test_native_protocol.py)、[优化工具](../tests/domain_model/unit/test_optimization_tools.py)、[分阶段RTO](../tests/rto/integration/test_staged_runtime.py)。
+新入口验收：[上下文压缩与分页](../tests/domain_model/unit/test_context_compaction.py)、[原生Agent](../tests/domain_model/unit/test_react_agent.py)、[模型协议](../tests/domain_model/unit/test_native_protocol.py)、[优化工具](../tests/domain_model/unit/test_optimization_tools.py)、分阶段RTO（已退役，历史路径：`../tests/rto/integration/test_staged_runtime.py`）。
 
-现存旧合同及计算回归入口（旧Agent部分待P6按消费者清理）：Agent行为（P6已删除，历史实现见基线Git）、Chat协议（P6已删除，历史实现见基线Git）、[CLI](../tests/domain_model/unit/test_chat_cli.py)、[架构边界](../tests/domain_model/unit/test_architecture_boundary.py)、[问题构造](../tests/rto/unit/test_unified_problem_builder.py)、[M2](../tests/rto/unit/test_unified_m2_evaluation.py)、[M4](../tests/rto/unit/test_unified_m4_evaluation.py)、[RTO CLI](../tests/rto/unit/test_rto_runtime_cli.py)。
+现存旧合同及计算回归入口（旧Agent部分待P6按消费者清理）：Agent行为（P6已删除，历史实现见基线Git）、Chat协议（P6已删除，历史实现见基线Git）、[CLI](../tests/domain_model/unit/test_chat_cli.py)、[架构边界](../tests/domain_model/unit/test_architecture_boundary.py)、问题构造（已退役，历史路径：`../tests/rto/unit/test_unified_problem_builder.py`）、M2（已退役，历史路径：`../tests/rto/unit/test_unified_m2_evaluation.py`）、M4（已退役，历史路径：`../tests/rto/unit/test_unified_m4_evaluation.py`）、RTO CLI（已退役，历史路径：`../tests/rto/unit/test_rto_runtime_cli.py`）。
 
 应改写或删除的旧断言包括：工况回复永不进入Chat、修改合同失败后继续允许原方案确认、修订澄清时精确确认执行旧方案，以及必须确认后才读取工况。新断言应保护本文件规定的新行为，不为通过旧测试恢复旧设计。
 

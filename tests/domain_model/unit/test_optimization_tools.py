@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 import pytest
 from langchain_core.messages import ToolMessage
+from steady_helpers import receipt
 from test_native_protocol import Wire, call, chat
 
 from petroleum_rto.assistant import react
@@ -15,7 +16,7 @@ from petroleum_rto.assistant.react import ReactAgent
 from petroleum_rto.assistant.session import SessionError, SessionStore
 from petroleum_rto.assistant.state import new_session
 from petroleum_rto.domain_model.models import DEFAULT_MODEL_ID, ModelSelection, model_profile
-from petroleum_rto.rto.runtime import OptimizationPreparationError, load_prepared_optimization
+from petroleum_rto.rto.runtime.steady import load_prepared_comparison
 
 
 def arguments(
@@ -26,9 +27,13 @@ def arguments(
     snapshot = domain.operating_context(state)["snapshot_ref"]
     return {
         "snapshot_ref": snapshot,
-        "objectives": [{"metric_id": "valuable_distillate_yield", "sense": "maximize"}],
-        "decision_variables": ["furnace_temperature_target_k"]
-        + (["tower_top_pressure_target_pa_a"] if pressure else []),
+        "changes": [
+            {
+                "variable_id": "C-1102.39_temperature_C",
+                "value": 156.9 if pressure else 156.8,
+                "unit": "C",
+            }
+        ],
         "previous_plan_ref": state["pending"]["ref"] if state["pending"] else None,
     }
 
@@ -47,32 +52,25 @@ def prepared(
         chat("方案已准备，请审阅程序摘要。"),
     ]
     runtime = ReactAgent(wire.model(), domain, store=store)
-    result = runtime.handle("提高收率，允许调温度和压力")
+    result = runtime.handle("比较T-39两个联调点")
     assert not result.errors, result.errors
     assert runtime.data["pending"]["status"] == "awaiting_confirmation"
-    assert "允许调整：炉出口温度目标、塔顶压力目标" in "".join(result.outputs)
+    assert "选定MV调整：" in "".join(result.outputs)
     return runtime
 
 
 @pytest.fixture
 def stages(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
     calls: list[Any] = []
-    static = {"static_ref": "static-1", "status": "static_complete"}
-    result = {"status": "complete", "result": {"status": "feasible_not_publishable"}}
+    final = receipt()
 
-    def solve(plan: Any, **kwargs: Any) -> dict[str, Any]:
-        calls.append(("M2", plan))
-        return dict(static)
+    def execute(plan: Any, **kwargs: Any) -> dict[str, Any]:
+        calls.append(("steady", plan))
+        return dict(final)
 
-    def verify(plan: Any, **kwargs: Any) -> dict[str, Any]:
-        calls.append(("M4", plan))
-        assert kwargs["static_ref"] == static["static_ref"]
-        return dict(result)
-
-    monkeypatch.setattr(react, "solve_prepared_optimization", solve)
-    monkeypatch.setattr(react, "verify_prepared_optimization", verify)
-    monkeypatch.setattr(react, "read_prepared_static", lambda *a, **kw: dict(static))
-    monkeypatch.setattr(react, "read_prepared_result", lambda *a, **kw: dict(result))
+    monkeypatch.setattr(react, "execute_comparison", execute)
+    monkeypatch.setattr(react, "read_prepared_result", lambda *a, **kw: dict(final))
+    monkeypatch.setattr(AgentDomainTools, "inspect_result", lambda *a, **kw: dict(final))
     return calls
 
 
@@ -95,8 +93,8 @@ def test_tool_contract_has_no_model_controlled_approval_or_stage_calls(repo_root
     )
     assert "constraints" not in schema["parameters"]["properties"]
     info = runtime.domain.plant_info(runtime.data)
-    assert info["tool_contract_version"] == "3.0.0"
-    assert "自动" in info["preparation"]["constraints"]
+    assert info["tool_contract_version"] == "5.0.0"
+    assert len(info["control_variables"]) == 24
     runtime.close()
 
 
@@ -126,26 +124,20 @@ def test_tool_field_repair_preserves_goals_and_guardrails_without_computation(
             ),
             chat(
                 None,
-                calls=[
-                    call("prepare_optimization", json.dumps(args | {"max_candidates": 1}), "valid")
-                ],
+                calls=[call("prepare_optimization", json.dumps(args), "valid")],
             ),
             chat("已保留用户目标与变量，请单独确认。"),
         ]
     )
     runtime = ReactAgent(wire.model(), domain)
-    reply = runtime.handle("提高收率，允许调温度和压力，保留质量门禁。开始吧。")
+    reply = runtime.handle("比较T-39两个联调点，保留质量门禁。开始吧。")
     assert not reply.errors
     results = [json.loads(str(m.content)) for m in runtime.messages if isinstance(m, ToolMessage)]
     assert results[1]["issues"][0]["json_pointer"] == "/constraints"
-    assert "自动保留" in results[1]["issues"][0]["message"]
-    assert results[2]["issues"][0]["code"] == "result-count-out-of-range"
-    assert results[2]["issues"][0]["maximum"] == 3
-    plan = load_prepared_optimization(runtime.data["pending"]["prepared"])
-    assert plan.intent.objectives[0].metric_id == "valuable_distillate_yield"
-    assert set(plan.intent.decision_variables) == set(args["decision_variables"])
-    assert len(plan.problem.hard_constraints) == 4
-    assert len(plan.problem.publishability_constraints) == 1
+    assert "不接受constraints" in results[1]["issues"][0]["message"]
+    assert results[2]["issues"][0]["code"] == "extra_forbidden"
+    plan = load_prepared_comparison(runtime.data["pending"]["prepared"])
+    assert plan.changes == [{"variable_id": "C-1102.39_temperature_C", "value": 156.9, "unit": "C"}]
     assert runtime.data["pending"]["status"] == "awaiting_confirmation" and not stages
     runtime.close()
 
@@ -174,22 +166,14 @@ def test_model_failure_before_plan_display_cannot_leave_an_approvable_plan(
     runtime.close()
 
 
-@pytest.mark.parametrize("count,maximum", [(1, 3), (2, 5), (3, 5)])
-def test_prepare_result_count_uses_current_route_limit(
-    repo_root: Path, count: int, maximum: int
-) -> None:
+@pytest.mark.parametrize("target", [156.7, 157.0, True, "156.9", float("nan")])
+def test_prepare_rejects_unqualified_targets(repo_root: Path, target: Any) -> None:
     domain = AgentDomainTools(repo_root)
     state = new_session(ModelSelection(model_profile(DEFAULT_MODEL_ID)))
     args = arguments(domain, state)
-    args["objectives"] = [
-        {"metric_id": "specific_furnace_fuel_energy_mj_per_t", "sense": "minimize"},
-        {"metric_id": "quality_proxy_max_abs_relative_change", "sense": "minimize"},
-        {"metric_id": "valuable_distillate_yield", "sense": "maximize"},
-    ][:count]
-    with pytest.raises(OptimizationPreparationError) as failure:
-        domain.prepare(state, **(args | {"max_candidates": maximum + 1}))
-    assert failure.value.issues[0]["maximum"] == maximum and state["pending"] is None
-    assert domain.prepare(state, **(args | {"max_candidates": maximum}))["status"] == "prepared"
+    with pytest.raises(ValueError):
+        domain.prepare(state, **(args | {"target_temperature_c": target}))
+    assert state["pending"] is None
 
 
 @pytest.mark.parametrize("confirmation", ["确认", "确认执行", "/confirm", " \n确认执行\t"])
@@ -198,19 +182,19 @@ def test_real_next_turn_confirmation_runs_fixed_stages_once(
 ) -> None:
     wire = Wire([])
     runtime = prepared(repo_root, wire=wire)
-    plan = load_prepared_optimization(runtime.data["pending"]["prepared"])
+    plan = load_prepared_comparison(runtime.data["pending"]["prepared"])
     assert not stages
     requests = len(wire.requests)
     wire.replies.append(chat("可行结果已保存，未达到发布改善门槛。"))
     result = runtime.handle(confirmation)
     assert not result.errors, result.errors
-    assert [item[0] for item in stages] == ["M2", "M4"]
-    assert stages[0][1] == stages[1][1] == plan
+    assert [item[0] for item in stages] == ["steady"]
+    assert stages[0][1] == plan
     assert len(wire.requests) == requests + 1
     assert not wire.requests[-1].get("tools")
     assert runtime.data["pending"]["status"] == "completed"
     assert "未达到发布改善门槛" in "".join(result.outputs)
-    assert not runtime.handle("/confirm").errors and len(stages) == 2
+    assert not runtime.handle("/confirm").errors and len(stages) == 1
     runtime.close()
 
 
@@ -255,7 +239,7 @@ def test_pending_followup_then_switch_then_confirm_keeps_bound_problem(
     assert len(wire.requests) == requests
     wire.replies.append(chat("按已保存核验报告说明结果。"))
     assert not runtime.handle("/confirm").errors
-    assert [item[0] for item in stages] == ["M2", "M4"]
+    assert [item[0] for item in stages] == ["steady"]
     runtime.close()
 
 
@@ -277,33 +261,25 @@ def test_revision_changes_version_and_requires_new_display_and_confirmation(
     pending = runtime.data["pending"]
     assert pending["ref"] != old["ref"] and pending["version"] == old["version"] + 1
     assert pending["status"] == "awaiting_confirmation"
-    plan = load_prepared_optimization(pending["prepared"])
-    assert plan.intent.decision_variables == ("furnace_temperature_target_k",)
-    assert "允许调整：炉出口温度目标\n" in "".join(reply.outputs)
+    plan = load_prepared_comparison(pending["prepared"])
+    assert plan.changes == [{"variable_id": "C-1102.39_temperature_C", "value": 156.8, "unit": "C"}]
+    assert "选定MV调整：" in "".join(reply.outputs)
     wire.replies.append(chat("仅温度调整的核验结果已保存。"))
     assert not runtime.handle("/confirm").errors and stages[0][1] == plan
     runtime.close()
 
 
 @pytest.mark.parametrize(
-    "bad,code,pointer",
+    "bad",
     [
-        ({"snapshot_ref": "case-20260604-nominal"}, "unknown-snapshot-reference", "/snapshot_ref"),
-        (
-            {"decision_variables": ["reflux_ratio_target"]},
-            "unsupported-decision-variable",
-            "/decision_variables/0",
-        ),
-        (
-            {"objectives": [{"metric_id": "valuable_distillate_yield", "sense": "minimize"}]},
-            "objective-sense-mismatch",
-            "/objectives/0/sense",
-        ),
-        ({"previous_plan_ref": "stale-plan"}, "stale-plan-reference", "/previous_plan_ref"),
+        {"snapshot_ref": "missing"},
+        {"previous_plan_ref": "stale"},
+        {"target_temperature_c": 999.0},
+        {"decision_variables": ["other"]},
     ],
 )
 def test_failed_business_revision_preserves_specific_error_and_revokes_old_approval(
-    repo_root: Path, stages: list[Any], bad: dict[str, Any], code: str, pointer: str
+    repo_root: Path, stages: list[Any], bad: dict[str, Any]
 ) -> None:
     wire = Wire([])
     runtime = prepared(repo_root, wire=wire)
@@ -319,8 +295,7 @@ def test_failed_business_revision_preserves_specific_error_and_revokes_old_appro
     pending = runtime.data["pending"]
     assert pending["ref"] == old["ref"] and pending["status"] == "revision_required"
     message = [m for m in runtime.messages if isinstance(m, ToolMessage)][-1]
-    issue = json.loads(str(message.content))["issues"][0]
-    assert issue["code"] == code and issue["json_pointer"] == pointer
+    assert message.status == "error"
     assert runtime.handle("/confirm").errors and runtime.handle("/resume").errors and not stages
     runtime.close()
 
@@ -448,8 +423,8 @@ def test_modifying_an_approved_unfinished_plan_revokes_its_existing_approval(
 ) -> None:
     wire = Wire([])
     runtime = prepared(repo_root, wire=wire)
-    solve = react.solve_prepared_optimization
-    monkeypatch.setattr(react, "solve_prepared_optimization", _interrupt)
+    solve = react.execute_comparison
+    monkeypatch.setattr(react, "execute_comparison", _interrupt)
     assert runtime.handle("/confirm").errors
     old = runtime.data["pending"]
     assert old["status"] == "approved" and not stages
@@ -467,33 +442,33 @@ def test_modifying_an_approved_unfinished_plan_revokes_its_existing_approval(
     assert pending["status"] == ("awaiting_confirmation" if valid else "revision_required")
     assert (pending["ref"] != old["ref"]) == valid
     assert runtime.handle("/resume").errors and not stages
-    monkeypatch.setattr(react, "solve_prepared_optimization", solve)
+    monkeypatch.setattr(react, "execute_comparison", solve)
     if valid:
         wire.replies.append(chat("修改后固定方案的结果已保存。"))
         assert not runtime.handle("/confirm").errors
-        assert [item[0] for item in stages] == ["M2", "M4"]
+        assert [item[0] for item in stages] == ["steady"]
     else:
         assert runtime.handle("/confirm").errors and not stages
     runtime.close()
 
 
-def test_interrupted_m4_keeps_m2_and_explicit_resume_does_not_repeat_it(
+def test_interrupted_steady_execution_needs_explicit_resume(
     repo_root: Path, stages: list[Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     wire = Wire([chat("静态搜索完成，动态复核尚未完成。")])
     runtime = prepared(repo_root, wire=wire)
-    verify = react.verify_prepared_optimization
-    monkeypatch.setattr(react, "verify_prepared_optimization", _interrupt)
+    verify = react.execute_comparison
+    monkeypatch.setattr(react, "execute_comparison", _interrupt)
     failure = runtime.handle("/confirm")
     assert failure.errors and "/resume" in "".join(failure.outputs)
     assert runtime.data["pending"]["status"] == "approved"
-    assert runtime.data["pending"]["static"] is not None
-    assert [item[0] for item in stages] == ["M2"]
-    assert not runtime.handle("进展怎么样？").errors and len(stages) == 1
-    monkeypatch.setattr(react, "verify_prepared_optimization", verify)
+    assert runtime.data["pending"]["result"] is None
+    assert [item[0] for item in stages] == []
+    assert not runtime.handle("进展怎么样？").errors and not stages
+    monkeypatch.setattr(react, "execute_comparison", verify)
     wire.replies.append(chat("动态复核恢复完成，以下说明已保存结果。"))
     assert not runtime.handle("/resume").errors
-    assert [item[0] for item in stages] == ["M2", "M4"]
+    assert [item[0] for item in stages] == ["steady"]
     assert runtime.handle("/resume").errors
     runtime.handle("/cancel")
     assert runtime.data["pending"] is None and runtime.data["last_result"]
@@ -510,24 +485,24 @@ def test_restart_shows_approved_task_without_request_or_execution_before_resume(
 ) -> None:
     path = tmp_path / "session.sqlite"
     runtime = prepared(repo_root, store=SessionStore(path))
-    verify = react.verify_prepared_optimization
-    monkeypatch.setattr(react, "verify_prepared_optimization", _interrupt)
+    verify = react.execute_comparison
+    monkeypatch.setattr(react, "execute_comparison", _interrupt)
     assert runtime.handle("/confirm").errors
     runtime.close()
-    monkeypatch.setattr(react, "verify_prepared_optimization", verify)
+    monkeypatch.setattr(react, "execute_comparison", verify)
     wire = Wire([])
     restored = ReactAgent(wire.model(), AgentDomainTools(repo_root), store=SessionStore(path))
-    assert [item[0] for item in stages] == ["M2"] and not wire.requests
+    assert [item[0] for item in stages] == [] and not wire.requests
     if show_startup:
         assert "/resume" in "".join(restored.startup())
     else:
         first_resume = restored.handle("/resume")
         assert first_resume.errors and "/resume" in "".join(first_resume.outputs)
-        assert [item[0] for item in stages] == ["M2"] and not wire.requests
+        assert [item[0] for item in stages] == [] and not wire.requests
     assert restored.data["pending"]["status"] == "approved"
     wire.replies.append(chat("结果已完成，现作只读说明。"))
     assert not restored.handle("/resume").errors
-    assert [item[0] for item in stages] == ["M2", "M4"] and len(wire.requests) == 1
+    assert [item[0] for item in stages] == ["steady"] and len(wire.requests) == 1
     assert not wire.requests[0].get("tools")
     restored.close()
 
@@ -541,10 +516,10 @@ def test_restore_rechecks_completed_evidence_and_refuses_missing_receipts(
     runtime.close()
     wire = Wire([])
     restored = ReactAgent(wire.model(), AgentDomainTools(repo_root), store=SessionStore(path))
-    assert not wire.requests and len(stages) == 2
+    assert not wire.requests and len(stages) == 1
     restored.startup()
     assert not restored.handle("/confirm").errors
-    assert restored.handle("/resume").errors and len(stages) == 2
+    assert restored.handle("/resume").errors and len(stages) == 1
     restored.close()
 
     def missing(*args: Any, **kwargs: Any) -> Any:
@@ -553,7 +528,7 @@ def test_restore_rechecks_completed_evidence_and_refuses_missing_receipts(
     monkeypatch.setattr(react, "read_prepared_result", missing)
     with pytest.raises(SessionError):
         ReactAgent(wire.model(), AgentDomainTools(repo_root), store=SessionStore(path))
-    assert not wire.requests and len(stages) == 2
+    assert not wire.requests and len(stages) == 1
 
 
 def test_missing_or_corrupt_stored_result_is_a_safe_tool_error(tmp_path: Path) -> None:
@@ -564,7 +539,7 @@ def test_missing_or_corrupt_stored_result_is_a_safe_tool_error(tmp_path: Path) -
                 calls=[
                     call(
                         "inspect_optimization",
-                        json.dumps({"workflow_id": "offline-rto-0123456789abcdef"}),
+                        json.dumps({"workflow_id": "steady-0123456789abcdef"}),
                     )
                 ],
             ),
@@ -575,6 +550,6 @@ def test_missing_or_corrupt_stored_result_is_a_safe_tool_error(tmp_path: Path) -
     assert not runtime.handle("查看这个结果").errors
     result = next(m for m in runtime.messages if isinstance(m, ToolMessage))
     assert result.status == "error" and str(tmp_path) not in str(result.content)
-    assert runtime.handle("/result offline-rto-0123456789abcdef").errors
+    assert runtime.handle("/result steady-0123456789abcdef").errors
     assert runtime.data["last_result"] is None
     runtime.close()

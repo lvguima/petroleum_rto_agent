@@ -1,0 +1,1167 @@
+{
+  "schema": "windows-hysys-read-validation/1",
+  "created_at_utc": "2026-09-11T10:34:50.195144+00:00",
+  "report_date_local": "2026-09-11",
+  "local_timezone": "Asia/Hong_Kong",
+  "claim_scope": "synthetic_engineering_simulation_observation_only",
+  "outcome": {
+    "automatic_disk_copy_open": "failed_twice_unresolved",
+    "manually_opened_case_attach_read": "passed",
+    "minimum_reading_capability_demonstrated": true,
+    "automatic_case_open_reliability_demonstrated": false,
+    "eligible_for_prepare_or_optimization": false
+  },
+  "runtime": {
+    "python_executable": ".venv/python.exe",
+    "python_version": "3.12.13",
+    "python_architecture": "64-bit",
+    "pywin32_version": "312",
+    "application_version_observed": {
+      "type_name": "_Application",
+      "version": "Aspen HYSYS Version 12 (38.0)"
+    },
+    "installation_executable": "D:/aspen/aspen/Aspen HYSYS V12.0/aspenhysys.exe",
+    "installation_file_version": "38.0.0.380",
+    "runtime_environment_basis": "Project environment verification and application metadata in the three raw probe reports."
+  },
+  "execution_boundary": {
+    "successful_command": ".venv/python.exe -B scripts/simulation/probe_hysys_read.py --case hysys/mjh_ATM.hsc --attach-existing",
+    "successful_exit_code": 0,
+    "successful_precondition": "The user manually opened the target case successfully and kept HYSYS running before the attach probe.",
+    "successful_case_selection": "GetActiveObject plus exactly one normalized FullName match; no missing case is opened in attach mode.",
+    "successful_source_kind": "existing_case_memory",
+    "new_hysys_calls_during_report_assembly": false,
+    "probe_written_mv": false,
+    "probe_requested_solve": false,
+    "probe_requested_close_or_quit": false,
+    "source_case_preserved": true,
+    "claim_about_unrelated_app_actions": "Only the probe actions are described; no blanket claim is made about user or HYSYS background actions."
+  },
+  "code_revision_boundary": {
+    "live_success_precedes_final_diagnostic_enhancement": true,
+    "post_success_change": "error_record now also stores EXCEPINFO scode, source, and description as structured fields.",
+    "final_enhanced_script_live_rerun": false,
+    "original_probe_reports_modified": false,
+    "legacy_error_extraction_is_report_assembly_only": true,
+    "limit": "The successful live evidence belongs to the script before this diagnostic-only enhancement; it is not a live retest of the final file."
+  },
+  "probe_runs": [
+    {
+      "report_artifact": {
+        "path": "runs/simulation/hysys-read-cu5l7775/report.json",
+        "sha256": "61fc3dcce9a5d2795cda376156d922fd3f63d03e204ee240514c1efc15a18c7a"
+      },
+      "raw_report": {
+        "schema": "hysys-read-probe-report/1",
+        "started_at_utc": "2026-09-11T10:23:43.398056+00:00",
+        "run_directory": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-read-cu5l7775",
+        "phase": "finished",
+        "status": "failed",
+        "source": {
+          "kind": "disk_case_copy",
+          "requested_case": "D:\\pyproject\\petroleum_rto_agent\\hysys\\mjh_ATM.hsc",
+          "memory_state_bound_to_disk_hash": false,
+          "disk_sha256_before": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+          "working_copy": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-read-cu5l7775\\mjh_ATM.hsc",
+          "disk_sha256_after": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+          "disk_unchanged": true
+        },
+        "ownership": {
+          "application_connection": "DispatchEx",
+          "application_exclusive_ownership_proven": false,
+          "probe_opened_case": false,
+          "close_or_quit_requested": false,
+          "case_retained_in_application_if_opened": true
+        },
+        "com_lifecycle": {
+          "initialized": true,
+          "uninitialized": true
+        },
+        "errors": [
+          {
+            "phase": "open_copy",
+            "code": "com_error",
+            "exception_type": "com_error",
+            "hresult": -2147352567,
+            "message": "(-2147352567, '发生意外。', (0, None, None, None, 0, -1072879842), None)"
+          }
+        ],
+        "snapshot": null,
+        "application": {
+          "type_name": "_Application",
+          "version": "Aspen HYSYS Version 12 (38.0)"
+        },
+        "finished_at_utc": "2026-09-11T10:24:06.923441+00:00"
+      },
+      "elapsed_seconds_from_report_timestamps": 23.525385,
+      "structured_error_excerpt_from_legacy_message": [
+        {
+          "phase": "open_copy",
+          "hresult": -2147352567,
+          "hresult_hex": "0x80020009",
+          "excepinfo": {
+            "wCode": 0,
+            "source": null,
+            "description": null,
+            "helpFile": null,
+            "helpContext": 0,
+            "scode": -1072879842,
+            "scode_hex": "0xC00D271E"
+          },
+          "extraction_basis": "Parsed existing error.message tuple with ast.literal_eval; not a new COM call and not a field present in the original report.",
+          "cause_classification": "undetermined"
+        }
+      ],
+      "working_copy_at_summary": {
+        "path": "runs/simulation/hysys-read-cu5l7775/mjh_ATM.hsc",
+        "sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741"
+      },
+      "working_copy_at_summary_matches_source_before": true
+    },
+    {
+      "report_artifact": {
+        "path": "runs/simulation/hysys-read-wlsqp41o/report.json",
+        "sha256": "14be759b3d3bc489fbe3de49b34bc39ce2d254349ac41694872e4eb4370c055d"
+      },
+      "raw_report": {
+        "schema": "hysys-read-probe-report/1",
+        "started_at_utc": "2026-09-11T10:28:03.530207+00:00",
+        "run_directory": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-read-wlsqp41o",
+        "phase": "finished",
+        "status": "failed",
+        "source": {
+          "kind": "disk_case_copy",
+          "requested_case": "D:\\pyproject\\petroleum_rto_agent\\hysys\\mjh_ATM.hsc",
+          "memory_state_bound_to_disk_hash": false,
+          "disk_sha256_before": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+          "working_copy": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-read-wlsqp41o\\mjh_ATM.hsc",
+          "disk_sha256_after": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+          "disk_unchanged": true
+        },
+        "ownership": {
+          "application_connection": "DispatchEx",
+          "application_exclusive_ownership_proven": false,
+          "probe_opened_case": false,
+          "close_or_quit_requested": false,
+          "case_retained_in_application_if_opened": true
+        },
+        "com_lifecycle": {
+          "initialized": true,
+          "uninitialized": true
+        },
+        "errors": [
+          {
+            "phase": "open_copy",
+            "code": "com_error",
+            "exception_type": "com_error",
+            "hresult": -2147352567,
+            "message": "(-2147352567, '发生意外。', (0, None, None, None, 0, -2147024891), None)"
+          }
+        ],
+        "snapshot": null,
+        "application": {
+          "type_name": "_Application",
+          "version": "Aspen HYSYS Version 12 (38.0)"
+        },
+        "finished_at_utc": "2026-09-11T10:28:09.622966+00:00"
+      },
+      "elapsed_seconds_from_report_timestamps": 6.092759,
+      "structured_error_excerpt_from_legacy_message": [
+        {
+          "phase": "open_copy",
+          "hresult": -2147352567,
+          "hresult_hex": "0x80020009",
+          "excepinfo": {
+            "wCode": 0,
+            "source": null,
+            "description": null,
+            "helpFile": null,
+            "helpContext": 0,
+            "scode": -2147024891,
+            "scode_hex": "0x80070005"
+          },
+          "extraction_basis": "Parsed existing error.message tuple with ast.literal_eval; not a new COM call and not a field present in the original report.",
+          "cause_classification": "undetermined"
+        }
+      ],
+      "working_copy_at_summary": {
+        "path": "runs/simulation/hysys-read-wlsqp41o/mjh_ATM.hsc",
+        "sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741"
+      },
+      "working_copy_at_summary_matches_source_before": true
+    },
+    {
+      "report_artifact": {
+        "path": "runs/simulation/hysys-read-6oktr5jg/report.json",
+        "sha256": "3a78353ac38ee54fc6f6d60c3a17bbb6ea925217d105cff11e6bea353db4b3b7"
+      },
+      "raw_report": {
+        "schema": "hysys-read-probe-report/1",
+        "started_at_utc": "2026-09-11T10:29:52.767976+00:00",
+        "run_directory": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-read-6oktr5jg",
+        "phase": "finished",
+        "status": "observed_stable",
+        "source": {
+          "kind": "existing_case_memory",
+          "requested_case": "D:\\pyproject\\petroleum_rto_agent\\hysys\\mjh_ATM.hsc",
+          "memory_state_bound_to_disk_hash": false,
+          "disk_sha256_before": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+          "disk_sha256_after": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+          "disk_unchanged": true
+        },
+        "ownership": {
+          "application_connection": "GetActiveObject",
+          "application_exclusive_ownership_proven": false,
+          "probe_opened_case": false,
+          "close_or_quit_requested": false,
+          "case_retained_in_application_if_opened": true
+        },
+        "com_lifecycle": {
+          "initialized": true,
+          "uninitialized": true
+        },
+        "errors": [],
+        "snapshot": {
+          "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-read-6oktr5jg\\snapshot.json",
+          "sha256": "d1e6bdc543556a35b9a36a4ca762973d9e2e6422e2a8995abceed8aef5147042"
+        },
+        "application": {
+          "type_name": "_Application",
+          "version": "Aspen HYSYS Version 12 (38.0)"
+        },
+        "opened_case_full_name": "d:\\pyproject\\petroleum_rto_agent\\hysys\\mjh_ATM.hsc",
+        "assessment": {
+          "consistent_observation": true,
+          "reasons": [],
+          "method": "two_complete_samples_exact_equality_and_four_solver_status_reads",
+          "atomic_snapshot_proven": false,
+          "eligible_for_prepare": false,
+          "prepare_blockers": [
+            "probe_only",
+            "units_not_qualified",
+            "rebuildable_baseline_not_frozen"
+          ]
+        },
+        "counts": {
+          "mv": 24,
+          "cv": 36,
+          "stage": 73
+        },
+        "finished_at_utc": "2026-09-11T10:29:55.543351+00:00"
+      },
+      "elapsed_seconds_from_report_timestamps": 2.775375
+    }
+  ],
+  "successful_snapshot": {
+    "artifact": {
+      "path": "runs/simulation/hysys-read-6oktr5jg/snapshot.json",
+      "sha256": "d1e6bdc543556a35b9a36a4ca762973d9e2e6422e2a8995abceed8aef5147042"
+    },
+    "matches_sha256_recorded_in_success_report": true,
+    "observed_at_utc": "2026-09-11T10:29:55.537352+00:00",
+    "opened_case_full_name": "d:\\pyproject\\petroleum_rto_agent\\hysys\\mjh_ATM.hsc",
+    "counts": {
+      "mv": 24,
+      "cv": 36,
+      "stage": 73
+    },
+    "scalar_values_per_complete_sample": 352,
+    "finite_nonboolean_scalar_validation": "passed",
+    "unique_object_property_mappings": 60,
+    "unique_stage_names": 73,
+    "two_complete_samples_exactly_equal": true,
+    "four_solver_status_reads": [
+      {
+        "sample_index": 1,
+        "boundary": "solver_before",
+        "status": {
+          "can_solve": true,
+          "is_solving": false,
+          "is_valid": true,
+          "column_converged": true
+        }
+      },
+      {
+        "sample_index": 1,
+        "boundary": "solver_after",
+        "status": {
+          "can_solve": true,
+          "is_solving": false,
+          "is_valid": true,
+          "column_converged": true
+        }
+      },
+      {
+        "sample_index": 2,
+        "boundary": "solver_before",
+        "status": {
+          "can_solve": true,
+          "is_solving": false,
+          "is_valid": true,
+          "column_converged": true
+        }
+      },
+      {
+        "sample_index": 2,
+        "boundary": "solver_after",
+        "status": {
+          "can_solve": true,
+          "is_solving": false,
+          "is_valid": true,
+          "column_converged": true
+        }
+      }
+    ],
+    "assessment": {
+      "consistent_observation": true,
+      "reasons": [],
+      "method": "two_complete_samples_exact_equality_and_four_solver_status_reads",
+      "atomic_snapshot_proven": false,
+      "eligible_for_prepare": false,
+      "prepare_blockers": [
+        "probe_only",
+        "units_not_qualified",
+        "rebuildable_baseline_not_frozen"
+      ]
+    },
+    "table_observation": {
+      "source_semantics": "raw_COM_CellValue_with_unverified_spreadsheet_unit_labels",
+      "unit_labels_qualified": false,
+      "raw_cell_values_converted": false,
+      "grouping_note": "Ranges group raw COM CellValue by the literal spreadsheet label only. Neither labels nor property names certify the actual quantity or unit; these are not operating limits.",
+      "label_groups": [
+        {
+          "section": "mv",
+          "literal_table_unit_label": "%",
+          "row_count": 2,
+          "rows": [
+            6,
+            22
+          ],
+          "property_labels": [
+            "boilup_rate",
+            "liquid_level"
+          ],
+          "raw_cell_value_range": {
+            "minimum": 0.5,
+            "maximum": 44.5
+          }
+        },
+        {
+          "section": "mv",
+          "literal_table_unit_label": "C",
+          "row_count": 13,
+          "rows": [
+            2,
+            5,
+            8,
+            9,
+            10,
+            11,
+            12,
+            17,
+            19,
+            21,
+            23,
+            24,
+            25
+          ],
+          "property_labels": [
+            "16_temperature_C",
+            "26_temperature_C",
+            "39_temperature_C",
+            "D_temperature_C",
+            "one_temperature_C",
+            "temperature_C",
+            "top_temperature_C",
+            "two_temperature_C"
+          ],
+          "raw_cell_value_range": {
+            "minimum": 32.6,
+            "maximum": 301.0
+          }
+        },
+        {
+          "section": "mv",
+          "literal_table_unit_label": "kg/h",
+          "row_count": 7,
+          "rows": [
+            4,
+            13,
+            14,
+            15,
+            16,
+            18,
+            20
+          ],
+          "property_labels": [
+            "massflow_kg_h",
+            "one_massflow_kg_h",
+            "top_massflow_kg_h",
+            "two_massflow_kg_h"
+          ],
+          "raw_cell_value_range": {
+            "minimum": 0.08333333333333333,
+            "maximum": 111.11111111111111
+          }
+        },
+        {
+          "section": "mv",
+          "literal_table_unit_label": "kpa",
+          "row_count": 2,
+          "rows": [
+            3,
+            7
+          ],
+          "property_labels": [
+            "D_pressure_kPa",
+            "pressure_kPa"
+          ],
+          "raw_cell_value_range": {
+            "minimum": 180.0,
+            "maximum": 550.0
+          }
+        },
+        {
+          "section": "cv",
+          "literal_table_unit_label": "C",
+          "row_count": 25,
+          "rows": [
+            35,
+            36,
+            37,
+            38,
+            39,
+            41,
+            42,
+            43,
+            44,
+            45,
+            47,
+            48,
+            49,
+            50,
+            51,
+            53,
+            54,
+            55,
+            56,
+            57,
+            59,
+            60,
+            61,
+            62,
+            63
+          ],
+          "property_labels": [
+            "100%TBP",
+            "20%TBP",
+            "40%TBP",
+            "60%TBP",
+            "80%TBP"
+          ],
+          "raw_cell_value_range": {
+            "minimum": 10.623397930062902,
+            "maximum": 714.2938568177741
+          }
+        },
+        {
+          "section": "cv",
+          "literal_table_unit_label": "KJ/h",
+          "row_count": 6,
+          "rows": [
+            28,
+            29,
+            30,
+            31,
+            32,
+            33
+          ],
+          "property_labels": [
+            "heat_load_KJ_h"
+          ],
+          "raw_cell_value_range": {
+            "minimum": 240.68747754387778,
+            "maximum": 44179.322269229335
+          }
+        },
+        {
+          "section": "cv",
+          "literal_table_unit_label": "kg/h",
+          "row_count": 5,
+          "rows": [
+            34,
+            40,
+            46,
+            52,
+            58
+          ],
+          "property_labels": [
+            "massflow_kg_h"
+          ],
+          "raw_cell_value_range": {
+            "minimum": 2.6964312696749118,
+            "maximum": 83.1348074449686
+          }
+        }
+      ],
+      "current_labels_by_row": [
+        {
+          "section": "mv",
+          "row": 2,
+          "object_name": "crude_oil",
+          "property_name": "temperature_C",
+          "value_cell": "C2",
+          "unit_label": "C"
+        },
+        {
+          "section": "mv",
+          "row": 3,
+          "object_name": "crude_oil",
+          "property_name": "pressure_kPa",
+          "value_cell": "C3",
+          "unit_label": "kpa"
+        },
+        {
+          "section": "mv",
+          "row": 4,
+          "object_name": "crude_oil",
+          "property_name": "massflow_kg_h",
+          "value_cell": "C4",
+          "unit_label": "kg/h"
+        },
+        {
+          "section": "mv",
+          "row": 5,
+          "object_name": "heater_to_flash",
+          "property_name": "D_temperature_C",
+          "value_cell": "C5",
+          "unit_label": "C"
+        },
+        {
+          "section": "mv",
+          "row": 6,
+          "object_name": "flash_column",
+          "property_name": "liquid_level",
+          "value_cell": "C6",
+          "unit_label": "%"
+        },
+        {
+          "section": "mv",
+          "row": 7,
+          "object_name": "pump",
+          "property_name": "D_pressure_kPa",
+          "value_cell": "C7",
+          "unit_label": "kpa"
+        },
+        {
+          "section": "mv",
+          "row": 8,
+          "object_name": "heater_to_furnace",
+          "property_name": "D_temperature_C",
+          "value_cell": "C8",
+          "unit_label": "C"
+        },
+        {
+          "section": "mv",
+          "row": 9,
+          "object_name": "furnace_1",
+          "property_name": "D_temperature_C",
+          "value_cell": "C9",
+          "unit_label": "C"
+        },
+        {
+          "section": "mv",
+          "row": 10,
+          "object_name": "furnace_2",
+          "property_name": "D_temperature_C",
+          "value_cell": "C10",
+          "unit_label": "C"
+        },
+        {
+          "section": "mv",
+          "row": 11,
+          "object_name": "furnace_3",
+          "property_name": "D_temperature_C",
+          "value_cell": "C11",
+          "unit_label": "C"
+        },
+        {
+          "section": "mv",
+          "row": 12,
+          "object_name": "furnace_4",
+          "property_name": "D_temperature_C",
+          "value_cell": "C12",
+          "unit_label": "C"
+        },
+        {
+          "section": "mv",
+          "row": 13,
+          "object_name": "Water1",
+          "property_name": "massflow_kg_h",
+          "value_cell": "C13",
+          "unit_label": "kg/h"
+        },
+        {
+          "section": "mv",
+          "row": 14,
+          "object_name": "Water2",
+          "property_name": "massflow_kg_h",
+          "value_cell": "C14",
+          "unit_label": "kg/h"
+        },
+        {
+          "section": "mv",
+          "row": 15,
+          "object_name": "Water3",
+          "property_name": "massflow_kg_h",
+          "value_cell": "C15",
+          "unit_label": "kg/h"
+        },
+        {
+          "section": "mv",
+          "row": 16,
+          "object_name": "C-1102",
+          "property_name": "top_massflow_kg_h",
+          "value_cell": "C16",
+          "unit_label": "kg/h"
+        },
+        {
+          "section": "mv",
+          "row": 17,
+          "object_name": "C-1102",
+          "property_name": "top_temperature_C",
+          "value_cell": "C17",
+          "unit_label": "C"
+        },
+        {
+          "section": "mv",
+          "row": 18,
+          "object_name": "C-1102",
+          "property_name": "one_massflow_kg_h",
+          "value_cell": "C18",
+          "unit_label": "kg/h"
+        },
+        {
+          "section": "mv",
+          "row": 19,
+          "object_name": "C-1102",
+          "property_name": "one_temperature_C",
+          "value_cell": "C19",
+          "unit_label": "C"
+        },
+        {
+          "section": "mv",
+          "row": 20,
+          "object_name": "C-1102",
+          "property_name": "two_massflow_kg_h",
+          "value_cell": "C20",
+          "unit_label": "kg/h"
+        },
+        {
+          "section": "mv",
+          "row": 21,
+          "object_name": "C-1102",
+          "property_name": "two_temperature_C",
+          "value_cell": "C21",
+          "unit_label": "C"
+        },
+        {
+          "section": "mv",
+          "row": 22,
+          "object_name": "C-1102",
+          "property_name": "boilup_rate",
+          "value_cell": "C22",
+          "unit_label": "%"
+        },
+        {
+          "section": "mv",
+          "row": 23,
+          "object_name": "C-1102",
+          "property_name": "39_temperature_C",
+          "value_cell": "C23",
+          "unit_label": "C"
+        },
+        {
+          "section": "mv",
+          "row": 24,
+          "object_name": "C-1102",
+          "property_name": "26_temperature_C",
+          "value_cell": "C24",
+          "unit_label": "C"
+        },
+        {
+          "section": "mv",
+          "row": 25,
+          "object_name": "C-1102",
+          "property_name": "16_temperature_C",
+          "value_cell": "C25",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 28,
+          "object_name": "heater_to_flash",
+          "property_name": "heat_load_KJ_h",
+          "value_cell": "C28",
+          "unit_label": "KJ/h"
+        },
+        {
+          "section": "cv",
+          "row": 29,
+          "object_name": "heater_to_furnace",
+          "property_name": "heat_load_KJ_h",
+          "value_cell": "C29",
+          "unit_label": "KJ/h"
+        },
+        {
+          "section": "cv",
+          "row": 30,
+          "object_name": "furnace_1",
+          "property_name": "heat_load_KJ_h",
+          "value_cell": "C30",
+          "unit_label": "KJ/h"
+        },
+        {
+          "section": "cv",
+          "row": 31,
+          "object_name": "furnace_2",
+          "property_name": "heat_load_KJ_h",
+          "value_cell": "C31",
+          "unit_label": "KJ/h"
+        },
+        {
+          "section": "cv",
+          "row": 32,
+          "object_name": "furnace_3",
+          "property_name": "heat_load_KJ_h",
+          "value_cell": "C32",
+          "unit_label": "KJ/h"
+        },
+        {
+          "section": "cv",
+          "row": 33,
+          "object_name": "furnace_4",
+          "property_name": "heat_load_KJ_h",
+          "value_cell": "C33",
+          "unit_label": "KJ/h"
+        },
+        {
+          "section": "cv",
+          "row": 34,
+          "object_name": "Naptha",
+          "property_name": "massflow_kg_h",
+          "value_cell": "C34",
+          "unit_label": "kg/h"
+        },
+        {
+          "section": "cv",
+          "row": 35,
+          "object_name": "Naptha",
+          "property_name": "20%TBP",
+          "value_cell": "C35",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 36,
+          "object_name": "Naptha",
+          "property_name": "40%TBP",
+          "value_cell": "C36",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 37,
+          "object_name": "Naptha",
+          "property_name": "60%TBP",
+          "value_cell": "C37",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 38,
+          "object_name": "Naptha",
+          "property_name": "80%TBP",
+          "value_cell": "C38",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 39,
+          "object_name": "Naptha",
+          "property_name": "100%TBP",
+          "value_cell": "C39",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 40,
+          "object_name": "Kerosene",
+          "property_name": "massflow_kg_h",
+          "value_cell": "C40",
+          "unit_label": "kg/h"
+        },
+        {
+          "section": "cv",
+          "row": 41,
+          "object_name": "Kerosene",
+          "property_name": "20%TBP",
+          "value_cell": "C41",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 42,
+          "object_name": "Kerosene",
+          "property_name": "40%TBP",
+          "value_cell": "C42",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 43,
+          "object_name": "Kerosene",
+          "property_name": "60%TBP",
+          "value_cell": "C43",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 44,
+          "object_name": "Kerosene",
+          "property_name": "80%TBP",
+          "value_cell": "C44",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 45,
+          "object_name": "Kerosene",
+          "property_name": "100%TBP",
+          "value_cell": "C45",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 46,
+          "object_name": "Diesel",
+          "property_name": "massflow_kg_h",
+          "value_cell": "C46",
+          "unit_label": "kg/h"
+        },
+        {
+          "section": "cv",
+          "row": 47,
+          "object_name": "Diesel",
+          "property_name": "20%TBP",
+          "value_cell": "C47",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 48,
+          "object_name": "Diesel",
+          "property_name": "40%TBP",
+          "value_cell": "C48",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 49,
+          "object_name": "Diesel",
+          "property_name": "60%TBP",
+          "value_cell": "C49",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 50,
+          "object_name": "Diesel",
+          "property_name": "80%TBP",
+          "value_cell": "C50",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 51,
+          "object_name": "Diesel",
+          "property_name": "100%TBP",
+          "value_cell": "C51",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 52,
+          "object_name": "AGO",
+          "property_name": "massflow_kg_h",
+          "value_cell": "C52",
+          "unit_label": "kg/h"
+        },
+        {
+          "section": "cv",
+          "row": 53,
+          "object_name": "AGO",
+          "property_name": "20%TBP",
+          "value_cell": "C53",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 54,
+          "object_name": "AGO",
+          "property_name": "40%TBP",
+          "value_cell": "C54",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 55,
+          "object_name": "AGO",
+          "property_name": "60%TBP",
+          "value_cell": "C55",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 56,
+          "object_name": "AGO",
+          "property_name": "80%TBP",
+          "value_cell": "C56",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 57,
+          "object_name": "AGO",
+          "property_name": "100%TBP",
+          "value_cell": "C57",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 58,
+          "object_name": "Risedue",
+          "property_name": "massflow_kg_h",
+          "value_cell": "C58",
+          "unit_label": "kg/h"
+        },
+        {
+          "section": "cv",
+          "row": 59,
+          "object_name": "Risedue",
+          "property_name": "20%TBP",
+          "value_cell": "C59",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 60,
+          "object_name": "Risedue",
+          "property_name": "40%TBP",
+          "value_cell": "C60",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 61,
+          "object_name": "Risedue",
+          "property_name": "60%TBP",
+          "value_cell": "C61",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 62,
+          "object_name": "Risedue",
+          "property_name": "80%TBP",
+          "value_cell": "C62",
+          "unit_label": "C"
+        },
+        {
+          "section": "cv",
+          "row": 63,
+          "object_name": "Risedue",
+          "property_name": "100%TBP",
+          "value_cell": "C63",
+          "unit_label": "C"
+        }
+      ],
+      "unit_review_examples": [
+        {
+          "row": 4,
+          "object_name": "crude_oil",
+          "property_name": "massflow_kg_h",
+          "value_cell": "C4",
+          "raw_cell_value": 111.11111111111111,
+          "unit_label": "kg/h",
+          "note": "Literal label and raw value are preserved without conversion or certification."
+        },
+        {
+          "row": 22,
+          "object_name": "C-1102",
+          "property_name": "boilup_rate",
+          "value_cell": "C22",
+          "raw_cell_value": 0.5,
+          "unit_label": "%",
+          "note": "Literal label and raw value are preserved without conversion or certification."
+        },
+        {
+          "row": 28,
+          "object_name": "heater_to_flash",
+          "property_name": "heat_load_KJ_h",
+          "value_cell": "C28",
+          "raw_cell_value": 44179.322269229335,
+          "unit_label": "KJ/h",
+          "note": "Literal label and raw value are preserved without conversion or certification."
+        }
+      ]
+    },
+    "stage_observation": {
+      "source_semantics": "COM_GetValue_in_explicit_kPa_C_kg_per_h_units",
+      "range_note": "Observed outputs from the explicit COM GetValue requests; not certified engineering ranges or safety limits.",
+      "ranges": {
+        "pressure_kPa": {
+          "minimum": 150.0,
+          "maximum": 180.0
+        },
+        "temperature_C": {
+          "minimum": 105.45224523382933,
+          "maximum": 369.3227670986382
+        },
+        "liquid_kg_h": {
+          "minimum": 5732.726000457569,
+          "maximum": 391649.51393063716
+        },
+        "vapor_kg_h": {
+          "minimum": 1295.729852005794,
+          "maximum": 228355.0288572091
+        }
+      },
+      "liquid_accessor": "SeparationStage.MassLiquidFlow.GetValue(\"kg/h\")",
+      "vapor_accessor": "SeparationStage.MassVapourFlow.GetValue(\"kg/h\")",
+      "stage_count_with_identical_liquid_and_vapor_values": 0,
+      "stage_count_with_distinct_liquid_and_vapor_values": 73,
+      "all_liquid_values_positive": true,
+      "all_vapor_values_positive": true
+    }
+  },
+  "source_integrity": {
+    "artifact_at_summary": {
+      "path": "hysys/mjh_ATM.hsc",
+      "sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741"
+    },
+    "bytes": 1773263,
+    "all_three_probe_before_after_hashes_identical": true,
+    "current_disk_hash_matches_probe_hashes": true,
+    "disk_sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+    "memory_state_bound_to_disk_hash": false,
+    "limit": "FullName matching identifies the opened case path. The unchanged disk hash does not bind the current in-memory state to that file, prove a rebuildable baseline, or authenticate the data."
+  },
+  "windows_crash_diagnostics": {
+    "collection_method": "Read-only Windows Application/System event queries, installation file version metadata, HKCR reads, and process-owner/DACL inspection; no process dumps or license/credential contents read.",
+    "early_limited_event_query_corrected": "The newest 150 Application events omitted HYSYS because IPF generated many events. A full two-hour query examined 10337 events and found the first crash; a subsequent targeted ID 1000/1001 query found the second crash.",
+    "application_error_events": [
+      {
+        "time_local": "2026-09-11T18:24:08+08:00",
+        "provider": "Application Error",
+        "event_id": 1000,
+        "process_id": 532,
+        "process_start_local": "2026-09-11T18:23:43+08:00",
+        "application": "D:/aspen/aspen/Aspen HYSYS V12.0/aspenhysys.exe",
+        "application_version": "38.0.0.380",
+        "fault_module": "C:/Program Files/Common Files/AspenTech Shared/STRGXI2.dll",
+        "module_version": "2018.11.1.508",
+        "exception_code": "0xc0000409",
+        "fault_offset": "0x00000000003889db",
+        "report_id": "c8ffda92-0641-4634-83da-860dbcd6fbf9"
+      },
+      {
+        "time_local": "2026-09-11T18:28:11+08:00",
+        "provider": "Application Error",
+        "event_id": 1000,
+        "process_id": 33692,
+        "process_start_local": "2026-09-11T18:25:35+08:00",
+        "application": "D:/aspen/aspen/Aspen HYSYS V12.0/AspenHysys.exe",
+        "application_version": "38.0.0.380",
+        "fault_module": "C:/Program Files/Common Files/AspenTech Shared/STRGXI2.dll",
+        "module_version": "2018.11.1.508",
+        "exception_code": "0xc0000409",
+        "fault_offset": "0x00000000003889db",
+        "report_id": "0076b11f-0c3a-44c9-bfeb-849857ac56c7"
+      }
+    ],
+    "windows_error_reporting_event": {
+      "time_local": "2026-09-11T18:24:18+08:00",
+      "provider": "Windows Error Reporting",
+      "event_id": 1001,
+      "event_name": "BEX64",
+      "report_id": "c8ffda92-0641-4634-83da-860dbcd6fbf9"
+    },
+    "fault_module_file_metadata": {
+      "description": "STRGXI2 Module",
+      "product": "STRGXI2 Module",
+      "company": "Aspentech",
+      "version": "2018.11.1.508"
+    },
+    "com_registry": {
+      "view": "64-bit HKCR",
+      "progid": "HYSYS.Application",
+      "clsid": "{388D7853-880C-470F-84CB-FC0E3464EF89}",
+      "clsid_appid_value_present": false,
+      "appid_aspenhysys_exe_key_present": false,
+      "hysys_matching_distributedcom_events_in_two_hour_query": 0,
+      "distributedcom_events_examined": 6
+    },
+    "process_and_copy_acl": {
+      "case_copy_run": "runs/simulation/hysys-read-cu5l7775",
+      "directory_and_case_owner": "WYL-MAIN-DESKTO/lvgui",
+      "allow_full_control_entries": [
+        "OWNER RIGHTS",
+        "NT AUTHORITY/SYSTEM",
+        "BUILTIN/Administrators"
+      ],
+      "pid_33692": {
+        "owner": "WYL-MAIN-DESKTO/lvgui",
+        "session_id": 1,
+        "owner_query_return_value": 0
+      },
+      "pid_21420": {
+        "parent_process_id": 532,
+        "session_id": 1,
+        "owner": null,
+        "owner_query_return_value": 2
+      },
+      "interpretation": "The ordinary DACL permits the known lvgui owner; the account of PID 21420 was not obtainable. Access issues for the automatic COM case are not conclusively excluded.",
+      "acl_or_owner_modified": false
+    },
+    "local_documentation": {
+      "path": "C:/ProgramData/AspenTech/Aspen HYSYS V12.0/HtmlHelp/Subsystems/HYSYS_Customization/Content/html/Automation_Syntax.htm",
+      "lines": [
+        125,
+        138
+      ],
+      "observation": "The local official help demonstrates HYSYS.Application followed by SimulationCases.Open(case_path)."
+    },
+    "limits": [
+      "Two HYSYS crash events are established; exact causal attribution from each COM error to a particular process/module failure is not proven.",
+      "Neither the COM numeric codes nor the module name establish a license failure, model corruption, or Python incompatibility.",
+      "No local HYSYS help text explaining 0xC00D271E was found.",
+      "The WER archive report was inaccessible; no crash dump was read.",
+      "Successful manual opening plus attach does not resolve reliable automatic Open."
+    ]
+  },
+  "validation_of_this_summary": {
+    "input_json_parser": "Rejects duplicate object keys and nonfinite JSON constants.",
+    "successful_snapshot_hash_verified_against_raw_report": true,
+    "counts_uniqueness_scalar_finiteness_and_exact_sample_equality_recomputed": true,
+    "legacy_error_tuple_fields_recovered_without_executing_input": true,
+    "source_and_failure_copy_hashes_recomputed": true,
+    "new_live_hysys_verification_performed": false
+  },
+  "remaining_work": [
+    "Qualify actual spreadsheet property bindings, quantity meanings, and unit conversions before projecting trusted process context.",
+    "Resolve automatic case opening and establish explicit case/instance ownership and isolation.",
+    "Freeze a rebuildable baseline and verify isolated A-to-B-to-A single-variable recovery before optimization."
+  ]
+}

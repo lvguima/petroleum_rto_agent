@@ -1,0 +1,174 @@
+{
+  "schema_id": "hysys-real-model-agent-acceptance",
+  "schema_version": "1.0.0",
+  "status": "passed",
+  "requested_model": "gpt-5.6-sol-cdx",
+  "endpoint": "https://www.dmxapi.cn/v1/chat/completions",
+  "model_requests": 4,
+  "tool_calls": [
+    "get_plant_info",
+    "read_operating_context",
+    "prepare_optimization"
+  ],
+  "live_report": {
+    "path": "runs\\simulation\\agent-steady-live-20260911\\report.json",
+    "sha256": "46d565a5b51309a02a8a215b2d11455a93f020df2ea1ce13eeeff5b9345f9903"
+  },
+  "workflow_id": "steady-e9f7a90c8d21e45d",
+  "result_sha256": "3c6fcc3da6a586e1bb46e577120e562cdccdcbe2156ae2296ed572b341bd706e",
+  "comparison_status": "comparison_only",
+  "eligible_for_optimization": false,
+  "strict_reload": true,
+  "session_restart": true,
+  "restart_and_result_model_requests": 0,
+  "points": [
+    {
+      "role": "baseline",
+      "report": "runs\\rto\\steady-e9f7a90c8d21e45d\\baseline\\report.json",
+      "sha256": "f28ff1a612a0d6df2e50f32bb2526c5fae80f1fe466bd75b9b4d42e1e18d14d0",
+      "target_c": 156.8,
+      "status": "passed",
+      "boundary_sha256": "fe6f08464bc49c8d19bd9952959e5d974ebde8b3e9d340a3bcb3320ee2018cf9",
+      "source_protection": true
+    },
+    {
+      "role": "candidate",
+      "report": "runs\\rto\\steady-e9f7a90c8d21e45d\\candidate\\report.json",
+      "sha256": "cae616f9cb9d4c60582bd53a8fcc15dc952ba44e90c15c58cd8ce0c7bbd4cdc5",
+      "target_c": 156.9,
+      "status": "passed",
+      "boundary_sha256": "f55d27ccd8947b886737e355d845ec8976889b38ab6456405d4707d5ca7db5fc",
+      "source_protection": true
+    }
+  ],
+  "credential_installation": {
+    "private_file_validated": true,
+    "temporary_source_removed": true,
+    "credential_absent_from_reports": true
+  },
+  "original_files": [
+    {
+      "path": "hysys/analyze_results.py",
+      "sha256": "bba79b0c29863a409d45b64bd502323c80ab720cca31b237152bacc72f91eccb",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/before_after.csv",
+      "sha256": "704663228149e986a011cf2e27440f461fee6947cfb56c786dffc54d5f0400fc",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/heat_loads.csv",
+      "sha256": "069f4806bcc6fe5c07666cac7fd88f969c995a8af8bcf465248f611155c2596a",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/products.csv",
+      "sha256": "9e1b51742ce4fee62ec4a2e3c961132c4895293445df86f08416402c409a6eb2",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/results_analysis.md",
+      "sha256": "a24538804deca565964596eb9413837539c0450a6d33c0a92669947f137c6cce",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/stages.csv",
+      "sha256": "32ec6c783c730b2cd0d0b126fe47aeffdefafe29ecf16916ac3d23f77b667501",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/summary.json",
+      "sha256": "325ab4f85329757d1285bc28c03a4a9d8a463056552575163d9e33a5169649a8",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/hysys_inspection.json",
+      "sha256": "524735252b826369e1567c7bdbe81608ae1c49da4c31f9766be955b33cbdd764",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/nature-figure.json",
+      "sha256": "dad100bf58fece91f6d9ce9ef861408b330aea06bb703ea8229bf8d464754a8b",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/operating_point_before.json",
+      "sha256": "21ed572cc511a25d28414ca815357997abec183bb7a7f0458e6ea073f60f512d",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/original/data_read",
+      "sha256": "313be0bd61ce5c77dddf3f48bd2d29be2293638bac5b636779a25facde825886",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/original/hysys_control.py",
+      "sha256": "ba1fb17f13858250bd5c025f6558aad6e81016899451284d48329194e4ab2073",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/original/main.py",
+      "sha256": "2e7ecf5824aebdd11bc16776e704518a44148b28ac864d29fc03633fc8e8a1e8",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/run_report.json",
+      "sha256": "3c15797bbb3e5b01ba4a1e8d58f96102e6106810aa38c16017375859cc9d4b01",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/data_read",
+      "sha256": "e8bf169c8033c676690846b3a81448d65c099f934b663e6b801ea9f6d85aa04e",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/data_write",
+      "sha256": "313be0bd61ce5c77dddf3f48bd2d29be2293638bac5b636779a25facde825886",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/hysys_control.py",
+      "sha256": "8394f6c3ec0be4e996158590c0de3542be4008fa35f4112704702f920e7374a7",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/inspect_hysys.py",
+      "sha256": "6b74d55ca3449d0df651693d14a138a10d7df0b77e477e5b4ce1ed275c2a2071",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/main.py",
+      "sha256": "645270e6d746399e0baca4928d73c98e06360901a14e0e98ccab9627a91c7fd1",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/mjh_ATM.hsc",
+      "sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/README.md",
+      "sha256": "6514470757ad2f49e794c70f2500d7212cf9b5098b072bdf85a23179413884e4",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/tests/test_hysys_control.py",
+      "sha256": "f4e7ef4f1b825af26259a5baecaef8a1777b640dca1bb8ba48540a706e98f0e6",
+      "unchanged": true
+    }
+  ],
+  "previous_automated_validation": {
+    "passed": 935,
+    "skipped": 5,
+    "subtests_passed": 17,
+    "rerun_this_batch": false,
+    "reason": "No application source, dependency, or calculation protocol changes in this batch."
+  },
+  "limits": [
+    "Only one configured model and one T-39 baseline/candidate pair tested.",
+    "Previous repeatability failure remains unresolved; no optimal ranking or quality qualification.",
+    "Separate HYSYS cases share one application; no hard timeout for blocking COM calls."
+  ],
+  "git_commit_or_push": false
+}

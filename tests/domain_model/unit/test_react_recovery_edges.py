@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 from langchain_core.messages import AIMessage, ToolMessage
+from steady_helpers import receipt
 from test_native_protocol import Wire, call, chat
 from test_optimization_tools import arguments, prepared
 
@@ -124,43 +125,21 @@ def test_failed_revision_of_completed_plan_clears_stage_slots_but_preserves_last
     failure_boundary: str,
 ) -> None:
     stages: list[str] = []
-    workflow_id = "offline-rto-" + "a" * 16
-    summary = {"status": "feasible_not_publishable", "synthetic_marker": "saved-result"}
-    static = {"static_ref": "synthetic-static-1", "status": "static_complete"}
-    final = {
-        "status": "complete",
-        "workflow_id": workflow_id,
-        "result_source": workflow_id + "/result.json",
-        "result": summary,
-        "physical_m2_executions": 1,
-        "physical_m4_executions": 1,
-    }
+    final = receipt()
 
-    def solve(plan: Any, **kwargs: Any) -> dict[str, Any]:
-        stages.append("M2")
-        return dict(static)
-
-    def verify(plan: Any, **kwargs: Any) -> dict[str, Any]:
-        stages.append("M4")
+    def execute(plan: Any, **kwargs: Any) -> dict[str, Any]:
+        stages.append("steady")
         return dict(final)
 
-    def inspect_result(
-        self: AgentDomainTools, state: dict[str, Any], requested: str | None = None
-    ) -> dict[str, Any]:
-        assert requested == workflow_id
-        return {"status": "ok", "workflow_id": workflow_id, "result": summary}
-
-    monkeypatch.setattr(react, "solve_prepared_optimization", solve)
-    monkeypatch.setattr(react, "verify_prepared_optimization", verify)
-    monkeypatch.setattr(react, "read_prepared_static", lambda *a, **kw: dict(static))
+    monkeypatch.setattr(react, "execute_comparison", execute)
     monkeypatch.setattr(react, "read_prepared_result", lambda *a, **kw: dict(final))
-    monkeypatch.setattr(AgentDomainTools, "inspect_result", inspect_result)
+    monkeypatch.setattr(AgentDomainTools, "inspect_result", lambda *a, **kw: dict(final))
     path = tmp_path.resolve() / "session.sqlite"
     wire = Wire([chat("该结果已保存，尚未达到发布改善门槛。")])
     runtime = prepared(repo_root, wire=wire, store=SessionStore(path))
     try:
         assert not runtime.handle("/confirm").errors
-        assert stages == ["M2", "M4"]
+        assert stages == ["steady"]
         assert runtime.data["pending"]["status"] == "completed"
         assert runtime.data["last_result"] == final
         old_ref = runtime.data["pending"]["ref"]
@@ -178,9 +157,9 @@ def test_failed_revision_of_completed_plan_clears_stage_slots_but_preserves_last
         data = validate_session(runtime.data, len(runtime.messages))
         assert data["pending"]["status"] == "revision_required"
         assert data["pending"]["ref"] == old_ref
-        assert data["pending"]["static"] is None and data["pending"]["result"] is None
+        assert data["pending"]["result"] is None
         assert data["last_result"] == final
-        assert stages == ["M2", "M4"]
+        assert stages == ["steady"]
     finally:
         runtime.close()
     restored_wire = Wire([])
@@ -192,9 +171,9 @@ def test_failed_revision_of_completed_plan_clears_stage_slots_but_preserves_last
         data = validate_session(runtime.data, len(runtime.messages))
         assert data["last_result"] == final
         assert data["pending"]["status"] == "revision_required"
-        assert data["pending"]["static"] is None and data["pending"]["result"] is None
+        assert data["pending"]["result"] is None
         assert runtime.handle("/confirm").errors
         assert runtime.handle("/resume").errors
-        assert restored_wire.transport.request_count == 0 and stages == ["M2", "M4"]
+        assert restored_wire.transport.request_count == 0 and stages == ["steady"]
     finally:
         runtime.close()

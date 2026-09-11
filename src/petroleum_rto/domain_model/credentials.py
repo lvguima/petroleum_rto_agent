@@ -33,7 +33,17 @@ def load_local_dmx_api_key(path: Path = LOCAL_DMX_API_CREDENTIAL_FILE) -> str | 
         raise TypeError("local credential path must be pathlib.Path")
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
     try:
-        descriptor = os.open(path, flags)
+        if os.name == "nt":
+            from petroleum_rto._windows_files import UnsafeWindowsFileError, open_private_file
+
+            try:
+                descriptor = open_private_file(path)
+            except UnsafeWindowsFileError as exc:
+                raise LocalCredentialError(
+                    "local credential file cannot be opened safely; check owner and permissions"
+                ) from exc
+        else:
+            descriptor = os.open(path, flags)
     except FileNotFoundError:
         return None
     except OSError as exc:
@@ -42,7 +52,7 @@ def load_local_dmx_api_key(path: Path = LOCAL_DMX_API_CREDENTIAL_FILE) -> str | 
         metadata = os.fstat(descriptor)
         if not stat.S_ISREG(metadata.st_mode):
             raise LocalCredentialError("local credential source must be a regular file")
-        if stat.S_IMODE(metadata.st_mode) & 0o077:
+        if os.name != "nt" and stat.S_IMODE(metadata.st_mode) & 0o077:
             raise LocalCredentialError("local credential file permissions are too broad")
         if not 0 < metadata.st_size <= _MAXIMUM_CREDENTIAL_FILE_BYTES:
             raise LocalCredentialError("local credential file size is invalid")

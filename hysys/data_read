@@ -1,0 +1,554 @@
+{
+    "mv": {
+        "crude_oil": {
+            "temperature_C": 32.6,
+            "pressure_kPa": 180.0,
+            "massflow_kg_h": 400000.0
+        },
+        "heater_to_flash": {
+            "D_temperature_C": 169.4
+        },
+        "flash_column": {
+            "liquid_level": 44.5
+        },
+        "pump": {
+            "D_pressure_kPa": 550.0
+        },
+        "heater_to_furnace": {
+            "D_temperature_C": 67.85
+        },
+        "furnace_1": {
+            "D_temperature_C": 115.0
+        },
+        "furnace_2": {
+            "D_temperature_C": 225.0
+        },
+        "furnace_3": {
+            "D_temperature_C": 225.0
+        },
+        "furnace_4": {
+            "D_temperature_C": 225.0
+        },
+        "Water1": {
+            "massflow_kg_h": 2200.0
+        },
+        "Water2": {
+            "massflow_kg_h": 300.0
+        },
+        "Water3": {
+            "massflow_kg_h": 500.0
+        },
+        "C-1102": {
+            "top_massflow_kg_h": 320690.0,
+            "top_temperature_C": 105.55555555555556,
+            "one_massflow_kg_h": 170000.0,
+            "one_temperature_C": 150.0,
+            "two_massflow_kg_h": 241000.0,
+            "two_temperature_C": 180.0,
+            "boilup_rate": 0.5,
+            "39_temperature_C": 156.8,
+            "26_temperature_C": 215.0,
+            "16_temperature_C": 301.0
+        }
+    },
+    "cv": {
+        "heater_to_flash": {
+            "heat_load_KJ_h": 159045560.1692256
+        },
+        "heater_to_furnace": {
+            "heat_load_KJ_h": 74413867.56096981
+        },
+        "furnace_1": {
+            "heat_load_KJ_h": 142137920.28323987
+        },
+        "furnace_2": {
+            "heat_load_KJ_h": 6354149.4071583785
+        },
+        "furnace_3": {
+            "heat_load_KJ_h": 866474.91915796
+        },
+        "furnace_4": {
+            "heat_load_KJ_h": 1444124.865263267
+        },
+        "Naptha": {
+            "massflow_kg_h": 12370.20711702424,
+            "20%TBP": 11.10632320913297,
+            "40%TBP": 55.58532998574192,
+            "60%TBP": 138.491008694708,
+            "80%TBP": 153.93300879512682,
+            "100%TBP": 174.85445754364906
+        },
+        "Kerosene": {
+            "massflow_kg_h": 9620.279964461632,
+            "20%TBP": 167.1853128948981,
+            "40%TBP": 179.94754111173089,
+            "60%TBP": 191.79459488366945,
+            "80%TBP": 201.52782723386497,
+            "100%TBP": 222.4299363338692
+        },
+        "Diesel": {
+            "massflow_kg_h": 25584.96627186053,
+            "20%TBP": 212.2053857540355,
+            "40%TBP": 228.0670220992831,
+            "60%TBP": 241.16991483129445,
+            "80%TBP": 255.88518440219292,
+            "100%TBP": 281.89094306820976
+        },
+        "AGO": {
+            "massflow_kg_h": 55234.268712176636,
+            "20%TBP": 281.7337371400156,
+            "40%TBP": 301.8495455437741,
+            "60%TBP": 321.1146979611873,
+            "80%TBP": 342.5569618609918,
+            "100%TBP": 379.6579874273826
+        },
+        "Risedue": {
+            "massflow_kg_h": 300190.277934477,
+            "20%TBP": 398.6504915732676,
+            "40%TBP": 455.0698868167465,
+            "60%TBP": 512.6885872140045,
+            "80%TBP": 594.0172921842648,
+            "100%TBP": 714.2938568176805
+        }
+    },
+    "stage": {
+        "52__Main Tower": {
+            "pressure_kPa": 150.0,
+            "temperature_C": 106.00027272847672,
+            "liquid_kg_h": 321582.6691089275,
+            "vapor_kg_h": 12370.20711702424
+        },
+        "51__Main Tower": {
+            "pressure_kPa": 150.58823529411765,
+            "temperature_C": 107.37468738034426,
+            "liquid_kg_h": 323870.18352171354,
+            "vapor_kg_h": 13263.384520982185
+        },
+        "50__Main Tower": {
+            "pressure_kPa": 151.1764705882353,
+            "temperature_C": 114.15445539138426,
+            "liquid_kg_h": 14175.862640277957,
+            "vapor_kg_h": 15550.898933768236
+        },
+        "49__Main Tower": {
+            "pressure_kPa": 151.76470588235296,
+            "temperature_C": 137.08528213206336,
+            "liquid_kg_h": 16023.978171112658,
+            "vapor_kg_h": 26546.069757302193
+        },
+        "48__Main Tower": {
+            "pressure_kPa": 152.3529411764706,
+            "temperature_C": 141.2683192456052,
+            "liquid_kg_h": 16398.783903803964,
+            "vapor_kg_h": 28394.185288136887
+        },
+        "47__Main Tower": {
+            "pressure_kPa": 152.94117647058826,
+            "temperature_C": 143.31924567819715,
+            "liquid_kg_h": 16563.906690610635,
+            "vapor_kg_h": 28768.99102082819
+        },
+        "46__Main Tower": {
+            "pressure_kPa": 153.5294117647059,
+            "temperature_C": 144.88760601719946,
+            "liquid_kg_h": 16671.713414024103,
+            "vapor_kg_h": 28934.11380763487
+        },
+        "45__Main Tower": {
+            "pressure_kPa": 154.11764705882356,
+            "temperature_C": 146.27149288092033,
+            "liquid_kg_h": 16747.974362607805,
+            "vapor_kg_h": 29041.920531048323
+        },
+        "44__Main Tower": {
+            "pressure_kPa": 154.70588235294122,
+            "temperature_C": 147.60404873013556,
+            "liquid_kg_h": 16799.430380210328,
+            "vapor_kg_h": 29118.181479632036
+        },
+        "43__Main Tower": {
+            "pressure_kPa": 155.29411764705887,
+            "temperature_C": 148.9953683678612,
+            "liquid_kg_h": 16826.25699011653,
+            "vapor_kg_h": 29169.63749723455
+        },
+        "42__Main Tower": {
+            "pressure_kPa": 155.88235294117652,
+            "temperature_C": 150.56803931123397,
+            "liquid_kg_h": 16825.49184179809,
+            "vapor_kg_h": 29196.464107140753
+        },
+        "41__Main Tower": {
+            "pressure_kPa": 156.47058823529417,
+            "temperature_C": 152.47018601931887,
+            "liquid_kg_h": 16795.75351549862,
+            "vapor_kg_h": 29195.698958822308
+        },
+        "40__Main Tower": {
+            "pressure_kPa": 157.05882352941182,
+            "temperature_C": 154.85718303395038,
+            "liquid_kg_h": 16705.731804914354,
+            "vapor_kg_h": 29165.960632522838
+        },
+        "39__Main Tower": {
+            "pressure_kPa": 157.64705882352948,
+            "temperature_C": 156.7999442099932,
+            "liquid_kg_h": 5649.7306779866685,
+            "vapor_kg_h": 27805.423849190214
+        },
+        "38__Main Tower": {
+            "pressure_kPa": 158.23529411764713,
+            "temperature_C": 160.35640745851305,
+            "liquid_kg_h": 5618.152498798164,
+            "vapor_kg_h": 27640.217759472514
+        },
+        "37__Main Tower": {
+            "pressure_kPa": 158.82352941176478,
+            "temperature_C": 161.8584254068761,
+            "liquid_kg_h": 5595.146393061961,
+            "vapor_kg_h": 27608.63958028401
+        },
+        "36__Main Tower": {
+            "pressure_kPa": 159.41176470588243,
+            "temperature_C": 162.52060837065505,
+            "liquid_kg_h": 189864.3445069297,
+            "vapor_kg_h": 27585.633474547816
+        },
+        "35__Main Tower": {
+            "pressure_kPa": 160.00000000000009,
+            "temperature_C": 172.31188904621814,
+            "liquid_kg_h": 202689.40664725177,
+            "vapor_kg_h": 41855.16995697758
+        },
+        "34__Main Tower": {
+            "pressure_kPa": 160.58823529411774,
+            "temperature_C": 180.01985953729144,
+            "liquid_kg_h": 43059.83330596658,
+            "vapor_kg_h": 54680.2320972996
+        },
+        "33__Main Tower": {
+            "pressure_kPa": 161.1764705882354,
+            "temperature_C": 189.48137951527292,
+            "liquid_kg_h": 45221.20443674415,
+            "vapor_kg_h": 65050.32038745243
+        },
+        "32__Main Tower": {
+            "pressure_kPa": 161.76470588235304,
+            "temperature_C": 193.98125330130915,
+            "liquid_kg_h": 45945.28469910517,
+            "vapor_kg_h": 67211.69151823003
+        },
+        "31__Main Tower": {
+            "pressure_kPa": 162.3529411764707,
+            "temperature_C": 197.0558669422337,
+            "liquid_kg_h": 46186.39718059138,
+            "vapor_kg_h": 67935.771780591
+        },
+        "30__Main Tower": {
+            "pressure_kPa": 162.94117647058835,
+            "temperature_C": 199.7038694766564,
+            "liquid_kg_h": 46159.958262994754,
+            "vapor_kg_h": 68176.88426207723
+        },
+        "29__Main Tower": {
+            "pressure_kPa": 163.529411764706,
+            "temperature_C": 202.44422686098653,
+            "liquid_kg_h": 45919.41900254705,
+            "vapor_kg_h": 68150.4453444806
+        },
+        "28__Main Tower": {
+            "pressure_kPa": 164.11764705882365,
+            "temperature_C": 205.6712229033734,
+            "liquid_kg_h": 45469.99524579076,
+            "vapor_kg_h": 67909.9060840329
+        },
+        "27__Main Tower": {
+            "pressure_kPa": 164.7058823529413,
+            "temperature_C": 209.743194768941,
+            "liquid_kg_h": 44844.82705371894,
+            "vapor_kg_h": 67460.48232727664
+        },
+        "26__Main Tower": {
+            "pressure_kPa": 165.29411764705895,
+            "temperature_C": 215.00005499443893,
+            "liquid_kg_h": 15011.802754202845,
+            "vapor_kg_h": 62908.88622951004
+        },
+        "25__Main Tower": {
+            "pressure_kPa": 165.8823529411766,
+            "temperature_C": 221.5676852010975,
+            "liquid_kg_h": 14747.882744788443,
+            "vapor_kg_h": 62287.25610754927
+        },
+        "24__Main Tower": {
+            "pressure_kPa": 166.47058823529426,
+            "temperature_C": 224.27926474107682,
+            "liquid_kg_h": 343183.80142129224,
+            "vapor_kg_h": 62023.336098134845
+        },
+        "23__Main Tower": {
+            "pressure_kPa": 167.0588235294119,
+            "temperature_C": 240.8060934920013,
+            "liquid_kg_h": 390939.96085744974,
+            "vapor_kg_h": 149458.03481051893
+        },
+        "22__Main Tower": {
+            "pressure_kPa": 167.64705882352956,
+            "temperature_C": 250.18578288758522,
+            "liquid_kg_h": 171421.75897053126,
+            "vapor_kg_h": 197214.19424667643
+        },
+        "21__Main Tower": {
+            "pressure_kPa": 168.23529411764721,
+            "temperature_C": 262.6848361552468,
+            "liquid_kg_h": 183172.34550628293,
+            "vapor_kg_h": 213505.36761371937
+        },
+        "20__Main Tower": {
+            "pressure_kPa": 168.82352941176487,
+            "temperature_C": 269.603509445428,
+            "liquid_kg_h": 186252.9167599065,
+            "vapor_kg_h": 225255.95414947107
+        },
+        "19__Main Tower": {
+            "pressure_kPa": 169.41176470588252,
+            "temperature_C": 275.40240069301217,
+            "liquid_kg_h": 185901.4758231107,
+            "vapor_kg_h": 228336.5254030945
+        },
+        "18__Main Tower": {
+            "pressure_kPa": 170.00000000000017,
+            "temperature_C": 281.58008780106195,
+            "liquid_kg_h": 182305.68075224917,
+            "vapor_kg_h": 227985.0844662987
+        },
+        "17__Main Tower": {
+            "pressure_kPa": 170.58823529411782,
+            "temperature_C": 289.4993137089954,
+            "liquid_kg_h": 175121.34984761797,
+            "vapor_kg_h": 224389.2893954372
+        },
+        "16__Main Tower": {
+            "pressure_kPa": 171.17647058823547,
+            "temperature_C": 300.99997591332624,
+            "liquid_kg_h": 96716.74872844492,
+            "vapor_kg_h": 200738.4209940421
+        },
+        "15__Main Tower": {
+            "pressure_kPa": 171.76470588235313,
+            "temperature_C": 316.7822592612001,
+            "liquid_kg_h": 94182.59531017736,
+            "vapor_kg_h": 193534.62608380968
+        },
+        "14__Main Tower": {
+            "pressure_kPa": 172.35294117647078,
+            "temperature_C": 327.3718883247923,
+            "liquid_kg_h": 93644.46182542956,
+            "vapor_kg_h": 191000.47266554215
+        },
+        "13__Main Tower": {
+            "pressure_kPa": 172.94117647058843,
+            "temperature_C": 333.73472916314654,
+            "liquid_kg_h": 92686.04389636999,
+            "vapor_kg_h": 190462.33918079434
+        },
+        "12__Main Tower": {
+            "pressure_kPa": 173.52941176470608,
+            "temperature_C": 337.7400692436589,
+            "liquid_kg_h": 91064.43719242599,
+            "vapor_kg_h": 189503.92125173475
+        },
+        "11__Main Tower": {
+            "pressure_kPa": 174.11764705882374,
+            "temperature_C": 340.603635898956,
+            "liquid_kg_h": 88841.30257675167,
+            "vapor_kg_h": 187882.31454779068
+        },
+        "10__Main Tower": {
+            "pressure_kPa": 174.7058823529414,
+            "temperature_C": 343.0123031560588,
+            "liquid_kg_h": 85787.1402272059,
+            "vapor_kg_h": 185659.1799321164
+        },
+        "9__Main Tower": {
+            "pressure_kPa": 175.29411764705904,
+            "temperature_C": 345.4506821642527,
+            "liquid_kg_h": 81019.2099305943,
+            "vapor_kg_h": 182605.01758257058
+        },
+        "8__Main Tower": {
+            "pressure_kPa": 175.8823529411767,
+            "temperature_C": 348.5352607008107,
+            "liquid_kg_h": 71676.41093833756,
+            "vapor_kg_h": 177837.08728595902
+        },
+        "7__Main Tower": {
+            "pressure_kPa": 176.47058823529434,
+            "temperature_C": 353.79310314021984,
+            "liquid_kg_h": 44058.199206892285,
+            "vapor_kg_h": 168494.2882937023
+        },
+        "6__Main Tower": {
+            "pressure_kPa": 177.058823529412,
+            "temperature_C": 369.1804655610239,
+            "liquid_kg_h": 338857.16862068285,
+            "vapor_kg_h": 140876.07656225702
+        },
+        "5__Main Tower": {
+            "pressure_kPa": 177.64705882352965,
+            "temperature_C": 367.2990709070689,
+            "liquid_kg_h": 328535.59820776706,
+            "vapor_kg_h": 40866.890686205756
+        },
+        "4__Main Tower": {
+            "pressure_kPa": 178.2352941176473,
+            "temperature_C": 366.3635198838608,
+            "liquid_kg_h": 323648.6058534576,
+            "vapor_kg_h": 30545.32027328995
+        },
+        "3__Main Tower": {
+            "pressure_kPa": 178.82352941176495,
+            "temperature_C": 365.5789670435677,
+            "liquid_kg_h": 319702.408305793,
+            "vapor_kg_h": 25658.327918980467
+        },
+        "2__Main Tower": {
+            "pressure_kPa": 179.4117647058826,
+            "temperature_C": 364.47099713264345,
+            "liquid_kg_h": 314432.7458453863,
+            "vapor_kg_h": 21712.130371315994
+        },
+        "1__Main Tower": {
+            "pressure_kPa": 180.0,
+            "temperature_C": 361.3150347106092,
+            "liquid_kg_h": 300190.277934477,
+            "vapor_kg_h": 16442.467910909225
+        },
+        "8__Kerosene SS": {
+            "pressure_kPa": 157.64705882352948,
+            "temperature_C": 184.53569506830866,
+            "liquid_kg_h": 13289.502721237379,
+            "vapor_kg_h": 1270.5150727483651
+        },
+        "7__Kerosene SS": {
+            "pressure_kPa": 157.64705882352948,
+            "temperature_C": 188.28515987224853,
+            "liquid_kg_h": 13695.379248786501,
+            "vapor_kg_h": 3669.2227567757473
+        },
+        "6__Kerosene SS": {
+            "pressure_kPa": 157.64705882352948,
+            "temperature_C": 188.924341141331,
+            "liquid_kg_h": 13765.27480835294,
+            "vapor_kg_h": 4075.0992843248655
+        },
+        "5__Kerosene SS": {
+            "pressure_kPa": 157.64705882352948,
+            "temperature_C": 189.19689123756757,
+            "liquid_kg_h": 13794.901367565253,
+            "vapor_kg_h": 4144.994843891307
+        },
+        "4__Kerosene SS": {
+            "pressure_kPa": 157.64705882352948,
+            "temperature_C": 189.4809515388684,
+            "liquid_kg_h": 13825.43359188735,
+            "vapor_kg_h": 4174.6214031036225
+        },
+        "3__Kerosene SS": {
+            "pressure_kPa": 157.64705882352948,
+            "temperature_C": 189.91569380722638,
+            "liquid_kg_h": 13871.046109256617,
+            "vapor_kg_h": 4205.153627425718
+        },
+        "2__Kerosene SS": {
+            "pressure_kPa": 157.64705882352948,
+            "temperature_C": 190.6883984971521,
+            "liquid_kg_h": 13948.107362551345,
+            "vapor_kg_h": 4250.766144794984
+        },
+        "1__Kerosene SS": {
+            "pressure_kPa": 157.64705882352948,
+            "temperature_C": 192.25059257044404,
+            "liquid_kg_h": 14089.897046814292,
+            "vapor_kg_h": 4327.827398089713
+        },
+        "Kerosene SS_Reb": {
+            "pressure_kPa": 157.64705882352948,
+            "temperature_C": 195.8702916750242,
+            "liquid_kg_h": 9620.279964461632,
+            "vapor_kg_h": 4469.617082352659
+        },
+        "6__Diesel SS": {
+            "pressure_kPa": 165.29411764705895,
+            "temperature_C": 213.50104710301184,
+            "liquid_kg_h": 28804.932874820424,
+            "vapor_kg_h": 3926.4279056947644
+        },
+        "5__Diesel SS": {
+            "pressure_kPa": 165.29411764705895,
+            "temperature_C": 212.36417531621845,
+            "liquid_kg_h": 28514.57511194686,
+            "vapor_kg_h": 3519.9666029598707
+        },
+        "4__Diesel SS": {
+            "pressure_kPa": 165.29411764705895,
+            "temperature_C": 211.14847399834332,
+            "liquid_kg_h": 28213.23514597933,
+            "vapor_kg_h": 3229.60884008632
+        },
+        "3__Diesel SS": {
+            "pressure_kPa": 165.29411764705895,
+            "temperature_C": 209.5593576877148,
+            "liquid_kg_h": 27828.43673171029,
+            "vapor_kg_h": 2928.2688741187835
+        },
+        "2__Diesel SS": {
+            "pressure_kPa": 165.29411764705895,
+            "temperature_C": 206.98701864810704,
+            "liquid_kg_h": 27221.439347456148,
+            "vapor_kg_h": 2543.4704598497524
+        },
+        "1__Diesel SS": {
+            "pressure_kPa": 165.29411764705895,
+            "temperature_C": 201.1494289614513,
+            "liquid_kg_h": 25584.96627186053,
+            "vapor_kg_h": 1936.4730755956114
+        },
+        "6__AGO SS": {
+            "pressure_kPa": 171.17647058823547,
+            "temperature_C": 296.67517922923776,
+            "liquid_kg_h": 67268.45958892522,
+            "vapor_kg_h": 16466.537496763904
+        },
+        "5__AGO SS": {
+            "pressure_kPa": 171.17647058823547,
+            "temperature_C": 294.3071740197014,
+            "liquid_kg_h": 65305.836942628484,
+            "vapor_kg_h": 12534.190876748564
+        },
+        "4__AGO SS": {
+            "pressure_kPa": 171.17647058823547,
+            "temperature_C": 292.416965501724,
+            "liquid_kg_h": 63825.47247672738,
+            "vapor_kg_h": 10571.568230451816
+        },
+        "3__AGO SS": {
+            "pressure_kPa": 171.17647058823547,
+            "temperature_C": 290.38982843256645,
+            "liquid_kg_h": 62313.15990271297,
+            "vapor_kg_h": 9091.203764550726
+        },
+        "2__AGO SS": {
+            "pressure_kPa": 171.17647058823547,
+            "temperature_C": 287.4579140390963,
+            "liquid_kg_h": 60229.96564318868,
+            "vapor_kg_h": 7578.8911905363275
+        },
+        "1__AGO SS": {
+            "pressure_kPa": 171.17647058823547,
+            "temperature_C": 281.09489298451024,
+            "liquid_kg_h": 55234.268712176636,
+            "vapor_kg_h": 5495.696931012042
+        }
+    }
+}

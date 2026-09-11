@@ -1,0 +1,171 @@
+{
+  "schema_id": "hysys-mv-controls-acceptance",
+  "schema_version": "1.0.0",
+  "completed_date": "2026-09-12",
+  "status": "implemented_and_representative_validation_passed_with_intermitttent_boundary_failure",
+  "authorized_mv_count": 24,
+  "real_binding_and_unit_checks": 24,
+  "real_changed_variable_count": 3,
+  "all_mv_individually_written": false,
+  "source_files_unchanged": 22,
+  "tool_contract": "5.0.0",
+  "plan_contract": "2.0.0",
+  "result_contract": "2.0.0",
+  "point_contract": "hysys-mv-point/1.0.0",
+  "workflow_id": "steady-63aa8dfbde0106f3",
+  "points": [
+    {
+      "name": "baseline",
+      "status": "passed",
+      "responses": [
+        {
+          "variable_id": "C-1102.39_temperature_C",
+          "unit": "C",
+          "target": 156.8,
+          "readback": 156.8,
+          "actual": 156.80060827962535,
+          "setpoint_matches": true,
+          "tracking_passed": true
+        },
+        {
+          "variable_id": "Water1.massflow_kg_h",
+          "unit": "kg/h",
+          "target": 2200.0,
+          "readback": 2200.0,
+          "actual": 2200.0,
+          "setpoint_matches": true,
+          "tracking_passed": true
+        },
+        {
+          "variable_id": "crude_oil.pressure_kPa",
+          "unit": "kPa",
+          "target": 180.0,
+          "readback": 180.0,
+          "actual": 180.0,
+          "setpoint_matches": true,
+          "tracking_passed": true
+        }
+      ],
+      "source_unchanged": true,
+      "restoration_equivalent": true,
+      "boundary_matches": true
+    },
+    {
+      "name": "candidate",
+      "status": "passed",
+      "responses": [
+        {
+          "variable_id": "C-1102.39_temperature_C",
+          "unit": "C",
+          "target": 156.9,
+          "readback": 156.9,
+          "actual": 156.90052543772362,
+          "setpoint_matches": true,
+          "tracking_passed": true
+        },
+        {
+          "variable_id": "Water1.massflow_kg_h",
+          "unit": "kg/h",
+          "target": 2201.0,
+          "readback": 2201.0,
+          "actual": 2201.0,
+          "setpoint_matches": true,
+          "tracking_passed": true
+        },
+        {
+          "variable_id": "crude_oil.pressure_kPa",
+          "unit": "kPa",
+          "target": 180.1,
+          "readback": 180.1,
+          "actual": 180.1,
+          "setpoint_matches": true,
+          "tracking_passed": true
+        }
+      ],
+      "source_unchanged": true,
+      "restoration_equivalent": true,
+      "boundary_matches": true
+    }
+  ],
+  "session_restart_verified": true,
+  "inspection_without_model_request": true,
+  "model_transport": "httpx.MockTransport; real HYSYS; no external model request",
+  "preserved_failure": {
+    "workflow_id": "steady-da49aea7fcf5ae56",
+    "phase": "read-computed-boundary",
+    "message": "Undefined quantity: Risedue.Temperature",
+    "result": "evaluation_error",
+    "root_cause_resolved": false
+  },
+  "bounded_diagnostic": {
+    "path": "runs\\simulation\\mv-controls-20260911\\boundary-diagnostic\\report.json",
+    "passed": true,
+    "additional_solver_toggle_used": false,
+    "note": "Same batch; read-only downstream checks after normal Run; all known immediately."
+  },
+  "offline_validation": {
+    "passed": 958,
+    "skipped_windows": 5,
+    "subtests_passed": 17,
+    "junit": "runs/simulation/mv-controls-20260911/full.xml",
+    "seconds": 151.95,
+    "ruff_check": "passed",
+    "formatted_files": 73,
+    "mypy_source_files": 34
+  },
+  "saved_results": {
+    "strict_saved_results": [
+      {
+        "workflow_id": "steady-d59fa79bb2c99ea1",
+        "status": "comparison_only",
+        "strict_reload": true
+      },
+      {
+        "workflow_id": "steady-e9f7a90c8d21e45d",
+        "status": "comparison_only",
+        "strict_reload": true
+      },
+      {
+        "workflow_id": "steady-da49aea7fcf5ae56",
+        "status": "evaluation_error",
+        "strict_reload": true
+      }
+    ],
+    "source_files_unchanged": 22,
+    "real_observation_all_mv_bindings_units_writable": 24,
+    "all_mv_individually_written": false
+  },
+  "documentation": {
+    "documents": 9,
+    "links": 156,
+    "broken": []
+  },
+  "limitations": [
+    "No all-MV physical sweep or divergence scan",
+    "No published process ranges or quality constraints",
+    "Previous ABBA repeatability failure remains",
+    "Shared HYSYS process; no hard COM timeout",
+    "One undefined downstream temperature observed; same-batch repeats passed, cause unresolved"
+  ],
+  "new_dependencies": [],
+  "deleted_files_this_batch": [],
+  "git_commit_or_push": false,
+  "implementation_sha256": {
+    "src/petroleum_rto/simulation/mv.py": "9893efbc114ac981c7983fe6483d93d0e965846b30e61fdb05aff43d1ee4616f",
+    "src/petroleum_rto/simulation/point.py": "b9a709a701a301fcfbbb255417fbda2e526dd2d4f58779ca04b9a2dec92605d1",
+    "src/petroleum_rto/simulation/point_evidence.py": "4e3f9e677dad2ab3d6892052eab37c32b459df2dae2b91540f059468849a245a",
+    "src/petroleum_rto/simulation/hysys.py": "86321a25253ff5deaf1279d9b8b1489e81f04eb9c16dd0e19b731265f933a634",
+    "src/petroleum_rto/rto/runtime/steady.py": "82ea074e6fe28c3cb43e13b0b85346530b9579c3c55f6a3853cc87b44bdc403f",
+    "src/petroleum_rto/rto/adapters/hysys_steady.py": "5679e539f699255f3edfa0a6482a84293f58995d32715c91d5b1238c5b68baef",
+    "src/petroleum_rto/assistant/native_tools.py": "e851397b7d9f84c44ed8d026d9a2070133fedb21df421ceeaddf15b1a5b8a823",
+    "src/petroleum_rto/assistant/react.py": "c9b3a36352035ed82411f4899d81164098b705ca3216011dbc2c4cbeb0c9b6d6",
+    "src/petroleum_rto/assistant/presentation.py": "e00d04a187c7df792fe466c769651aec0fbe88ee5980ec496d5da32304271bda",
+    "tests/simulation/test_mv.py": "daa63645b16f899341f0ef1faf910640d1e934b17e1df0cc32c32e3b6649db2f",
+    "tests/simulation/test_steady_runtime.py": "a5625404999bfbd4b90dfe1943adb0fecbe8c417109987546565241ddd99bb3d",
+    "tests/domain_model/unit/steady_helpers.py": "12b6f0466973c2182278724d6f416c12d5abb037b4d953c8f20013c8046f4762",
+    "tests/domain_model/unit/test_optimization_tools.py": "a0cfea7b20b14dea0ddf5bc80945e39617ff02a3f350238325639b02aa89dd2d",
+    "tests/domain_model/unit/test_react_agent.py": "bf38c659a1306c065acd00fd40b4398bdc6e3088ccd2bd9be6bec2c4bb841911",
+    "tests/domain_model/unit/test_persisted_agent.py": "80a8949ed8ba2448b3fb24c42824f51f9f41f4cc2134213e3dd9fdaf090ebb9e",
+    "tests/domain_model/unit/test_architecture_boundary.py": "367457990fbbf3e388118f5503851fa13d9815bf2a837d790ea9e8510111216b"
+  }
+}

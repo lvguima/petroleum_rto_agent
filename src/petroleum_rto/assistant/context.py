@@ -187,7 +187,7 @@ class ConversationContext:
         pending = state.get("pending_plan")
         if pending is not None:
             pending = dict(pending)
-            for key in ("static", "result"):
+            for key in ("result",):
                 if pending.get(key) is not None:
                     text = _dump(pending[key])
                     pending[key] = self._store(text)

@@ -1,0 +1,156 @@
+{
+  "schema": "windows-agent-runtime-validation/1",
+  "recorded_at_utc": "2026-09-11T10:39:20.946706+00:00",
+  "status": "relevant_windows_checks_passed_legacy_cdu_experiment_cancelled",
+  "runtime": {
+    "python": "3.12.13",
+    "bits": 64,
+    "interpreter": ".venv/python.exe",
+    "existing_conda_layout_preserved": true
+  },
+  "installed_versions": {
+    "petroleum-rto-agent": "0.1.0",
+    "pywin32": "312",
+    "httpx": "0.28.1",
+    "langchain": "1.4.0",
+    "langchain-core": "1.6.2",
+    "langgraph": "1.2.11",
+    "langgraph-checkpoint-sqlite": "3.1.1",
+    "pytest": "9.1.1",
+    "ruff": "0.16.3",
+    "mypy": "2.3.1"
+  },
+  "installation": {
+    "source": "uv.lock frozen export with hashes; targeted existing environment; editable project without dependencies or build isolation",
+    "pip_check": "No broken requirements found.",
+    "com_and_framework_imports": "passed",
+    "credentials_or_remote_llm_used": false
+  },
+  "scope": [
+    "Windows local single-writer locks, private ACL and path guards",
+    "SQLite session and checkpoint reload",
+    "credential validation without mutating existing credential ACL",
+    "native terminal input and native Ctrl-C drain",
+    "Windows RTO file persistence, retaining per-file fsync and omitting unsupported directory fsync"
+  ],
+  "tests": {
+    "domain-windows.xml": {
+      "path": "runs/simulation/dependency_setup_20260911/domain-windows.xml",
+      "sha256": "419b8a4ead9b4db83a0f83cba27d044ba405f11b5fd4353646033a59c211600d",
+      "tests": 427,
+      "failures": 5,
+      "errors": 0,
+      "skipped": 5,
+      "elapsed_seconds": 133.692
+    },
+    "domain-windows-final.xml": {
+      "path": "runs/simulation/dependency_setup_20260911/domain-windows-final.xml",
+      "sha256": "14723b85b233bacfebeb3d7eeac871885534e434c64e01b60be52f3d807b511d",
+      "tests": 432,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 5,
+      "elapsed_seconds": 140.081
+    },
+    "hysys-probe.xml": {
+      "path": "runs/simulation/dependency_setup_20260911/hysys-probe.xml",
+      "sha256": "10426ac5d5c43f50e41806ca7d1de3f55423c034f0db65fa24dd8bd991b2bd82",
+      "tests": 38,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "elapsed_seconds": 0.236
+    },
+    "rto-windows.xml": {
+      "path": "runs/simulation/dependency_setup_20260911/rto-windows.xml",
+      "sha256": "dff81959f87167b1a7c112bc901e0b854893548be4d96a177e9a4c1ff0a65911",
+      "tests": 233,
+      "failures": 2,
+      "errors": 0,
+      "skipped": 0,
+      "elapsed_seconds": 59.738
+    },
+    "rto-workflow-windows-final.xml": {
+      "path": "runs/simulation/dependency_setup_20260911/rto-workflow-windows-final.xml",
+      "sha256": "94dc676b12be3d5b636bc1c278795a91a80fe46030de35de40f3f4bdd15238fa",
+      "tests": 34,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2,
+      "elapsed_seconds": 63.695
+    }
+  },
+  "test_interpretation": {
+    "domain_final": "427 passed, 5 skipped; excludes one legacy CDU checkpoint experiment cancelled by the user and not counted as passed",
+    "rto_final": "231 passed, 2 skipped across the full initial run and the final workflow-module replacement; do not sum overlapping runs",
+    "hysys_probe": "21 passed plus 17 unittest subtests; no real COM in these tests",
+    "skip_reasons": [
+      "1 Unix PTY test unavailable",
+      "5 Windows symlink tests lack creation privilege (4 domain, 1 RTO)",
+      "1 filesystem FIFO test unavailable"
+    ]
+  },
+  "failures_corrected": [
+    "Initial domain run: 4 tests used POSIX SIGINT API on Windows; real Windows Ctrl-C tests now used",
+    "Strengthened native cancellation test demonstrated delayed cancellation during a blocking wait before native callback fix",
+    "Initial heavy checkpoint workflow failed at POSIX directory os.open/fsync on Windows",
+    "Initial RTO run failed 2 unsupported fixture creation cases; now explicitly skipped only for platform limitation or WinError 1314",
+    "Windows trailing-dot/space path alias could select one database under two lock names; aliases now rejected"
+  ],
+  "checks": {
+    "ruff_src_tests_simulation_scripts": "passed",
+    "mypy_src_files": 163,
+    "mypy_probe": "passed",
+    "changed_python_format_files": 17,
+    "source_file_hashes": {
+      "pyproject.toml": "db054d593037ea653f7c7616f17e74ae238d36073a7686739b39890f24dbfaa2",
+      "uv.lock": "217c6d0354c5cead92511a1f8ce5be944c1a111df8c2e1b3632d4dd8deffee5d",
+      "src/petroleum_rto/_windows_files.py": "45d5e44ee0862c901d465caa3cd508481e6da073a2144e752954a1b5fc487a55",
+      "src/petroleum_rto/assistant/cli.py": "bf0108ff2fdc4ce592b788aed931cabf5ea8aad477788ec8856339dd61464212",
+      "src/petroleum_rto/assistant/react.py": "b1f46af4f1101affff05565bb3541d01b87cb77d04975277e9bcfa657a86ecea",
+      "src/petroleum_rto/assistant/session.py": "52ab82565038dabd8d626abe64a200331c268ccbe852904107e982e55037f071",
+      "src/petroleum_rto/domain_model/credentials.py": "59156535709485f3cd9c2bd3e36968b65be32b4d5d7ded95932816c0efa0fc89",
+      "src/petroleum_rto/rto/_file_lock.py": "f0ea652ef65702b8ebeec279101b8d1c381635b7ad8f501e34edbc4a2d9c8a6f",
+      "src/petroleum_rto/rto/orchestration/service.py": "72a2dfcebe2549f6f571b0dd49219bc518e42d6874f82c0584bac482c3a336db"
+    },
+    "documentation": {
+      "documents": 7,
+      "local_links": 123,
+      "balanced_code_fences": true,
+      "missing_local_links": 0
+    },
+    "git_diff_check": "passed using repository line-ending configuration"
+  },
+  "not_executed": [
+    "full old CDU-only test suite",
+    "new native POSIX runtime verification",
+    "manual Windows Chinese terminal editing",
+    "power-loss directory durability",
+    "live LLM API requests on Windows",
+    "HYSYS perturbation, baseline rebuilding, or optimization"
+  ],
+  "limits": [
+    "RTO and Agent still use old CDU M2/M4 contracts; HYSYS is a separate read-only probe",
+    "Windows per-file flush is preserved but equivalent POSIX directory power-loss durability is not claimed",
+    "No project source or user assets deleted, committed, or pushed; dependency installation updated the existing environment."
+  ],
+  "heavy_checkpoint_performance_review": {
+    "method": "static source review against HEAD, not live profiling",
+    "finding": "A completed plan is checked via read_prepared_static and read_prepared_result; when a workflow manifest exists, each can replay the complete workflow. The test repeatedly restores, queries and checks completed plans.",
+    "estimated_complete_replays_in_normal_post_compute_test_path": 20,
+    "count_is_measured": false,
+    "other_work": "Two deliberately damaged-manifest partial reloads and seven complete simulator file hashing passes; complete reloads repeatedly validate paired baseline/candidate evidence.",
+    "m4_time_series": "Existing test configuration uses a 7200-second horizon with 1-second steps.",
+    "windows_changes_add_evidence_replay_loop": false,
+    "legacy_cdu_or_replay_implementation_changed": false,
+    "limit": "Static review cannot locate the running process stack, guarantee completion time, or substitute for the final test result."
+  },
+  "legacy_heavy_checkpoint_test": {
+    "status": "cancelled_by_user_not_counted_as_passed",
+    "process_absence_verified": true,
+    "final_pytest_result_available": false,
+    "record": "runs/simulation/dependency_setup_20260911/checkpointed-workflow-windows.txt",
+    "record_sha256": "208fc9650e66535fac28fb9513e701feb2df9e43119d3f23a7f5050dffe2493a",
+    "verification_recorded_at_utc": "2026-09-11T11:09:15.150917+00:00"
+  }
+}

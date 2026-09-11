@@ -26,6 +26,7 @@ coverage.xml
 !.env.example
 /src/petroleum_rto/domain_model/dmx_api.json
 /src/petroleum_rto/domain_model/dmx_api.json.*
+/dmx.txt
 *.local.json
 *.sqlite
 *.sqlite-*
@@ -36,8 +37,6 @@ coverage.xml
 build/
 dist/
 runs/*
-!runs/cdu/
-runs/cdu/*
-!runs/cdu/.gitkeep
 /data/cdu/raw/
 /data/simulation/raw/
+/base_files/

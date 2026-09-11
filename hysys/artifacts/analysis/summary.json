@@ -1,0 +1,137 @@
+{
+  "run": {
+    "started_at": "2026-09-09T01:54:59.276393+00:00",
+    "case": "mjh_ATM.hsc",
+    "read_only": false,
+    "success": true,
+    "initial_status": {
+      "can_solve": true,
+      "is_solving": false,
+      "is_valid": true,
+      "column_converged": true
+    },
+    "mv_written": 24,
+    "final_status": {
+      "can_solve": true,
+      "is_solving": false,
+      "is_valid": true,
+      "column_converged": true
+    },
+    "counts": {
+      "mv": 24,
+      "cv": 36,
+      "stages": 73
+    },
+    "output": "data_read",
+    "elapsed_seconds": 3.687
+  },
+  "crude_kg_h": 400000.0,
+  "water_kg_h": 3000.0,
+  "listed_products_kg_h": 403000.00000000006,
+  "balance_residual_kg_h": 5.820766091346741e-11,
+  "listed_duties_MW": 106.73947144583745,
+  "listed_duties_GJ_per_t_crude": 0.960655243012537,
+  "mv_unchanged": true,
+  "mv_matches_input": true,
+  "max_stage_temperature_drift_C": 0.009463129860478148,
+  "max_TBP_drift_C": 0.029947933606706556,
+  "products": [
+    {
+      "name": "Naptha",
+      "label": "石脑油",
+      "flow_t_h": 12.37020711702424,
+      "apparent_yield_pct": 3.09255177925606,
+      "delta_kg_h": 0.9245929611806787,
+      "delta_pct": 0.007474911817895169,
+      "20%TBP": 11.10632320913297,
+      "40%TBP": 55.58532998574192,
+      "60%TBP": 138.491008694708,
+      "80%TBP": 153.93300879512682,
+      "100%TBP": 174.85445754364906
+    },
+    {
+      "name": "Kerosene",
+      "label": "煤油",
+      "flow_t_h": 9.620279964461632,
+      "apparent_yield_pct": 2.4050699911154076,
+      "delta_kg_h": -2.6776320700628276,
+      "delta_pct": -0.02782545847471729,
+      "20%TBP": 167.1853128948981,
+      "40%TBP": 179.94754111173089,
+      "60%TBP": 191.79459488366945,
+      "80%TBP": 201.52782723386497,
+      "100%TBP": 222.4299363338692
+    },
+    {
+      "name": "Diesel",
+      "label": "柴油",
+      "flow_t_h": 25.58496627186053,
+      "apparent_yield_pct": 6.396241567965132,
+      "delta_kg_h": 4.905232452540076,
+      "delta_pct": 0.019175999795240095,
+      "20%TBP": 212.2053857540355,
+      "40%TBP": 228.0670220992831,
+      "60%TBP": 241.16991483129445,
+      "80%TBP": 255.88518440219292,
+      "100%TBP": 281.89094306820976
+    },
+    {
+      "name": "AGO",
+      "label": "常压瓦斯油（AGO）",
+      "flow_t_h": 55.234268712176636,
+      "apparent_yield_pct": 13.808567178044159,
+      "delta_kg_h": -12.385255817862344,
+      "delta_pct": -0.0224181102896015,
+      "20%TBP": 281.7337371400156,
+      "40%TBP": 301.8495455437741,
+      "60%TBP": 321.1146979611873,
+      "80%TBP": 342.5569618609918,
+      "100%TBP": 379.6579874273826
+    },
+    {
+      "name": "Risedue",
+      "label": "渣油",
+      "flow_t_h": 300.190277934477,
+      "apparent_yield_pct": 75.04756948361926,
+      "delta_kg_h": 9.233062474057078,
+      "delta_pct": 0.0030758312797418697,
+      "20%TBP": 398.6504915732676,
+      "40%TBP": 455.0698868167465,
+      "60%TBP": 512.6885872140045,
+      "80%TBP": 594.0172921842648,
+      "100%TBP": 714.2938568176805
+    }
+  ],
+  "heat_loads": [
+    {
+      "name": "heater_to_flash",
+      "duty_MW": 44.17932226922933
+    },
+    {
+      "name": "heater_to_furnace",
+      "duty_MW": 20.67051876693606
+    },
+    {
+      "name": "furnace_1",
+      "duty_MW": 39.4827556342333
+    },
+    {
+      "name": "furnace_2",
+      "duty_MW": 1.7650415019884385
+    },
+    {
+      "name": "furnace_3",
+      "duty_MW": 0.2406874775438778
+    },
+    {
+      "name": "furnace_4",
+      "duty_MW": 0.40114579590646304
+    }
+  ],
+  "source_hashes": {
+    "data_read": "e8bf169c8033c676690846b3a81448d65c099f934b663e6b801ea9f6d85aa04e",
+    "data_write": "313be0bd61ce5c77dddf3f48bd2d29be2293638bac5b636779a25facde825886",
+    "artifacts/operating_point_before.json": "21ed572cc511a25d28414ca815357997abec183bb7a7f0458e6ea073f60f512d",
+    "artifacts/run_report.json": "3c15797bbb3e5b01ba4a1e8d58f96102e6106810aa38c16017375859cc9d4b01"
+  }
+}

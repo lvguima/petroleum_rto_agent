@@ -9,9 +9,10 @@ from typing import Any
 import httpx
 import pytest
 from langchain_core.messages import ToolMessage
+from steady_helpers import synthetic_context
 from test_native_protocol import FLASH_MODEL_ID, Wire, call, chat, selection, sse
 
-from petroleum_rto.assistant import cli
+from petroleum_rto.assistant import cli, native_tools
 from petroleum_rto.assistant.native_tools import AgentDomainTools
 from petroleum_rto.assistant.react import ReactAgent
 from petroleum_rto.domain_model.models import model_profile
@@ -20,6 +21,61 @@ from petroleum_rto.domain_model.models import model_profile
 def agent(repo_root: Path, replies: list[Any], *, max_calls: int = 12) -> tuple[ReactAgent, Wire]:
     wire = Wire(replies)
     return ReactAgent(wire.model(), AgentDomainTools(repo_root), max_model_calls=max_calls), wire
+
+
+def test_feed_and_products_reach_model_without_exposing_local_snapshot(
+    repo_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    context = synthetic_context(repo_root)
+    observations = [
+        ("crude_oil.temperature_C", "Crude_Oil", "temperature", "C", 35.0),
+        ("crude_oil.pressure_kPa", "Crude_Oil", "pressure", "kPa", 150.0),
+        ("crude_oil.massflow_kg_h", "Crude_Oil", "mass_flow", "kg/h", 300000.0),
+        ("Naptha.massflow_kg_h", "Naptha", "mass_flow", "kg/h", 30000.0),
+        ("Kerosene.massflow_kg_h", "Kerosene", "mass_flow", "kg/h", 20000.0),
+        ("Diesel.massflow_kg_h", "Diesel", "mass_flow", "kg/h", 50000.0),
+        ("AGO.massflow_kg_h", "AGO", "mass_flow", "kg/h", 60000.0),
+        ("Risedue.massflow_kg_h", "Risedue", "mass_flow", "kg/h", 140000.0),
+        ("Naptha.20%TBP", "沸点曲线-Naptha", "temperature", "C", 80.0),
+    ]
+    for variable_id, name, quantity, unit, value in observations:
+        reading = next(r for r in context["variables"] if r["variable_id"] == variable_id)
+        reading.update(
+            variable_id=variable_id,
+            object_name=name,
+            quantity_type=quantity,
+            unit=unit,
+            value=value,
+        )
+    monkeypatch.setattr(native_tools, "read_context", lambda workspace: context)
+    runtime, wire = agent(
+        repo_root,
+        [chat(None, calls=[call("read_operating_context")]), chat("已取得进料及产品物流数据。")],
+    )
+    try:
+        turn = runtime.handle("入料和常压塔的产出情况如何")
+        assert not turn.errors
+        message = next(m for m in wire.requests[-1]["messages"] if m.get("role") == "tool")
+        facts = json.loads(message["content"])
+        readings = {item["variable_id"]: item for item in facts["readings"]}
+        for variable_id, name, quantity, unit, value in observations:
+            assert readings[variable_id]["value"] == value
+            assert readings[variable_id]["unit"] == unit
+            assert readings[variable_id]["object_name"] == name
+            assert readings[variable_id]["quantity_type"] == quantity
+        assert len(readings) == 60
+        assert facts["solver_called"] is False
+        assert facts["observed_at_utc"] == context["observed_at_utc"]
+        assert "TBP" in facts["reading_scope"]
+        assert "未读取组分及相态" in facts["reading_scope"]
+        assert facts["tool_contract_version"] == "5.0.0"
+        for private_field in ("source_case_path", "source_disk_sha256", "internal_value", "stages"):
+            assert private_field not in message["content"]
+        assert str(repo_root) not in message["content"]
+        assert runtime.data["snapshots"][facts["snapshot_ref"]] == context
+        assert runtime.data["pending"] is None
+    finally:
+        runtime.close()
 
 
 def test_two_tool_rounds_and_followup_share_all_facts(repo_root: Path) -> None:
@@ -52,7 +108,7 @@ def test_two_tool_rounds_and_followup_share_all_facts(repo_root: Path) -> None:
             if message.get("role") == "tool" and message.get("tool_call_id") == "c1"
         )
     )
-    assert fact1["process_type"] == "常压蒸馏（CDU）"
+    assert fact1["process_type"] == "HYSYS常压蒸馏稳态仿真"
     fact2 = json.loads(
         next(
             message["content"]
@@ -60,7 +116,14 @@ def test_two_tool_rounds_and_followup_share_all_facts(repo_root: Path) -> None:
             if message.get("role") == "tool" and message.get("tool_call_id") == "c2"
         )
     )
-    assert fact2["current_setpoints"][1]["value_mpa_a"] == 0.152325
+    assert (
+        next(
+            x["value"]
+            for x in fact2["control_values"]
+            if x["variable_id"] == "C-1102.39_temperature_C"
+        )
+        == 156.8
+    )
     assert fact2["snapshot_ref"] in runtime.data["snapshots"]
     runtime.handle("刚才压力是绝压吗？")
     assert next(
@@ -420,9 +483,19 @@ def test_forty_turns_do_not_duplicate_history_or_drop_received_answer(repo_root:
     ]
 
 
-def test_read_only_failure_is_structured_and_has_no_paths(tmp_path: Path) -> None:
-    runtime, _ = agent(tmp_path, [chat(None, calls=[call("get_plant_info")]), chat("读取失败")])
-    runtime.handle("查装置")
+def test_read_only_failure_is_structured_and_has_no_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from petroleum_rto.assistant import native_tools
+
+    def fail(workspace: Path) -> Any:
+        raise OSError(str(workspace))
+
+    monkeypatch.setattr(native_tools, "read_context", fail)
+    runtime, _ = agent(
+        tmp_path, [chat(None, calls=[call("read_operating_context")]), chat("读取失败")]
+    )
+    runtime.handle("查工况")
     result = json.loads(
         str(next(m.content for m in runtime.messages if isinstance(m, ToolMessage)))
     )

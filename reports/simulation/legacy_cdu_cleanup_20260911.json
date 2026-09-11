@@ -1,0 +1,124 @@
+{
+  "schema_id": "legacy-cdu-retirement",
+  "schema_version": "1.0.0",
+  "date": "2026-09-11",
+  "status": "passed",
+  "authorization": "User approved cleanup after inventory; historical data and HYSYS evidence retained",
+  "removed": {
+    "backed_up_files": 517,
+    "tracked_files_in_manifest": 267,
+    "legacy_source_files": 154,
+    "additional_cleanup": [
+      "runs/cdu/.gitkeep",
+      "one orphan legacy integration test bytecode cache"
+    ],
+    "retired_entrypoints": [
+      "cdu-mini",
+      "rto-offline"
+    ],
+    "retired_distribution": "petroleum-rto-cdu-model"
+  },
+  "backup": {
+    "path": "runs\\simulation\\legacy-cleanup-20260911\\legacy-files-before-cleanup.zip",
+    "sha256": "aeedf748a040075863a643caf062d685d85e2d9675b3701f85afb7e026362120",
+    "all_entries_read_back_and_hashed": true
+  },
+  "retained_rto_files": [
+    "__init__.py",
+    "_file_lock.py",
+    "adapters/__init__.py",
+    "adapters/hysys_steady.py",
+    "runtime/__init__.py",
+    "runtime/steady.py"
+  ],
+  "validation": {
+    "pytest_passed": 939,
+    "pytest_skipped": 5,
+    "subtests_passed": 17,
+    "pytest_seconds": 142.17,
+    "junit": "runs/simulation/legacy-cleanup-20260911/full.xml",
+    "ruff": "passed; 77 files formatted unchanged",
+    "mypy": "passed; 33 source files",
+    "uv_lock_offline_check": "passed",
+    "editable_reinstall_offline": "passed",
+    "source_dependency_audit": [],
+    "cli": {
+      "status": "passed",
+      "installed_entry": "rto-chat",
+      "exit_code": 0,
+      "commands": [
+        "/help",
+        "/exit"
+      ],
+      "model_requests": 0,
+      "credential": "dummy; real credentials not read",
+      "session": "isolated cli-workspace",
+      "legacy_cdu_loaded": false,
+      "note": "CLI uses interactive /help; --help argument is intentionally unsupported"
+    },
+    "saved_results": {
+      "strict_reload": [
+        {
+          "workflow_id": "steady-d59fa79bb2c99ea1",
+          "strict_reload": "complete",
+          "comparison_status": "comparison_only",
+          "files_unchanged": true,
+          "files": 32
+        },
+        {
+          "workflow_id": "steady-e9f7a90c8d21e45d",
+          "strict_reload": "complete",
+          "comparison_status": "comparison_only",
+          "files_unchanged": true,
+          "files": 32
+        }
+      ],
+      "entry_points": {
+        "rto-chat": "petroleum_rto.assistant.cli:main"
+      },
+      "legacy_distribution_removed": true,
+      "hysys_com_calls": 0,
+      "model_requests": 0
+    },
+    "docs_and_sources": {
+      "documents_checked": [
+        "README.md",
+        "docs/README.md",
+        "docs/architecture/01_项目目录与模块边界.md",
+        "docs/architecture/02_领域智能体架构与功能设计.md",
+        "docs/domain_model/01_聚合式垂域模型综合说明.md",
+        "docs/rto/01_RTO系统综合说明.md",
+        "docs/simulation/02_HYSYS连接与状态读取说明.md"
+      ],
+      "missing_links": [],
+      "hysys_source_files_unchanged": 22
+    }
+  },
+  "failures_resolved": [
+    "Bulk deletion initially rejected; full verified backup and dependency proof added, reviewed manifest deletion approved",
+    "Focused tests initially 37 passed / 1 failed; persistence fixture migrated from retired config to HYSYS config, repair and full suite passed",
+    "Ruff required explicit subprocess check=False; fixed",
+    "CLI --help intentionally unsupported; installed entry passed interactive /help and /exit",
+    "Final manifest check initially counted regenerated current-module bytecode as legacy; corrected to distinguish source from regenerated caches"
+  ],
+  "not_executed": [
+    "No new HYSYS computation",
+    "No external model requests",
+    "No legacy CDU experiments",
+    "No Git commit or push"
+  ],
+  "preserved": [
+    "hysys originals (22 hashes unchanged)",
+    "data/cdu historical observations and gold",
+    "reports/cdu and historical docs",
+    "all prior HYSYS runs and failure evidence",
+    "base_files",
+    "real credentials and daily sessions"
+  ],
+  "limitations": [
+    "Repeatability failure unresolved",
+    "No optimization search or product quality constraints",
+    "Shared HYSYS process; no hard timeout for blocking COM"
+  ],
+  "next_step": "Continue single T-39 Agent development; address repeatability before ranking"
+}

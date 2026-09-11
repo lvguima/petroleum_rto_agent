@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import json
-import shutil
 import time
 from collections.abc import Iterator
 from dataclasses import replace
@@ -34,8 +33,7 @@ def no_delay_or_computation(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
         computations.append("unrequested-computation")
         raise AssertionError("model retry acceptance cannot run physical computation")
 
-    monkeypatch.setattr(react, "solve_prepared_optimization", unexpected)
-    monkeypatch.setattr(react, "verify_prepared_optimization", unexpected)
+    monkeypatch.setattr(react, "execute_comparison", unexpected)
     yield
     assert not computations
 
@@ -43,7 +41,6 @@ def no_delay_or_computation(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 @pytest.fixture
 def retry_workspace(tmp_path: Path, repo_root: Path) -> Path:
     workspace = tmp_path / "workspace"
-    shutil.copytree(repo_root / "configs/rto", workspace / "configs/rto")
     return workspace
 
 

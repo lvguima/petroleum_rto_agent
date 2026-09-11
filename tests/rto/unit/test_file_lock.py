@@ -50,5 +50,34 @@ with exclusive_file_lock(Path(sys.argv[1]), label="child writer"):
             child.wait(timeout=10)
 
     with exclusive_file_lock(lock_path, label="replacement writer"):
-        assert lock_path.read_text(encoding="ascii") == f"pid={os.getpid()}\n"
+        pass
+    assert lock_path.read_text(encoding="ascii") == f"pid={os.getpid()}\n"
     assert lock_path.is_file()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows reparse-point boundary")
+def test_windows_writer_rejects_junction_and_hardlink_targets(tmp_path: Path) -> None:
+    import _winapi
+
+    original = tmp_path / "original"
+    original.mkdir()
+    linked = tmp_path / "linked"
+    _winapi.CreateJunction(str(original), str(linked))
+    with pytest.raises(ValueError), exclusive_file_lock(linked / "writer.lock", label="writer"):
+        pytest.fail("junction path accepted")
+    assert not (original / "writer.lock").exists()
+    preserved = original / "preserved"
+    preserved.write_text("unchanged")
+    lock_path = original / "writer.lock"
+    os.link(preserved, lock_path)
+    with pytest.raises(ValueError), exclusive_file_lock(lock_path, label="writer"):
+        pytest.fail("hardlinked lock accepted")
+    assert preserved.read_text() == "unchanged"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows mandatory lock and directory handles")
+def test_windows_writer_pins_directory_until_release(tmp_path: Path) -> None:
+    original = tmp_path / "original"
+    with exclusive_file_lock(original / "writer.lock", label="writer"), pytest.raises(OSError):
+        original.rename(tmp_path / "moved")
+    original.rename(tmp_path / "moved")

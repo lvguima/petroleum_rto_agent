@@ -1,0 +1,877 @@
+{
+  "schema_id": "hysys-order-and-boundary-verification",
+  "schema_version": "1.0.0",
+  "checked_at_utc": "2026-09-11T12:55:49.645351+00:00",
+  "status": "boundary_read_verified_repeatability_failed",
+  "scope": "synthetic_engineering_simulation_only",
+  "eligible_for_optimization": false,
+  "order_verification": {
+    "report": {
+      "path": "runs/simulation/hysys-order-20260911/report.json",
+      "sha256": "264611a64e76712663cbaa3e8e6c4b8116c99e8d1dfe523d2341631bc66cbc99"
+    },
+    "status": "failed",
+    "execution_order": [
+      "A",
+      "B",
+      "B",
+      "A"
+    ],
+    "targets_c": {
+      "A": 156.8,
+      "B": 156.9
+    },
+    "baseline_sha256": "d214ae6417623850427de058767d63db52ae823214b04945302bcf9ea1a2bdc0",
+    "frozen_files": {
+      "manifest.json": "65a12236a257629c324541d5799ea1ae76714e64202cd38778120ae49c4b6318",
+      "baseline.hsc": "d214ae6417623850427de058767d63db52ae823214b04945302bcf9ea1a2bdc0",
+      "snapshot.json": "51066786c5cfd6ecc70e9145b61275a6772a70a2016d1935f810f4ba9981ac43",
+      "variables.json": "2a53edf15fc0d84d12a13442fa9850f4702e7249dc8d2220f54bb62eb9ea4ef3"
+    },
+    "points": [
+      {
+        "label": "A",
+        "target_c": 156.8,
+        "actual_T39_c": 156.8001920613317,
+        "status": "passed",
+        "strict_reload": "passed",
+        "report": {
+          "path": "runs/simulation/hysys-order-20260911/01-A/report.json",
+          "sha256": "ff3807981c593110a1b8eb1a67aa20ce24b24ac03ad715be060fcaca9cc53ae0"
+        },
+        "product_mass_kg_h": {
+          "Naptha.massflow_kg_h": 12292.379529801357,
+          "Kerosene.massflow_kg_h": 9702.15723992068,
+          "Diesel.massflow_kg_h": 25294.907360978745,
+          "AGO.massflow_kg_h": 56351.13924293068,
+          "Risedue.massflow_kg_h": 299359.41662636865
+        },
+        "six_heater_loads_MW": 106.73947144583747
+      },
+      {
+        "label": "B",
+        "target_c": 156.9,
+        "actual_T39_c": 156.90029159487523,
+        "status": "passed",
+        "strict_reload": "passed",
+        "report": {
+          "path": "runs/simulation/hysys-order-20260911/02-B/report.json",
+          "sha256": "8094dca78038d556e76ead0c07742a9a8808245350d96923a2ba60f1f5f4d6f1"
+        },
+        "product_mass_kg_h": {
+          "Naptha.massflow_kg_h": 12297.49137975889,
+          "Kerosene.massflow_kg_h": 9702.690770164158,
+          "Diesel.massflow_kg_h": 25042.06942139643,
+          "AGO.massflow_kg_h": 57317.97703457693,
+          "Risedue.massflow_kg_h": 298639.77139410377
+        },
+        "six_heater_loads_MW": 106.73947144583747
+      },
+      {
+        "label": "B",
+        "target_c": 156.9,
+        "actual_T39_c": 156.90049807320577,
+        "status": "passed",
+        "strict_reload": "passed",
+        "report": {
+          "path": "runs/simulation/hysys-order-20260911/03-B/report.json",
+          "sha256": "a41195d70737a05df9e4ea0b165e5d9e45bd27d4e8ef4b3d5bce188ba6264bc6"
+        },
+        "product_mass_kg_h": {
+          "Naptha.massflow_kg_h": 12299.255795575575,
+          "Kerosene.massflow_kg_h": 9697.695356775526,
+          "Diesel.massflow_kg_h": 25049.671683358654,
+          "AGO.massflow_kg_h": 57300.78700459785,
+          "Risedue.massflow_kg_h": 298652.5901596925
+        },
+        "six_heater_loads_MW": 106.73947144583747
+      },
+      {
+        "label": "A",
+        "target_c": 156.8,
+        "actual_T39_c": 156.80060827962535,
+        "status": "passed",
+        "strict_reload": "passed",
+        "report": {
+          "path": "runs/simulation/hysys-order-20260911/04-A/report.json",
+          "sha256": "dc4736a330126a4ef5b96d3ec476350ff1555928341da25636f4959e81ac8988"
+        },
+        "product_mass_kg_h": {
+          "Naptha.massflow_kg_h": 12295.542369475359,
+          "Kerosene.massflow_kg_h": 9697.200903782183,
+          "Diesel.massflow_kg_h": 25277.60989449799,
+          "AGO.massflow_kg_h": 56422.609364625816,
+          "Risedue.massflow_kg_h": 299307.03746761876
+        },
+        "six_heater_loads_MW": 106.73947144583747
+      }
+    ],
+    "comparisons": {
+      "A_A": {
+        "equivalent": false,
+        "input_differences": 0,
+        "output_differences": 296,
+        "state_differences": 0
+      },
+      "B_B": {
+        "equivalent": false,
+        "input_differences": 0,
+        "output_differences": 296,
+        "state_differences": 0
+      }
+    },
+    "difference_count_semantics": "Each 296 consists of 30 CV display/internal pairs, 17 specification Current fields, and 219 stage fields; these are not 296 independent measurement points.",
+    "interpretation": "All four independent points passed response, frozen-baseline restoration and source protection. Repeated outputs differ; fixed-order zero-tolerance acceptance failed. This does not identify order as the cause, prove hidden-state equality, or qualify candidate ranking.",
+    "retry_or_tolerance_change": false
+  },
+  "boundary_verification": {
+    "public_interfaces": [
+      "read_current_boundary(case_path)",
+      "write_boundary_snapshot(path, snapshot)",
+      "read_boundary_snapshot(path)"
+    ],
+    "report": {
+      "path": "runs/simulation/hysys-boundary-20260911/report.json",
+      "sha256": "5923d02121292175c2a402ffcae6d30f7cc8da5f92761d1b3ea0e52b0170bb5d"
+    },
+    "observed": {
+      "status": "passed",
+      "eligible_for_optimization": false,
+      "consistent_observation": true,
+      "strict_reload_equal": true,
+      "source_disk_unchanged": true,
+      "source_disk_sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+      "snapshot_sha256": "ef179995273929a0114d481d08405b29946282b247e8b4a50c0e56a72a28a116",
+      "definition_sha256": "53a40de77cc6d2b639eb6fbc0e87b64cfedbbdf416f0cf33c21391de5c3531dd",
+      "material_stream_count": 9,
+      "physical_energy_stream_count": 11,
+      "component_count": 44,
+      "balance_sha256": "135e4c44bbfa8bb3a95ae1408939c686dca4b2fba57cd6065b8c7f9355d7edb3"
+    },
+    "snapshot": {
+      "path": "runs/simulation/hysys-boundary-20260911/snapshot.json",
+      "sha256": "ef179995273929a0114d481d08405b29946282b247e8b4a50c0e56a72a28a116"
+    },
+    "balance": {
+      "path": "runs/simulation/hysys-boundary-20260911/balance.json",
+      "sha256": "135e4c44bbfa8bb3a95ae1408939c686dca4b2fba57cd6065b8c7f9355d7edb3"
+    },
+    "balance_values": {
+      "basis": "observed_model_external_boundary_not_product_or_economic_qualification",
+      "units": {
+        "mass": "kg/h",
+        "energy": "kJ/h",
+        "residual_power": "kW"
+      },
+      "material": {
+        "input": 403000.0,
+        "output": 403000.0000000002,
+        "output_minus_input": 1.7462298274040222e-10
+      },
+      "components": [
+        {
+          "name": "Methane",
+          "is_hypothetical": false,
+          "input_kg_h": 20.000000015334525,
+          "output_kg_h": 20.00000001533454,
+          "output_minus_input_kg_h": 1.4210854715202004e-14
+        },
+        {
+          "name": "Ethane",
+          "is_hypothetical": false,
+          "input_kg_h": 60.00000004600357,
+          "output_kg_h": 60.00000004600362,
+          "output_minus_input_kg_h": 4.973799150320701e-14
+        },
+        {
+          "name": "Propane",
+          "is_hypothetical": false,
+          "input_kg_h": 320.00000024535234,
+          "output_kg_h": 320.00000024535245,
+          "output_minus_input_kg_h": 1.1368683772161603e-13
+        },
+        {
+          "name": "i-Butane",
+          "is_hypothetical": false,
+          "input_kg_h": 320.0000002453524,
+          "output_kg_h": 320.00000024535245,
+          "output_minus_input_kg_h": 5.684341886080802e-14
+        },
+        {
+          "name": "n-Butane",
+          "is_hypothetical": false,
+          "input_kg_h": 720.0000005520428,
+          "output_kg_h": 720.0000005520435,
+          "output_minus_input_kg_h": 6.821210263296962e-13
+        },
+        {
+          "name": "i-Pentane",
+          "is_hypothetical": false,
+          "input_kg_h": 800.0000006133811,
+          "output_kg_h": 800.0000006133808,
+          "output_minus_input_kg_h": -2.2737367544323206e-13
+        },
+        {
+          "name": "n-Pentane",
+          "is_hypothetical": false,
+          "input_kg_h": 1200.0000009200712,
+          "output_kg_h": 1200.0000009200717,
+          "output_minus_input_kg_h": 4.547473508864641e-13
+        },
+        {
+          "name": "H2O",
+          "is_hypothetical": false,
+          "input_kg_h": 3600.0000004600356,
+          "output_kg_h": 3600.000000460039,
+          "output_minus_input_kg_h": 3.183231456205249e-12
+        },
+        {
+          "name": "Nitrogen",
+          "is_hypothetical": false,
+          "input_kg_h": 20.000000015334518,
+          "output_kg_h": 20.000000015334532,
+          "output_minus_input_kg_h": 1.4210854715202004e-14
+        },
+        {
+          "name": "Oxygen",
+          "is_hypothetical": false,
+          "input_kg_h": 0.0,
+          "output_kg_h": 0.0,
+          "output_minus_input_kg_h": 0.0
+        },
+        {
+          "name": "CO",
+          "is_hypothetical": false,
+          "input_kg_h": 0.0,
+          "output_kg_h": 0.0,
+          "output_minus_input_kg_h": 0.0
+        },
+        {
+          "name": "CO2",
+          "is_hypothetical": false,
+          "input_kg_h": 40.00000003066904,
+          "output_kg_h": 40.00000003066909,
+          "output_minus_input_kg_h": 4.973799150320701e-14
+        },
+        {
+          "name": "Hydrogen",
+          "is_hypothetical": false,
+          "input_kg_h": 0.0,
+          "output_kg_h": 0.0,
+          "output_minus_input_kg_h": 0.0
+        },
+        {
+          "name": "NBP[1]126*",
+          "is_hypothetical": true,
+          "input_kg_h": 860.5374077458616,
+          "output_kg_h": 860.5374077458628,
+          "output_minus_input_kg_h": 1.1368683772161603e-12
+        },
+        {
+          "name": "NBP[1]139*",
+          "is_hypothetical": true,
+          "input_kg_h": 1723.1584869565304,
+          "output_kg_h": 1723.158486956537,
+          "output_minus_input_kg_h": 6.59383658785373e-12
+        },
+        {
+          "name": "NBP[1]152*",
+          "is_hypothetical": true,
+          "input_kg_h": 2905.3384924566703,
+          "output_kg_h": 2905.338492456644,
+          "output_minus_input_kg_h": -2.637534635141492e-11
+        },
+        {
+          "name": "NBP[1]166*",
+          "is_hypothetical": true,
+          "input_kg_h": 2824.2903115465833,
+          "output_kg_h": 2824.290311546579,
+          "output_minus_input_kg_h": -4.547473508864641e-12
+        },
+        {
+          "name": "NBP[1]180*",
+          "is_hypothetical": true,
+          "input_kg_h": 3429.1272662633696,
+          "output_kg_h": 3429.12726626337,
+          "output_minus_input_kg_h": 4.547473508864641e-13
+        },
+        {
+          "name": "NBP[1]196*",
+          "is_hypothetical": true,
+          "input_kg_h": 3846.7065419981914,
+          "output_kg_h": 3846.7065419981914,
+          "output_minus_input_kg_h": 0.0
+        },
+        {
+          "name": "NBP[1]208*",
+          "is_hypothetical": true,
+          "input_kg_h": 5094.540554900868,
+          "output_kg_h": 5094.540554900887,
+          "output_minus_input_kg_h": 1.9099388737231493e-11
+        },
+        {
+          "name": "NBP[1]223*",
+          "is_hypothetical": true,
+          "input_kg_h": 5413.9033870329,
+          "output_kg_h": 5413.903387032903,
+          "output_minus_input_kg_h": 2.7284841053187847e-12
+        },
+        {
+          "name": "NBP[1]237*",
+          "is_hypothetical": true,
+          "input_kg_h": 6128.2196198830015,
+          "output_kg_h": 6128.21961988302,
+          "output_minus_input_kg_h": 1.8189894035458565e-11
+        },
+        {
+          "name": "NBP[1]251*",
+          "is_hypothetical": true,
+          "input_kg_h": 6815.649257549729,
+          "output_kg_h": 6815.649257549703,
+          "output_minus_input_kg_h": -2.546585164964199e-11
+        },
+        {
+          "name": "NBP[1]265*",
+          "is_hypothetical": true,
+          "input_kg_h": 7511.786859100204,
+          "output_kg_h": 7511.786859100181,
+          "output_minus_input_kg_h": -2.3646862246096134e-11
+        },
+        {
+          "name": "NBP[1]279*",
+          "is_hypothetical": true,
+          "input_kg_h": 8345.274195234742,
+          "output_kg_h": 8345.274195234733,
+          "output_minus_input_kg_h": -9.094947017729282e-12
+        },
+        {
+          "name": "NBP[1]293*",
+          "is_hypothetical": true,
+          "input_kg_h": 9348.736278615133,
+          "output_kg_h": 9348.736278615128,
+          "output_minus_input_kg_h": -5.4569682106375694e-12
+        },
+        {
+          "name": "NBP[1]307*",
+          "is_hypothetical": true,
+          "input_kg_h": 10657.966502241314,
+          "output_kg_h": 10657.966502241314,
+          "output_minus_input_kg_h": 0.0
+        },
+        {
+          "name": "NBP[1]321*",
+          "is_hypothetical": true,
+          "input_kg_h": 11750.076916710588,
+          "output_kg_h": 11750.076916710594,
+          "output_minus_input_kg_h": 5.4569682106375694e-12
+        },
+        {
+          "name": "NBP[1]335*",
+          "is_hypothetical": true,
+          "input_kg_h": 12508.376366624574,
+          "output_kg_h": 12508.376366624572,
+          "output_minus_input_kg_h": -1.8189894035458565e-12
+        },
+        {
+          "name": "NBP[1]349*",
+          "is_hypothetical": true,
+          "input_kg_h": 12939.867646842418,
+          "output_kg_h": 12939.867646842431,
+          "output_minus_input_kg_h": 1.2732925824820995e-11
+        },
+        {
+          "name": "NBP[1]364*",
+          "is_hypothetical": true,
+          "input_kg_h": 13311.42197766917,
+          "output_kg_h": 13311.421977669172,
+          "output_minus_input_kg_h": 1.8189894035458565e-12
+        },
+        {
+          "name": "NBP[1]378*",
+          "is_hypothetical": true,
+          "input_kg_h": 13446.58048301279,
+          "output_kg_h": 13446.580483012802,
+          "output_minus_input_kg_h": 1.0913936421275139e-11
+        },
+        {
+          "name": "NBP[1]392*",
+          "is_hypothetical": true,
+          "input_kg_h": 13381.190115236579,
+          "output_kg_h": 13381.190115236572,
+          "output_minus_input_kg_h": -7.275957614183426e-12
+        },
+        {
+          "name": "NBP[1]406*",
+          "is_hypothetical": true,
+          "input_kg_h": 13512.731438484232,
+          "output_kg_h": 13512.731438484232,
+          "output_minus_input_kg_h": 0.0
+        },
+        {
+          "name": "NBP[1]420*",
+          "is_hypothetical": true,
+          "input_kg_h": 13911.260404823925,
+          "output_kg_h": 13911.26040482393,
+          "output_minus_input_kg_h": 5.4569682106375694e-12
+        },
+        {
+          "name": "NBP[1]441*",
+          "is_hypothetical": true,
+          "input_kg_h": 30052.935389809405,
+          "output_kg_h": 30052.935389809423,
+          "output_minus_input_kg_h": 1.8189894035458565e-11
+        },
+        {
+          "name": "NBP[1]467*",
+          "is_hypothetical": true,
+          "input_kg_h": 28565.89878870986,
+          "output_kg_h": 28565.898788709877,
+          "output_minus_input_kg_h": 1.8189894035458565e-11
+        },
+        {
+          "name": "NBP[1]496*",
+          "is_hypothetical": true,
+          "input_kg_h": 27771.273295686922,
+          "output_kg_h": 27771.273295686937,
+          "output_minus_input_kg_h": 1.4551915228366852e-11
+        },
+        {
+          "name": "NBP[1]522*",
+          "is_hypothetical": true,
+          "input_kg_h": 27273.874866553262,
+          "output_kg_h": 27273.874866553273,
+          "output_minus_input_kg_h": 1.0913936421275139e-11
+        },
+        {
+          "name": "NBP[1]551*",
+          "is_hypothetical": true,
+          "input_kg_h": 20374.746032849962,
+          "output_kg_h": 20374.746032849966,
+          "output_minus_input_kg_h": 3.637978807091713e-12
+        },
+        {
+          "name": "NBP[1]579*",
+          "is_hypothetical": true,
+          "input_kg_h": 17807.390148157403,
+          "output_kg_h": 17807.3901481574,
+          "output_minus_input_kg_h": -3.637978807091713e-12
+        },
+        {
+          "name": "NBP[1]607*",
+          "is_hypothetical": true,
+          "input_kg_h": 15915.854068560768,
+          "output_kg_h": 15915.854068560777,
+          "output_minus_input_kg_h": 9.094947017729282e-12
+        },
+        {
+          "name": "NBP[1]635*",
+          "is_hypothetical": true,
+          "input_kg_h": 14723.172058224427,
+          "output_kg_h": 14723.172058224429,
+          "output_minus_input_kg_h": 1.8189894035458565e-12
+        },
+        {
+          "name": "NBP[1]682*",
+          "is_hypothetical": true,
+          "input_kg_h": 33748.114837375106,
+          "output_kg_h": 33748.11483737513,
+          "output_minus_input_kg_h": 2.1827872842550278e-11
+        }
+      ],
+      "maximum_absolute_component_residual_kg_h": 2.637534635141492e-11,
+      "energy": {
+        "input": 386235503.79218024,
+        "output": 68689574.06997341,
+        "material_enthalpy_input": -900143943.0439557,
+        "material_enthalpy_output": -582598383.0002685,
+        "material_enthalpy_rise": 317545560.0436872,
+        "input_minus_output_minus_material_enthalpy_rise": 369.67851960659027,
+        "residual_kW": 0.1026884776684973,
+        "engineering_pass_tolerance": null,
+        "bridge_counting": "column TopStagePA_Q-Cooler_1 counted once; matching main mirror excluded"
+      },
+      "streams": [
+        {
+          "name": "Crude_Oil",
+          "direction": "in",
+          "mass_flow_kg_h": 400000.0,
+          "water_kg_h": 600.0000004600357,
+          "temperature_C": 32.6,
+          "pressure_kPa": 180.0,
+          "vapour_fraction_molar": 0.0,
+          "enthalpy_flow_minus_mass_times_specific_enthalpy_kJ_h": -1.1920928955078125e-07
+        },
+        {
+          "name": "Risedue",
+          "direction": "out",
+          "mass_flow_kg_h": 299285.30680188694,
+          "water_kg_h": 72.916038038159,
+          "temperature_C": 361.47439553404604,
+          "pressure_kPa": 180.0,
+          "vapour_fraction_molar": 0.0,
+          "enthalpy_flow_minus_mass_times_specific_enthalpy_kJ_h": -5.960464477539063e-08
+        },
+        {
+          "name": "Naptha",
+          "direction": "out",
+          "mass_flow_kg_h": 12293.667585972546,
+          "water_kg_h": 3491.920946619956,
+          "temperature_C": 105.45225017420495,
+          "pressure_kPa": 150.0,
+          "vapour_fraction_molar": 0.99999999,
+          "enthalpy_flow_minus_mass_times_specific_enthalpy_kJ_h": 7.450580596923828e-09
+        },
+        {
+          "name": "Kerosene",
+          "direction": "out",
+          "mass_flow_kg_h": 9707.152570829683,
+          "water_kg_h": 2.5726510116900176e-13,
+          "temperature_C": 195.68080629258174,
+          "pressure_kPa": 157.64705882352948,
+          "vapour_fraction_molar": 0.0,
+          "enthalpy_flow_minus_mass_times_specific_enthalpy_kJ_h": 0.0
+        },
+        {
+          "name": "Diesel",
+          "direction": "out",
+          "mass_flow_kg_h": 25261.752878960364,
+          "water_kg_h": 15.239135898046298,
+          "temperature_C": 200.92190499684216,
+          "pressure_kPa": 165.29411764705895,
+          "vapour_fraction_molar": 0.0,
+          "enthalpy_flow_minus_mass_times_specific_enthalpy_kJ_h": 0.0
+        },
+        {
+          "name": "AGO",
+          "direction": "out",
+          "mass_flow_kg_h": 56452.12016235065,
+          "water_kg_h": 19.92387990387726,
+          "temperature_C": 281.3931899555538,
+          "pressure_kPa": 171.17647058823547,
+          "vapour_fraction_molar": 0.0,
+          "enthalpy_flow_minus_mass_times_specific_enthalpy_kJ_h": -1.4901161193847656e-08
+        },
+        {
+          "name": "Water1",
+          "direction": "in",
+          "mass_flow_kg_h": 2200.0,
+          "water_kg_h": 2200.0,
+          "temperature_C": 25.0,
+          "pressure_kPa": 300.0,
+          "vapour_fraction_molar": 0.0,
+          "enthalpy_flow_minus_mass_times_specific_enthalpy_kJ_h": -7.450580596923828e-09
+        },
+        {
+          "name": "Water2",
+          "direction": "in",
+          "mass_flow_kg_h": 300.0,
+          "water_kg_h": 300.0,
+          "temperature_C": 25.0,
+          "pressure_kPa": 300.0,
+          "vapour_fraction_molar": 0.0,
+          "enthalpy_flow_minus_mass_times_specific_enthalpy_kJ_h": 9.313225746154785e-10
+        },
+        {
+          "name": "Water3",
+          "direction": "in",
+          "mass_flow_kg_h": 500.0,
+          "water_kg_h": 500.0,
+          "temperature_C": 25.0,
+          "pressure_kPa": 300.0,
+          "vapour_fraction_molar": 0.0,
+          "enthalpy_flow_minus_mass_times_specific_enthalpy_kJ_h": 0.0
+        }
+      ]
+    },
+    "raw_inventory": [
+      {
+        "path": "runs/simulation/boundary_probe_20260911/inventory.json",
+        "sha256": "10d222e703fa82fea1ad41e2c5837a2ea15d1fe3bfcb454bb1e461ee0bf82c53"
+      },
+      {
+        "path": "runs/simulation/boundary_probe_20260911/column_energy.json",
+        "sha256": "d15d7391b6650d6608b9dd5f0dfd84411bdab82a756e492ea232025d6e8c46c8"
+      },
+      {
+        "path": "runs/simulation/boundary_probe_20260911/source_before.json",
+        "sha256": "b669bb61a5757d4c3ef578bae1d6d8b942e1587aaa28b31ed435c6bde9f5c5e6"
+      },
+      {
+        "path": "runs/simulation/boundary_probe_20260911/source_after.json",
+        "sha256": "eff250178539f97996530492e507f3c90b0f022c39b5cc366356dad0050820f8"
+      },
+      {
+        "path": "runs/simulation/boundary_probe_20260911/column_source_before.json",
+        "sha256": "08d8e62e3a373f73e1b9d731c50b902f2593d0397bd83d4c77f820d7d08a8d7a"
+      },
+      {
+        "path": "runs/simulation/boundary_probe_20260911/column_source_after.json",
+        "sha256": "f2dabd75f10ba70a680d21e3666b066949335de4e747c3e081f218dc871ed8b2"
+      }
+    ],
+    "definition_persistence": "Complete consumed definition and canonical hash are embedded; offline reload does not read current configuration or connect COM.",
+    "no_atomic_snapshot_or_memory_to_source_disk_binding_claim": true,
+    "source_core_before_after_equal": true,
+    "source_COM_identity": "checked by live reader; not independently re-proven offline",
+    "not_candidate_boundary": "This is the original source memory state, not any Reset/Run candidate. Point-result boundary integration remains pending."
+  },
+  "source_files_unchanged_from_intake": [
+    {
+      "path": "hysys/analyze_results.py",
+      "sha256": "bba79b0c29863a409d45b64bd502323c80ab720cca31b237152bacc72f91eccb"
+    },
+    {
+      "path": "hysys/artifacts/analysis/before_after.csv",
+      "sha256": "704663228149e986a011cf2e27440f461fee6947cfb56c786dffc54d5f0400fc"
+    },
+    {
+      "path": "hysys/artifacts/analysis/heat_loads.csv",
+      "sha256": "069f4806bcc6fe5c07666cac7fd88f969c995a8af8bcf465248f611155c2596a"
+    },
+    {
+      "path": "hysys/artifacts/analysis/products.csv",
+      "sha256": "9e1b51742ce4fee62ec4a2e3c961132c4895293445df86f08416402c409a6eb2"
+    },
+    {
+      "path": "hysys/artifacts/analysis/results_analysis.md",
+      "sha256": "a24538804deca565964596eb9413837539c0450a6d33c0a92669947f137c6cce"
+    },
+    {
+      "path": "hysys/artifacts/analysis/stages.csv",
+      "sha256": "32ec6c783c730b2cd0d0b126fe47aeffdefafe29ecf16916ac3d23f77b667501"
+    },
+    {
+      "path": "hysys/artifacts/analysis/summary.json",
+      "sha256": "325ab4f85329757d1285bc28c03a4a9d8a463056552575163d9e33a5169649a8"
+    },
+    {
+      "path": "hysys/artifacts/hysys_inspection.json",
+      "sha256": "524735252b826369e1567c7bdbe81608ae1c49da4c31f9766be955b33cbdd764"
+    },
+    {
+      "path": "hysys/artifacts/nature-figure.json",
+      "sha256": "dad100bf58fece91f6d9ce9ef861408b330aea06bb703ea8229bf8d464754a8b"
+    },
+    {
+      "path": "hysys/artifacts/operating_point_before.json",
+      "sha256": "21ed572cc511a25d28414ca815357997abec183bb7a7f0458e6ea073f60f512d"
+    },
+    {
+      "path": "hysys/artifacts/original/data_read",
+      "sha256": "313be0bd61ce5c77dddf3f48bd2d29be2293638bac5b636779a25facde825886"
+    },
+    {
+      "path": "hysys/artifacts/original/hysys_control.py",
+      "sha256": "ba1fb17f13858250bd5c025f6558aad6e81016899451284d48329194e4ab2073"
+    },
+    {
+      "path": "hysys/artifacts/original/main.py",
+      "sha256": "2e7ecf5824aebdd11bc16776e704518a44148b28ac864d29fc03633fc8e8a1e8"
+    },
+    {
+      "path": "hysys/artifacts/run_report.json",
+      "sha256": "3c15797bbb3e5b01ba4a1e8d58f96102e6106810aa38c16017375859cc9d4b01"
+    },
+    {
+      "path": "hysys/data_read",
+      "sha256": "e8bf169c8033c676690846b3a81448d65c099f934b663e6b801ea9f6d85aa04e"
+    },
+    {
+      "path": "hysys/data_write",
+      "sha256": "313be0bd61ce5c77dddf3f48bd2d29be2293638bac5b636779a25facde825886"
+    },
+    {
+      "path": "hysys/hysys_control.py",
+      "sha256": "8394f6c3ec0be4e996158590c0de3542be4008fa35f4112704702f920e7374a7"
+    },
+    {
+      "path": "hysys/inspect_hysys.py",
+      "sha256": "6b74d55ca3449d0df651693d14a138a10d7df0b77e477e5b4ce1ed275c2a2071"
+    },
+    {
+      "path": "hysys/main.py",
+      "sha256": "645270e6d746399e0baca4928d73c98e06360901a14e0e98ccab9627a91c7fd1"
+    },
+    {
+      "path": "hysys/mjh_ATM.hsc",
+      "sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741"
+    },
+    {
+      "path": "hysys/README.md",
+      "sha256": "6514470757ad2f49e794c70f2500d7212cf9b5098b072bdf85a23179413884e4"
+    },
+    {
+      "path": "hysys/tests/test_hysys_control.py",
+      "sha256": "f4e7ef4f1b825af26259a5baecaef8a1777b640dca1bb8ba48540a706e98f0e6"
+    }
+  ],
+  "validation": {
+    "junit": {
+      "path": "runs/simulation/dependency_setup_20260911/simulation-order-boundary-final.xml",
+      "sha256": "539220fd6f48682e393d48d5e35399cd90e92be4e13cc024a0ace02b1083063c"
+    },
+    "junit_suite_attributes": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "525",
+      "time": "17.720",
+      "timestamp": "2026-09-11T20:54:35.754300+08:00",
+      "hostname": "wyl-main-desktop"
+    },
+    "pytest_passed": 508,
+    "unittest_subtests_passed": 17,
+    "pytest_seconds": 17.8,
+    "ruff_check": "passed",
+    "ruff_format_files": 24,
+    "mypy_source_files": 13,
+    "boundary_targeted_tests": 80,
+    "order_targeted_tests": 27,
+    "targeted_test_counts_are_subsets_of_full_suite": true,
+    "initial_boundary_lifecycle_test_result": "65 passed / 2 failed: retained exception traceback cycle delayed COM release. Cleared finished exception frames before CoUninitialize; regression passed. This was an offline fake failure, not a live HYSYS error.",
+    "scope": "simulation only; no legacy CDU experiments or optimization search",
+    "independent_reviews": [
+      "fixed-order orchestration and evidence integrity",
+      "material/component/energy accounting and strict boundary persistence"
+    ],
+    "review_fixes": [
+      "exact full operation inventory",
+      "no invented numeric sentinel threshold",
+      "cross-check repeated material quantities in core and boundary readings",
+      "clear finished exception traceback frames before COM uninitialize"
+    ]
+  },
+  "implementation_and_tests": [
+    {
+      "path": "configs/simulation/mjh_atm_boundary.json",
+      "sha256": "939d8a04db3c5400a3b04916f62a99a3cd0695a69f6c81bd8cff3735c7b018fa"
+    },
+    {
+      "path": "configs/simulation/mjh_atm_variables.json",
+      "sha256": "2a53edf15fc0d84d12a13442fa9850f4702e7249dc8d2220f54bb62eb9ea4ef3"
+    },
+    {
+      "path": "scripts/simulation/probe_hysys_read.py",
+      "sha256": "a108a26fc1290c7a0d85d68e6c8146a9e51734980f33365606010815640b5bcd"
+    },
+    {
+      "path": "scripts/simulation/probe_hysys_single_change.py",
+      "sha256": "7f2adf44e0b17d18c61bef3ae77083086abb3a08781abbba2ca1aeab3840330d"
+    },
+    {
+      "path": "scripts/simulation/verify_t39_order.py",
+      "sha256": "6f00567baeea731adf531d930e6f07a03b520e7c96ae7703fb7c138368b06cad"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/__init__.py",
+      "sha256": "bdedf9566aea8d391f54bfb1fd4a17e588822857fe9e7ac3d39e4ffbede932b5"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/__main__.py",
+      "sha256": "f3259bc1a66c3e50a9a54fb3ef45f7ce9e6e805fddd1df2b368bb311e05b2caa"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/baseline.py",
+      "sha256": "7a3b54df4c64bc9cc08bc85db88670539c558d809d740762fc8062c963573f6a"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/boundary.py",
+      "sha256": "e818f762961ef0693ea0db6f7ca218de845d363bcd59bfe56a8314e6433cc4dc"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/comparison.py",
+      "sha256": "dacda81bb1544812cce0c5bc3a451f38d611319c6e530163d75a3e7ce3204028"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/hysys.py",
+      "sha256": "94f9df99856483b0f16170a3a97e6e93d9b66685249c373b7f484a8d45140207"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/models.py",
+      "sha256": "bf11182c362c179dc9798c98cfbdb742e57ffe24de117820bf17035dd6ea13f2"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/point.py",
+      "sha256": "f68b88c0dfcc612078070eed713520a0d15cd5facba62dc9106d48f26997fd4d"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/point_evidence.py",
+      "sha256": "800ba83d0cd9c5546393bbea6806a09615450bda00b342e7ca9d905478d14d72"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/recovery.py",
+      "sha256": "143e16f62da590bd1c081b25c10e2894903c956c17148a68bd267c9b10de13b7"
+    },
+    {
+      "path": "tests/simulation/test_baseline.py",
+      "sha256": "db5af5f48582c74aad789fbdf8a34aad7e0549933f018f5c3593f6fca20540b6"
+    },
+    {
+      "path": "tests/simulation/test_boundary.py",
+      "sha256": "56e3623b6f7a681bba32b65afed0bad6b0bbc3704a85e7acbe4c552ea12ede37"
+    },
+    {
+      "path": "tests/simulation/test_comparison.py",
+      "sha256": "ee15ea5b71d4105e3d6cf17196a41b33480507f7149c9510fc7a2c319b427df5"
+    },
+    {
+      "path": "tests/simulation/test_hysys_read_probe.py",
+      "sha256": "f92296cda1d2aa23227aec049e9b580e0794a4156d60b4ad97f3aea0546fc4fc"
+    },
+    {
+      "path": "tests/simulation/test_hysys_reader.py",
+      "sha256": "01bca630b1609677d9322b66bc2259670e48d563bfb7bb304febaf62731ef571"
+    },
+    {
+      "path": "tests/simulation/test_point.py",
+      "sha256": "7fed874e629c09af740a2dadbb3352761fe28fb78781d726931162a7fdf474fa"
+    },
+    {
+      "path": "tests/simulation/test_point_cli.py",
+      "sha256": "97984cc2b2b31cb37ceec04043d2d7110d1cffed50ec7a6daee32f7d4d3a84c1"
+    },
+    {
+      "path": "tests/simulation/test_point_evidence.py",
+      "sha256": "e3587e5bc66a5c4d13148099ce513d002f3f03ef0bf0e8e64d6b576b0f32f810"
+    },
+    {
+      "path": "tests/simulation/test_recovery.py",
+      "sha256": "e20ea2b716eaa1c59548863279c3d41867142b8b656dd76bc683ed27bbb0abdf"
+    },
+    {
+      "path": "tests/simulation/test_snapshot.py",
+      "sha256": "db1ab50d5e425c87ff175d6164451fdaf3421883eceb14c98085668c6d96e367"
+    },
+    {
+      "path": "tests/simulation/test_t39_order.py",
+      "sha256": "763bc42c1ce933158f1e7e98e5da4d321d7ee7123649c4670793772a6d18f18a"
+    }
+  ],
+  "local_official_sources": [
+    {
+      "path": "C:/ProgramData/AspenTech/Aspen HYSYS V12.0/HtmlHelp/Subsystems/HYSYS_Customization/Content/html/Key_HYSYS_Objects.htm",
+      "line": 753,
+      "supports": "Component mass fraction array follows FluidPackage.Components ordering"
+    },
+    {
+      "path": "C:/ProgramData/AspenTech/Aspen HYSYS V12.0/HtmlHelp/Subsystems/Properties_Env/Content/TechRef/VaporFractionFlashCalcs.htm",
+      "line": 36,
+      "supports": "Vapour fraction uses total moles"
+    }
+  ],
+  "remaining": [
+    "diagnose repeated Reset/Run output differences before candidate ranking",
+    "include boundary evidence from each computed working point",
+    "other writable variables and operating ranges",
+    "product quality methods and constraints",
+    "fuel/utility or economic mapping",
+    "RTO and Agent replacement",
+    "independent process isolation and hard blocking-COM timeout",
+    "point result relocation",
+    "field validation"
+  ],
+  "removed_files": [],
+  "new_dependencies": [],
+  "git_commit_or_push": false
+}

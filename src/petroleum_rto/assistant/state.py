@@ -9,7 +9,7 @@ from langchain_core.messages import HumanMessage, message_to_dict, messages_from
 from pydantic import BaseModel, ConfigDict, Field
 
 from petroleum_rto.domain_model.models import ModelSelection, model_profile
-from petroleum_rto.rto.runtime import OperatingContext, load_prepared_optimization
+from petroleum_rto.rto.runtime.steady import context_ref, load_prepared_comparison
 
 
 class Record(BaseModel):
@@ -41,12 +41,11 @@ class SavedPlan(Record):
     status: Literal[
         "awaiting_display", "awaiting_confirmation", "revision_required", "approved", "completed"
     ]
-    static: dict[str, Any] | None = None
     result: dict[str, Any] | None = None
 
 
 class SessionData(Record):
-    schema_version: Literal["1.0.0"] = "1.0.0"
+    schema_version: Literal["2.0.0"] = "2.0.0"
     model: SavedModel
     segment_start: int = Field(default=0, ge=0)
     turn_id: int = Field(default=0, ge=0)
@@ -110,12 +109,12 @@ def validate_session(data: Any, message_count: int) -> dict[str, Any]:
     if saved.segment_start > message_count:
         raise ValueError("session segment exceeds original messages")
     for fingerprint, value in saved.snapshots.items():
-        if OperatingContext.from_mapping(value).fingerprint != fingerprint:
+        if context_ref(value) != fingerprint:
             raise ValueError("snapshot fingerprint differs")
     if saved.pending is not None:
         plan = saved.pending
-        prepared = load_prepared_optimization(plan.prepared)
-        if plan.ref != f"plan-{plan.version}-{prepared.problem.fingerprint[:12]}":
+        prepared = load_prepared_comparison(plan.prepared)
+        if plan.ref != f"plan-{plan.version}-{prepared.fingerprint[:12]}":
             raise ValueError("saved plan identity differs")
         if plan.version != saved.plan_version or (plan.displayed_turn or 0) > saved.turn_id:
             raise ValueError("saved plan version or display turn differs")
@@ -124,10 +123,8 @@ def validate_session(data: Any, message_count: int) -> dict[str, Any]:
             and plan.displayed_turn is None
         ):
             raise ValueError("saved plan has not been displayed")
-        if plan.static is not None and plan.status not in {"approved", "completed"}:
-            raise ValueError("unapproved plan has a completed static stage")
-        if plan.result is not None and (plan.static is None or plan.status != "completed"):
-            raise ValueError("saved final result has no completed static stage")
+        if plan.result is not None and plan.status != "completed":
+            raise ValueError("Uncompleted plan has a final result")
         if plan.status == "completed" and plan.result is None:
             raise ValueError("saved completed plan lacks a result")
     if saved.context.summary is not None:

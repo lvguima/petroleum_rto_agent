@@ -1,0 +1,608 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "mjh_atm",
+  "table_name": "Table",
+  "column_name": "C-1102",
+  "variables": [
+    {
+      "variable_id": "crude_oil.temperature_C",
+      "row": 2,
+      "role": "mv",
+      "object_name": "Crude_Oil",
+      "property_name": "相-温度 (总体)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "crude_oil.pressure_kPa",
+      "row": 3,
+      "role": "mv",
+      "object_name": "Crude_Oil",
+      "property_name": "相-压力 (总体)",
+      "quantity_type": "pressure",
+      "unit": "kPa",
+      "column_specification": null
+    },
+    {
+      "variable_id": "crude_oil.massflow_kg_h",
+      "row": 4,
+      "role": "mv",
+      "object_name": "Crude_Oil",
+      "property_name": "相-质量流量 (总体)",
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "column_specification": null
+    },
+    {
+      "variable_id": "heater_to_flash.D_temperature_C",
+      "row": 5,
+      "role": "mv",
+      "object_name": "heater_to_flash",
+      "property_name": "温差",
+      "quantity_type": "temperature_difference",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "flash_column.liquid_volume_percent",
+      "row": 6,
+      "role": "mv",
+      "object_name": "Flash",
+      "property_name": "液相体积百分比",
+      "quantity_type": "percent",
+      "unit": "%",
+      "column_specification": null
+    },
+    {
+      "variable_id": "pump.D_pressure_kPa",
+      "row": 7,
+      "role": "mv",
+      "object_name": "P-100",
+      "property_name": "压差",
+      "quantity_type": "pressure_difference",
+      "unit": "kPa",
+      "column_specification": null
+    },
+    {
+      "variable_id": "heater_to_furnace.D_temperature_C",
+      "row": 8,
+      "role": "mv",
+      "object_name": "heater_to_furnace",
+      "property_name": "温差",
+      "quantity_type": "temperature_difference",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "furnace_1.D_temperature_C",
+      "row": 9,
+      "role": "mv",
+      "object_name": "furnace_1",
+      "property_name": "温差",
+      "quantity_type": "temperature_difference",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "furnace_2.D_temperature_C",
+      "row": 10,
+      "role": "mv",
+      "object_name": "furnace_2",
+      "property_name": "温差",
+      "quantity_type": "temperature_difference",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "furnace_3.D_temperature_C",
+      "row": 11,
+      "role": "mv",
+      "object_name": "furnace_3",
+      "property_name": "温差",
+      "quantity_type": "temperature_difference",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "furnace_4.D_temperature_C",
+      "row": 12,
+      "role": "mv",
+      "object_name": "furnace_4",
+      "property_name": "温差",
+      "quantity_type": "temperature_difference",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Water1.massflow_kg_h",
+      "row": 13,
+      "role": "mv",
+      "object_name": "Water1",
+      "property_name": "相-质量流量 (总体)",
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Water2.massflow_kg_h",
+      "row": 14,
+      "role": "mv",
+      "object_name": "Water2",
+      "property_name": "相-质量流量 (总体)",
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Water3.massflow_kg_h",
+      "row": 15,
+      "role": "mv",
+      "object_name": "Water3",
+      "property_name": "相-质量流量 (总体)",
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "column_specification": null
+    },
+    {
+      "variable_id": "C-1102.top_massflow_kg_h",
+      "row": 16,
+      "role": "mv",
+      "object_name": "C-1102",
+      "property_name": "规定值 (TopStagePA_Rate(Pa))",
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "column_specification": "TopStagePA_Rate(Pa)"
+    },
+    {
+      "variable_id": "C-1102.top_temperature_C",
+      "row": 17,
+      "role": "mv",
+      "object_name": "C-1102",
+      "property_name": "规定值 (TopStagePA_TRet(Pa))",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": "TopStagePA_TRet(Pa)"
+    },
+    {
+      "variable_id": "C-1102.one_massflow_kg_h",
+      "row": 18,
+      "role": "mv",
+      "object_name": "C-1102",
+      "property_name": "规定值 (PA_1_Rate(Pa))",
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "column_specification": "PA_1_Rate(Pa)"
+    },
+    {
+      "variable_id": "C-1102.one_temperature_C",
+      "row": 19,
+      "role": "mv",
+      "object_name": "C-1102",
+      "property_name": "规定值 (PA_1_TRet(Pa))",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": "PA_1_TRet(Pa)"
+    },
+    {
+      "variable_id": "C-1102.two_massflow_kg_h",
+      "row": 20,
+      "role": "mv",
+      "object_name": "C-1102",
+      "property_name": "规定值 (PA_2_Rate(Pa))",
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "column_specification": "PA_2_Rate(Pa)"
+    },
+    {
+      "variable_id": "C-1102.two_temperature_C",
+      "row": 21,
+      "role": "mv",
+      "object_name": "C-1102",
+      "property_name": "规定值 (PA_2_TRet(Pa))",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": "PA_2_TRet(Pa)"
+    },
+    {
+      "variable_id": "C-1102.kerosene_ss_boilup_ratio",
+      "row": 22,
+      "role": "mv",
+      "object_name": "C-1102",
+      "property_name": "规定值 (Kerosene SS BoilUp Ratio)",
+      "quantity_type": "ratio",
+      "unit": "",
+      "column_specification": "Kerosene SS BoilUp Ratio"
+    },
+    {
+      "variable_id": "C-1102.39_temperature_C",
+      "row": 23,
+      "role": "mv",
+      "object_name": "C-1102",
+      "property_name": "规定值 (T-39)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": "T-39"
+    },
+    {
+      "variable_id": "C-1102.26_temperature_C",
+      "row": 24,
+      "role": "mv",
+      "object_name": "C-1102",
+      "property_name": "规定值 (T-26)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": "T-26"
+    },
+    {
+      "variable_id": "C-1102.16_temperature_C",
+      "row": 25,
+      "role": "mv",
+      "object_name": "C-1102",
+      "property_name": "规定值 (T-16)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": "T-16"
+    },
+    {
+      "variable_id": "heater_to_flash.heat_load_KJ_h",
+      "row": 28,
+      "role": "cv",
+      "object_name": "heater_to_flash",
+      "property_name": "总体负荷",
+      "quantity_type": "heat_flow",
+      "unit": "kJ/h",
+      "column_specification": null
+    },
+    {
+      "variable_id": "heater_to_furnace.heat_load_KJ_h",
+      "row": 29,
+      "role": "cv",
+      "object_name": "heater_to_furnace",
+      "property_name": "总体负荷",
+      "quantity_type": "heat_flow",
+      "unit": "kJ/h",
+      "column_specification": null
+    },
+    {
+      "variable_id": "furnace_1.heat_load_KJ_h",
+      "row": 30,
+      "role": "cv",
+      "object_name": "furnace_1",
+      "property_name": "总体负荷",
+      "quantity_type": "heat_flow",
+      "unit": "kJ/h",
+      "column_specification": null
+    },
+    {
+      "variable_id": "furnace_2.heat_load_KJ_h",
+      "row": 31,
+      "role": "cv",
+      "object_name": "furnace_2",
+      "property_name": "总体负荷",
+      "quantity_type": "heat_flow",
+      "unit": "kJ/h",
+      "column_specification": null
+    },
+    {
+      "variable_id": "furnace_3.heat_load_KJ_h",
+      "row": 32,
+      "role": "cv",
+      "object_name": "furnace_3",
+      "property_name": "总体负荷",
+      "quantity_type": "heat_flow",
+      "unit": "kJ/h",
+      "column_specification": null
+    },
+    {
+      "variable_id": "furnace_4.heat_load_KJ_h",
+      "row": 33,
+      "role": "cv",
+      "object_name": "furnace_4",
+      "property_name": "总体负荷",
+      "quantity_type": "heat_flow",
+      "unit": "kJ/h",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Naptha.massflow_kg_h",
+      "row": 34,
+      "role": "cv",
+      "object_name": "Naptha",
+      "property_name": "相-质量流量 (总体)",
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Naptha.20%TBP",
+      "row": 35,
+      "role": "cv",
+      "object_name": "沸点曲线-Naptha",
+      "property_name": "真实沸点 (Cut Pt-20.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Naptha.40%TBP",
+      "row": 36,
+      "role": "cv",
+      "object_name": "沸点曲线-Naptha",
+      "property_name": "真实沸点 (Cut Pt-40.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Naptha.60%TBP",
+      "row": 37,
+      "role": "cv",
+      "object_name": "沸点曲线-Naptha",
+      "property_name": "真实沸点 (Cut Pt-60.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Naptha.80%TBP",
+      "row": 38,
+      "role": "cv",
+      "object_name": "沸点曲线-Naptha",
+      "property_name": "真实沸点 (Cut Pt-80.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Naptha.100%TBP",
+      "row": 39,
+      "role": "cv",
+      "object_name": "沸点曲线-Naptha",
+      "property_name": "真实沸点 (Cut Pt-100.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Kerosene.massflow_kg_h",
+      "row": 40,
+      "role": "cv",
+      "object_name": "Kerosene",
+      "property_name": "相-质量流量 (总体)",
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Kerosene.20%TBP",
+      "row": 41,
+      "role": "cv",
+      "object_name": "沸点曲线-Kerosene",
+      "property_name": "真实沸点 (Cut Pt-20.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Kerosene.40%TBP",
+      "row": 42,
+      "role": "cv",
+      "object_name": "沸点曲线-Kerosene",
+      "property_name": "真实沸点 (Cut Pt-40.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Kerosene.60%TBP",
+      "row": 43,
+      "role": "cv",
+      "object_name": "沸点曲线-Kerosene",
+      "property_name": "真实沸点 (Cut Pt-60.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Kerosene.80%TBP",
+      "row": 44,
+      "role": "cv",
+      "object_name": "沸点曲线-Kerosene",
+      "property_name": "真实沸点 (Cut Pt-80.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Kerosene.100%TBP",
+      "row": 45,
+      "role": "cv",
+      "object_name": "沸点曲线-Kerosene",
+      "property_name": "真实沸点 (Cut Pt-100.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Diesel.massflow_kg_h",
+      "row": 46,
+      "role": "cv",
+      "object_name": "Diesel",
+      "property_name": "相-质量流量 (总体)",
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Diesel.20%TBP",
+      "row": 47,
+      "role": "cv",
+      "object_name": "沸点曲线-Diesel",
+      "property_name": "真实沸点 (Cut Pt-20.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Diesel.40%TBP",
+      "row": 48,
+      "role": "cv",
+      "object_name": "沸点曲线-Diesel",
+      "property_name": "真实沸点 (Cut Pt-40.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Diesel.60%TBP",
+      "row": 49,
+      "role": "cv",
+      "object_name": "沸点曲线-Diesel",
+      "property_name": "真实沸点 (Cut Pt-60.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Diesel.80%TBP",
+      "row": 50,
+      "role": "cv",
+      "object_name": "沸点曲线-Diesel",
+      "property_name": "真实沸点 (Cut Pt-80.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Diesel.100%TBP",
+      "row": 51,
+      "role": "cv",
+      "object_name": "沸点曲线-Diesel",
+      "property_name": "真实沸点 (Cut Pt-100.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "AGO.massflow_kg_h",
+      "row": 52,
+      "role": "cv",
+      "object_name": "AGO",
+      "property_name": "相-质量流量 (总体)",
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "column_specification": null
+    },
+    {
+      "variable_id": "AGO.20%TBP",
+      "row": 53,
+      "role": "cv",
+      "object_name": "沸点曲线-AGO",
+      "property_name": "真实沸点 (Cut Pt-20.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "AGO.40%TBP",
+      "row": 54,
+      "role": "cv",
+      "object_name": "沸点曲线-AGO",
+      "property_name": "真实沸点 (Cut Pt-40.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "AGO.60%TBP",
+      "row": 55,
+      "role": "cv",
+      "object_name": "沸点曲线-AGO",
+      "property_name": "真实沸点 (Cut Pt-60.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "AGO.80%TBP",
+      "row": 56,
+      "role": "cv",
+      "object_name": "沸点曲线-AGO",
+      "property_name": "真实沸点 (Cut Pt-80.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "AGO.100%TBP",
+      "row": 57,
+      "role": "cv",
+      "object_name": "沸点曲线-AGO",
+      "property_name": "真实沸点 (Cut Pt-100.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Risedue.massflow_kg_h",
+      "row": 58,
+      "role": "cv",
+      "object_name": "Risedue",
+      "property_name": "相-质量流量 (总体)",
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Risedue.20%TBP",
+      "row": 59,
+      "role": "cv",
+      "object_name": "沸点曲线-Risedue",
+      "property_name": "真实沸点 (Cut Pt-20.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Risedue.40%TBP",
+      "row": 60,
+      "role": "cv",
+      "object_name": "沸点曲线-Risedue",
+      "property_name": "真实沸点 (Cut Pt-40.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Risedue.60%TBP",
+      "row": 61,
+      "role": "cv",
+      "object_name": "沸点曲线-Risedue",
+      "property_name": "真实沸点 (Cut Pt-60.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Risedue.80%TBP",
+      "row": 62,
+      "role": "cv",
+      "object_name": "沸点曲线-Risedue",
+      "property_name": "真实沸点 (Cut Pt-80.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    },
+    {
+      "variable_id": "Risedue.100%TBP",
+      "row": 63,
+      "role": "cv",
+      "object_name": "沸点曲线-Risedue",
+      "property_name": "真实沸点 (Cut Pt-100.00%)",
+      "quantity_type": "temperature",
+      "unit": "C",
+      "column_specification": null
+    }
+  ]
+}

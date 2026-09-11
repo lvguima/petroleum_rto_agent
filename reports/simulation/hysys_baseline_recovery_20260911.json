@@ -1,0 +1,763 @@
+{
+  "schema_id": "hysys-baseline-single-change-verification",
+  "schema_version": "1.0.0",
+  "checked_at_utc": "2026-09-11T12:07:29.449338+00:00",
+  "status": "baseline_recovery_and_fixed_T39_diagnostic_verified",
+  "scope": "synthetic_engineering_simulation_baseline_and_one_fixed_variable_only",
+  "eligible_for_optimization": false,
+  "process_isolation_verified": false,
+  "isolation": "serial_separate_cases_and_files_in_existing_HYSYS_application",
+  "source_memory_was_unsaved": true,
+  "source_files": [
+    {
+      "path": "hysys/analyze_results.py",
+      "bytes": 11608,
+      "sha256": "bba79b0c29863a409d45b64bd502323c80ab720cca31b237152bacc72f91eccb",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/before_after.csv",
+      "bytes": 29305,
+      "sha256": "704663228149e986a011cf2e27440f461fee6947cfb56c786dffc54d5f0400fc",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/heat_loads.csv",
+      "bytes": 208,
+      "sha256": "069f4806bcc6fe5c07666cac7fd88f969c995a8af8bcf465248f611155c2596a",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/products.csv",
+      "bytes": 1034,
+      "sha256": "9e1b51742ce4fee62ec4a2e3c961132c4895293445df86f08416402c409a6eb2",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/results_analysis.md",
+      "bytes": 6550,
+      "sha256": "a24538804deca565964596eb9413837539c0450a6d33c0a92669947f137c6cce",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/stages.csv",
+      "bytes": 6564,
+      "sha256": "32ec6c783c730b2cd0d0b126fe47aeffdefafe29ecf16916ac3d23f77b667501",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/summary.json",
+      "bytes": 4057,
+      "sha256": "325ab4f85329757d1285bc28c03a4a9d8a463056552575163d9e33a5169649a8",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/artifacts/hysys_inspection.json",
+      "bytes": 14979,
+      "sha256": "524735252b826369e1567c7bdbe81608ae1c49da4c31f9766be955b33cbdd764",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/artifacts/nature-figure.json",
+      "bytes": 29,
+      "sha256": "dad100bf58fece91f6d9ce9ef861408b330aea06bb703ea8229bf8d464754a8b",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/artifacts/operating_point_before.json",
+      "bytes": 20357,
+      "sha256": "21ed572cc511a25d28414ca815357997abec183bb7a7f0458e6ea073f60f512d",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/artifacts/original/data_read",
+      "bytes": 20351,
+      "sha256": "313be0bd61ce5c77dddf3f48bd2d29be2293638bac5b636779a25facde825886",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/artifacts/original/hysys_control.py",
+      "bytes": 5258,
+      "sha256": "ba1fb17f13858250bd5c025f6558aad6e81016899451284d48329194e4ab2073",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/artifacts/original/main.py",
+      "bytes": 344,
+      "sha256": "2e7ecf5824aebdd11bc16776e704518a44148b28ac864d29fc03633fc8e8a1e8",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/artifacts/run_report.json",
+      "bytes": 604,
+      "sha256": "3c15797bbb3e5b01ba4a1e8d58f96102e6106810aa38c16017375859cc9d4b01",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/data_read",
+      "bytes": 20336,
+      "sha256": "e8bf169c8033c676690846b3a81448d65c099f934b663e6b801ea9f6d85aa04e",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/data_write",
+      "bytes": 20351,
+      "sha256": "313be0bd61ce5c77dddf3f48bd2d29be2293638bac5b636779a25facde825886",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/hysys_control.py",
+      "bytes": 10056,
+      "sha256": "8394f6c3ec0be4e996158590c0de3542be4008fa35f4112704702f920e7374a7",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/inspect_hysys.py",
+      "bytes": 1847,
+      "sha256": "6b74d55ca3449d0df651693d14a138a10d7df0b77e477e5b4ce1ed275c2a2071",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/main.py",
+      "bytes": 2639,
+      "sha256": "645270e6d746399e0baca4928d73c98e06360901a14e0e98ccab9627a91c7fd1",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/mjh_ATM.hsc",
+      "bytes": 1773263,
+      "sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/README.md",
+      "bytes": 3528,
+      "sha256": "6514470757ad2f49e794c70f2500d7212cf9b5098b072bdf85a23179413884e4",
+      "unchanged_from_intake": true
+    },
+    {
+      "path": "hysys/tests/test_hysys_control.py",
+      "bytes": 6306,
+      "sha256": "f4e7ef4f1b825af26259a5baecaef8a1777b640dca1bb8ba48540a706e98f0e6",
+      "unchanged_from_intake": true
+    }
+  ],
+  "final_interface_receipt": {
+    "path": "runs/simulation/baseline_probe_20260911/final-interfaces.json",
+    "bytes": 1299,
+    "sha256": "8d161fc0d1edf8d64c4a0e9416f788d9f549b94af0fd28a5141b31c865606e85"
+  },
+  "captures": [
+    {
+      "directory": "runs/simulation/hysys-baseline-20260911-formal",
+      "artifacts": [
+        {
+          "path": "runs/simulation/hysys-baseline-20260911-formal/manifest.json",
+          "bytes": 443,
+          "sha256": "2d5a577670aba6eca50c68b0716f1b662e712233e6948ab90312be754efc563d"
+        },
+        {
+          "path": "runs/simulation/hysys-baseline-20260911-formal/baseline.hsc",
+          "bytes": 1390746,
+          "sha256": "9bc72bc7438262ccc1133de321a0a65280dcf1306823da155bfb941eddd65a7f"
+        },
+        {
+          "path": "runs/simulation/hysys-baseline-20260911-formal/snapshot.json",
+          "bytes": 42446,
+          "sha256": "4e8ad6f59e362635f73b3aeb062e1d78ff08df2630f2afa55957d099c68c81c9"
+        },
+        {
+          "path": "runs/simulation/hysys-baseline-20260911-formal/variables.json",
+          "bytes": 16731,
+          "sha256": "2a53edf15fc0d84d12a13442fa9850f4702e7249dc8d2220f54bb62eb9ea4ef3"
+        }
+      ],
+      "recovery_report": {
+        "path": "runs/simulation/hysys-recovery-20260911-formal/report.json",
+        "bytes": 3515,
+        "sha256": "b1595c004a1ee4d24f0d46d4e4503d62c6829dc8bca2e1733318fbaa787a447c"
+      },
+      "recovery_result": {
+        "schema_id": "hysys-baseline-recovery",
+        "schema_version": "1.0.0",
+        "status": "verified",
+        "eligible_for_optimization": false,
+        "baseline_manifest": {
+          "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-baseline-20260911-formal\\manifest.json",
+          "sha256": "2d5a577670aba6eca50c68b0716f1b662e712233e6948ab90312be754efc563d"
+        },
+        "work_case": {
+          "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-recovery-20260911-formal\\work.hsc",
+          "ownership_verified": true,
+          "close_requested": true,
+          "closed": true
+        },
+        "source_protection": {
+          "original_cases_restored": true,
+          "observation_unchanged": true,
+          "disk_unchanged": true,
+          "changed_fields": []
+        },
+        "com_lifecycle": {
+          "initialized": true,
+          "uninitialized": true
+        },
+        "observed_snapshot": {
+          "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-recovery-20260911-formal\\observed.json",
+          "sha256": "0bdd4402b0ec92c52b0c4a852811f35731e24162b954e45766b98124583710ed"
+        },
+        "comparison": {
+          "equivalent": true,
+          "input_differences": [],
+          "output_differences": [],
+          "state_differences": []
+        },
+        "file_checks": [
+          {
+            "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-baseline-20260911-formal\\manifest.json",
+            "expected_sha256": "2d5a577670aba6eca50c68b0716f1b662e712233e6948ab90312be754efc563d",
+            "unchanged": true,
+            "sha256": "2d5a577670aba6eca50c68b0716f1b662e712233e6948ab90312be754efc563d"
+          },
+          {
+            "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-baseline-20260911-formal\\baseline.hsc",
+            "expected_sha256": "9bc72bc7438262ccc1133de321a0a65280dcf1306823da155bfb941eddd65a7f",
+            "unchanged": true,
+            "sha256": "9bc72bc7438262ccc1133de321a0a65280dcf1306823da155bfb941eddd65a7f"
+          },
+          {
+            "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-baseline-20260911-formal\\snapshot.json",
+            "expected_sha256": "4e8ad6f59e362635f73b3aeb062e1d78ff08df2630f2afa55957d099c68c81c9",
+            "unchanged": true,
+            "sha256": "4e8ad6f59e362635f73b3aeb062e1d78ff08df2630f2afa55957d099c68c81c9"
+          },
+          {
+            "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-baseline-20260911-formal\\variables.json",
+            "expected_sha256": "2a53edf15fc0d84d12a13442fa9850f4702e7249dc8d2220f54bb62eb9ea4ef3",
+            "unchanged": true,
+            "sha256": "2a53edf15fc0d84d12a13442fa9850f4702e7249dc8d2220f54bb62eb9ea4ef3"
+          },
+          {
+            "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-recovery-20260911-formal\\work.hsc",
+            "expected_sha256": "9bc72bc7438262ccc1133de321a0a65280dcf1306823da155bfb941eddd65a7f",
+            "unchanged": true,
+            "sha256": "9bc72bc7438262ccc1133de321a0a65280dcf1306823da155bfb941eddd65a7f"
+          },
+          {
+            "path": "D:\\pyproject\\petroleum_rto_agent\\hysys\\mjh_ATM.hsc",
+            "expected_sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+            "unchanged": true,
+            "sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741"
+          }
+        ],
+        "errors": [],
+        "documents_before": [
+          "d:\\pyproject\\petroleum_rto_agent\\hysys\\mjh_atm.hsc"
+        ],
+        "documents_with_work": [
+          "d:\\pyproject\\petroleum_rto_agent\\hysys\\mjh_atm.hsc",
+          "d:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-recovery-20260911-formal\\work.hsc"
+        ],
+        "documents_after": [
+          "d:\\pyproject\\petroleum_rto_agent\\hysys\\mjh_atm.hsc"
+        ]
+      }
+    },
+    {
+      "directory": "runs/simulation/hysys-baseline-20260911-final",
+      "artifacts": [
+        {
+          "path": "runs/simulation/hysys-baseline-20260911-final/manifest.json",
+          "bytes": 443,
+          "sha256": "65a12236a257629c324541d5799ea1ae76714e64202cd38778120ae49c4b6318"
+        },
+        {
+          "path": "runs/simulation/hysys-baseline-20260911-final/baseline.hsc",
+          "bytes": 1390745,
+          "sha256": "d214ae6417623850427de058767d63db52ae823214b04945302bcf9ea1a2bdc0"
+        },
+        {
+          "path": "runs/simulation/hysys-baseline-20260911-final/snapshot.json",
+          "bytes": 42446,
+          "sha256": "51066786c5cfd6ecc70e9145b61275a6772a70a2016d1935f810f4ba9981ac43"
+        },
+        {
+          "path": "runs/simulation/hysys-baseline-20260911-final/variables.json",
+          "bytes": 16731,
+          "sha256": "2a53edf15fc0d84d12a13442fa9850f4702e7249dc8d2220f54bb62eb9ea4ef3"
+        }
+      ],
+      "recovery_report": {
+        "path": "runs/simulation/hysys-recovery-20260911-final/report.json",
+        "bytes": 3506,
+        "sha256": "a00e132f209787e9e90d35937c3d366ffc88976d5f67760b0f7a06e1a3d80436"
+      },
+      "recovery_result": {
+        "schema_id": "hysys-baseline-recovery",
+        "schema_version": "1.0.0",
+        "status": "verified",
+        "eligible_for_optimization": false,
+        "baseline_manifest": {
+          "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-baseline-20260911-final\\manifest.json",
+          "sha256": "65a12236a257629c324541d5799ea1ae76714e64202cd38778120ae49c4b6318"
+        },
+        "work_case": {
+          "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-recovery-20260911-final\\work.hsc",
+          "ownership_verified": true,
+          "close_requested": true,
+          "closed": true
+        },
+        "source_protection": {
+          "original_cases_restored": true,
+          "observation_unchanged": true,
+          "disk_unchanged": true,
+          "changed_fields": []
+        },
+        "com_lifecycle": {
+          "initialized": true,
+          "uninitialized": true
+        },
+        "observed_snapshot": {
+          "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-recovery-20260911-final\\observed.json",
+          "sha256": "055e67a728baae52c79f0b1a6ba1e5e77df6ebb54252e67ced7d77b85b5765dc"
+        },
+        "comparison": {
+          "equivalent": true,
+          "input_differences": [],
+          "output_differences": [],
+          "state_differences": []
+        },
+        "file_checks": [
+          {
+            "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-baseline-20260911-final\\manifest.json",
+            "expected_sha256": "65a12236a257629c324541d5799ea1ae76714e64202cd38778120ae49c4b6318",
+            "unchanged": true,
+            "sha256": "65a12236a257629c324541d5799ea1ae76714e64202cd38778120ae49c4b6318"
+          },
+          {
+            "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-baseline-20260911-final\\baseline.hsc",
+            "expected_sha256": "d214ae6417623850427de058767d63db52ae823214b04945302bcf9ea1a2bdc0",
+            "unchanged": true,
+            "sha256": "d214ae6417623850427de058767d63db52ae823214b04945302bcf9ea1a2bdc0"
+          },
+          {
+            "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-baseline-20260911-final\\snapshot.json",
+            "expected_sha256": "51066786c5cfd6ecc70e9145b61275a6772a70a2016d1935f810f4ba9981ac43",
+            "unchanged": true,
+            "sha256": "51066786c5cfd6ecc70e9145b61275a6772a70a2016d1935f810f4ba9981ac43"
+          },
+          {
+            "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-baseline-20260911-final\\variables.json",
+            "expected_sha256": "2a53edf15fc0d84d12a13442fa9850f4702e7249dc8d2220f54bb62eb9ea4ef3",
+            "unchanged": true,
+            "sha256": "2a53edf15fc0d84d12a13442fa9850f4702e7249dc8d2220f54bb62eb9ea4ef3"
+          },
+          {
+            "path": "D:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-recovery-20260911-final\\work.hsc",
+            "expected_sha256": "d214ae6417623850427de058767d63db52ae823214b04945302bcf9ea1a2bdc0",
+            "unchanged": true,
+            "sha256": "d214ae6417623850427de058767d63db52ae823214b04945302bcf9ea1a2bdc0"
+          },
+          {
+            "path": "D:\\pyproject\\petroleum_rto_agent\\hysys\\mjh_ATM.hsc",
+            "expected_sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+            "unchanged": true,
+            "sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741"
+          }
+        ],
+        "errors": [],
+        "documents_before": [
+          "d:\\pyproject\\petroleum_rto_agent\\hysys\\mjh_atm.hsc"
+        ],
+        "documents_with_work": [
+          "d:\\pyproject\\petroleum_rto_agent\\hysys\\mjh_atm.hsc",
+          "d:\\pyproject\\petroleum_rto_agent\\runs\\simulation\\hysys-recovery-20260911-final\\work.hsc"
+        ],
+        "documents_after": [
+          "d:\\pyproject\\petroleum_rto_agent\\hysys\\mjh_atm.hsc"
+        ]
+      }
+    }
+  ],
+  "fixed_diagnostic_trials": [
+    {
+      "report": {
+        "path": "runs/simulation/hysys-single-change-20260911/report.json",
+        "bytes": 79432,
+        "sha256": "c70a2bccdb9dd509df3a545ec14a8d4fe775ac19f6c81872bc372299e2255de8"
+      },
+      "implementation": {
+        "path": "runs/simulation/hysys-single-change-20260911/script_used.py",
+        "bytes": 16095,
+        "sha256": "d2a2ce19053eb1636857a495f4fe1696560ded4422a3574313662624cbccf53a"
+      },
+      "writer": "ImportedVariable.SetValue",
+      "solver_action": "Run",
+      "status": "failed",
+      "change_error": {
+        "phase": "wait-and-read-B",
+        "message": "T-39 current temperature did not follow the diagnostic target within 0.01 C",
+        "hresult": null,
+        "scode": null
+      },
+      "restore_error": null,
+      "cleanup_errors": [],
+      "target_temperature_C": 156.9,
+      "actual_temperature_C": 156.79999949099715,
+      "source_unchanged": true,
+      "source_disk_unchanged": true,
+      "files_unchanged": true,
+      "eligible_for_optimization": false,
+      "temperature_response": null,
+      "initial_comparison": {
+        "equivalent": true,
+        "input_differences": 0,
+        "output_differences": 0,
+        "state_differences": 0
+      },
+      "change_comparison": {
+        "equivalent": false,
+        "input_differences": 0,
+        "output_differences": 297,
+        "state_differences": 0
+      },
+      "restoration_comparison": {
+        "equivalent": true,
+        "input_differences": 0,
+        "output_differences": 0,
+        "state_differences": 0
+      },
+      "snapshots": [
+        {
+          "path": "runs/simulation/hysys-single-change-20260911/A_before.json",
+          "bytes": 42489,
+          "sha256": "295f5838c6308456bc8e49c8f3d81e52c5bb160e76de84eaba3f2d263c51374c"
+        },
+        {
+          "path": "runs/simulation/hysys-single-change-20260911/B_changed.json",
+          "bytes": 42449,
+          "sha256": "409dde2e598b2cf1e5bf7f0a3ac26c9ea662b20d026e85715eb6d5c410cd3051"
+        },
+        {
+          "path": "runs/simulation/hysys-single-change-20260911/A_restored.json",
+          "bytes": 42488,
+          "sha256": "7ee2cacbde727f4c2b73a1f2494ed06bd97b120d5d28e8dedd48b25fe9952dee"
+        },
+        {
+          "path": "runs/simulation/hysys-single-change-20260911/source_before.json",
+          "bytes": 42446,
+          "sha256": "b3b9d3e20ef635ce7bd18bffaeeba7813f3f07d8522d1a59a5ad6c73719703ed"
+        },
+        {
+          "path": "runs/simulation/hysys-single-change-20260911/source_after.json",
+          "bytes": 42446,
+          "sha256": "e9262714b617f33172a931f9463a2bad413eedebe6743e55ea1d290cb3db2fac"
+        }
+      ]
+    },
+    {
+      "report": {
+        "path": "runs/simulation/hysys-single-change-20260911-owner/report.json",
+        "bytes": 80065,
+        "sha256": "da0f5c5745e0770cc8ddd9ee9926010f7d13fc3a1ea4133538806dfaa4f26341"
+      },
+      "implementation": {
+        "path": "runs/simulation/hysys-single-change-20260911-owner/script_used.py",
+        "bytes": 17553,
+        "sha256": "e26db3a2dcac5e2cf9d6cd97e9e1450390ec24f99d4ab9c99e0744453442c47f"
+      },
+      "writer": "ColumnTemperatureSpec.GoalValue",
+      "solver_action": "Run",
+      "status": "failed",
+      "change_error": {
+        "phase": "wait-and-read-B",
+        "message": "T-39 current temperature did not follow the diagnostic target within 0.01 C",
+        "hresult": null,
+        "scode": null
+      },
+      "restore_error": null,
+      "cleanup_errors": [],
+      "target_temperature_C": 156.9,
+      "actual_temperature_C": 156.79999949099715,
+      "source_unchanged": true,
+      "source_disk_unchanged": true,
+      "files_unchanged": true,
+      "eligible_for_optimization": false,
+      "temperature_response": null,
+      "initial_comparison": {
+        "equivalent": true,
+        "input_differences": 0,
+        "output_differences": 0,
+        "state_differences": 0
+      },
+      "change_comparison": {
+        "equivalent": false,
+        "input_differences": 0,
+        "output_differences": 297,
+        "state_differences": 0
+      },
+      "restoration_comparison": {
+        "equivalent": true,
+        "input_differences": 0,
+        "output_differences": 0,
+        "state_differences": 0
+      },
+      "snapshots": [
+        {
+          "path": "runs/simulation/hysys-single-change-20260911-owner/A_before.json",
+          "bytes": 42495,
+          "sha256": "e8cfa8690b75eee4097de7b301e8b9ca5f045d5f8aa055b584e79e73657fcf88"
+        },
+        {
+          "path": "runs/simulation/hysys-single-change-20260911-owner/B_changed.json",
+          "bytes": 42455,
+          "sha256": "2780b785f748a675415668cf2d258f2aeb72e6cabf3f5882b6cca7c938e18096"
+        },
+        {
+          "path": "runs/simulation/hysys-single-change-20260911-owner/A_restored.json",
+          "bytes": 42494,
+          "sha256": "291f55672dee14a04446cf4f0af3689b7092e0975be132009f37541af87aba1a"
+        },
+        {
+          "path": "runs/simulation/hysys-single-change-20260911-owner/source_before.json",
+          "bytes": 42446,
+          "sha256": "1bf71bcdb2a227a527d94597b3eb7493a887b6e5297f6c7817913e8c4382f398"
+        },
+        {
+          "path": "runs/simulation/hysys-single-change-20260911-owner/source_after.json",
+          "bytes": 42446,
+          "sha256": "628c7769b09911089d920b34cb203a3a42ee77afa0e86ffc31e2705897f3a890"
+        }
+      ]
+    },
+    {
+      "report": {
+        "path": "runs/simulation/hysys-single-change-20260911-reset/report.json",
+        "bytes": 79800,
+        "sha256": "e78a67b0c6e3a9327ebb083aec8c643a78d4377b3d54f845fcf7704fb16867b6"
+      },
+      "implementation": {
+        "path": "runs/simulation/hysys-single-change-20260911-reset/script_used.py",
+        "bytes": 17924,
+        "sha256": "8f040feed3846d4c7819b51a2e84802280df4ced7f4c2f7b58a643490450baff"
+      },
+      "writer": "ColumnTemperatureSpec.GoalValue",
+      "solver_action": "Reset_then_Run",
+      "status": "passed",
+      "change_error": null,
+      "restore_error": null,
+      "cleanup_errors": [],
+      "target_temperature_C": 156.9,
+      "actual_temperature_C": 156.90049807320577,
+      "source_unchanged": true,
+      "source_disk_unchanged": true,
+      "files_unchanged": true,
+      "eligible_for_optimization": false,
+      "temperature_response": {
+        "before_current_C": 156.79999949345017,
+        "after_current_C": 156.90049807320577,
+        "observed_change_C": 0.10049857975559462,
+        "target_residual_C": 0.0004980732057617843,
+        "diagnostic_tracking_tolerance_C": 0.01
+      },
+      "initial_comparison": {
+        "equivalent": true,
+        "input_differences": 0,
+        "output_differences": 0,
+        "state_differences": 0
+      },
+      "change_comparison": {
+        "equivalent": false,
+        "input_differences": 0,
+        "output_differences": 299,
+        "state_differences": 0
+      },
+      "restoration_comparison": {
+        "equivalent": true,
+        "input_differences": 0,
+        "output_differences": 0,
+        "state_differences": 0
+      },
+      "snapshots": [
+        {
+          "path": "runs/simulation/hysys-single-change-20260911-reset/A_before.json",
+          "bytes": 42495,
+          "sha256": "e12ebc87d5c4590a2cc2c3e21decbfd11bfe81c9350fce0c630dee3b41250110"
+        },
+        {
+          "path": "runs/simulation/hysys-single-change-20260911-reset/B_changed.json",
+          "bytes": 42459,
+          "sha256": "802a0d4ef99a12ef0eb2a114c263870dd508041fcfb0f5ee99f1208e6732eec0"
+        },
+        {
+          "path": "runs/simulation/hysys-single-change-20260911-reset/A_restored.json",
+          "bytes": 42494,
+          "sha256": "16c08634418c6bd738f35754cf835cbed17d42029cbb760b1c253ef9e64dca3d"
+        },
+        {
+          "path": "runs/simulation/hysys-single-change-20260911-reset/source_before.json",
+          "bytes": 42446,
+          "sha256": "5e9e99f03521476d7943422f8fddc794107d97cabed0d01c42ca22ebc3eb67bd"
+        },
+        {
+          "path": "runs/simulation/hysys-single-change-20260911-reset/source_after.json",
+          "bytes": 42446,
+          "sha256": "42df337dfc2b04d7df7fbb0788c1de80bdbaa35205eac4574bf942096c956d9a"
+        }
+      ]
+    }
+  ],
+  "earlier_open_failures": {
+    "records": [
+      {
+        "path": "runs/simulation/baseline_probe_20260911/reopen-report.json",
+        "bytes": 306,
+        "sha256": "1886a73a4563f35ae53dd5f3bf4c5ccc4bc736d22d4be0a76ed0089f4dec10c2"
+      },
+      {
+        "path": "runs/simulation/baseline_probe_20260911/visible-reopen-report.json",
+        "bytes": 316,
+        "sha256": "b7f0037a7a8729607233c0095d48552a7ef2abb1aac3287785b32ea2e97b5262"
+      },
+      {
+        "path": "runs/simulation/baseline_probe_20260911/cli-reopen-report.json",
+        "bytes": 181,
+        "sha256": "cabb6c6dd4bb06f0c8612fb1e2f608c88a3ba1d5c021444a844f77b3e6693777"
+      }
+    ],
+    "observed": "NewInstance Open/Visible failed; Windows recorded STRGXI2.dll 0xc0000409. Task process 36788 had Licensing error title and did not register work case within 45s; only that identified task process was stopped.",
+    "unknown": "No license dialog body or license type/count conclusion; no process isolation claim."
+  },
+  "warm_run_diagnosis": {
+    "read_only_metadata": {
+      "path": "runs/simulation/baseline_probe_20260911/solver-settings.json",
+      "bytes": 4104,
+      "sha256": "047b6c9f874a4eff3da8f9e2933deed95c188038ce5e7a3ae488173c3cc869ed"
+    },
+    "absolute_tolerance_value": 1.0,
+    "weighted_tolerance_value": 0.01,
+    "heat_spec_error_tolerance": 0.0005,
+    "conclusion": "Both writers changed Goal but warm Run did not track +0.1C. Reset/Run in work case tracked it without changing native tolerances. Tolerance settings may permit residual; enable switch and normalization mapping not fully qualified. No claim of broken owner notification.",
+    "metadata_note": "Tuple properties logged formatting errors in introspection; this is not evidence those HYSYS getters failed."
+  },
+  "validation": {
+    "pytest_passed": 322,
+    "unittest_subtests_passed": 17,
+    "pytest_seconds": 4.92,
+    "junit": {
+      "path": "runs/simulation/dependency_setup_20260911/simulation-baseline-final-v2.xml",
+      "bytes": 48224,
+      "sha256": "2080f4f05246eb2f7618d838ba33388b9bbeed36b608167148b41e2544f3602a"
+    },
+    "junit_suite_attributes": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "339",
+      "time": "4.743",
+      "timestamp": "2026-09-11T19:57:07.227394+08:00",
+      "hostname": "wyl-main-desktop"
+    },
+    "ruff_check": "passed",
+    "ruff_format_files": 16,
+    "mypy_source_files": 9,
+    "intermediate_fixture_failure": "11 failed / 37 passed while Reset fake update was in progress; final full simulation suite passed.",
+    "legacy_CDU_experiments_run": false
+  },
+  "implementation_and_tests": [
+    {
+      "path": "src/petroleum_rto/simulation/__init__.py",
+      "bytes": 76,
+      "sha256": "bdedf9566aea8d391f54bfb1fd4a17e588822857fe9e7ac3d39e4ffbede932b5"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/__main__.py",
+      "bytes": 2307,
+      "sha256": "f3259bc1a66c3e50a9a54fb3ef45f7ce9e6e805fddd1df2b368bb311e05b2caa"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/baseline.py",
+      "bytes": 10661,
+      "sha256": "7a3b54df4c64bc9cc08bc85db88670539c558d809d740762fc8062c963573f6a"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/comparison.py",
+      "bytes": 6888,
+      "sha256": "dacda81bb1544812cce0c5bc3a451f38d611319c6e530163d75a3e7ce3204028"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/hysys.py",
+      "bytes": 14394,
+      "sha256": "94f9df99856483b0f16170a3a97e6e93d9b66685249c373b7f484a8d45140207"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/models.py",
+      "bytes": 11142,
+      "sha256": "bf11182c362c179dc9798c98cfbdb742e57ffe24de117820bf17035dd6ea13f2"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/recovery.py",
+      "bytes": 13407,
+      "sha256": "143e16f62da590bd1c081b25c10e2894903c956c17148a68bd267c9b10de13b7"
+    },
+    {
+      "path": "scripts/simulation/probe_hysys_read.py",
+      "bytes": 18100,
+      "sha256": "a108a26fc1290c7a0d85d68e6c8146a9e51734980f33365606010815640b5bcd"
+    },
+    {
+      "path": "scripts/simulation/probe_hysys_single_change.py",
+      "bytes": 17924,
+      "sha256": "8f040feed3846d4c7819b51a2e84802280df4ced7f4c2f7b58a643490450baff"
+    },
+    {
+      "path": "tests/simulation/test_baseline.py",
+      "bytes": 17732,
+      "sha256": "db5af5f48582c74aad789fbdf8a34aad7e0549933f018f5c3593f6fca20540b6"
+    },
+    {
+      "path": "tests/simulation/test_comparison.py",
+      "bytes": 10211,
+      "sha256": "ee15ea5b71d4105e3d6cf17196a41b33480507f7149c9510fc7a2c319b427df5"
+    },
+    {
+      "path": "tests/simulation/test_hysys_read_probe.py",
+      "bytes": 19787,
+      "sha256": "f92296cda1d2aa23227aec049e9b580e0794a4156d60b4ad97f3aea0546fc4fc"
+    },
+    {
+      "path": "tests/simulation/test_hysys_reader.py",
+      "bytes": 18398,
+      "sha256": "01bca630b1609677d9322b66bc2259670e48d563bfb7bb304febaf62731ef571"
+    },
+    {
+      "path": "tests/simulation/test_recovery.py",
+      "bytes": 13937,
+      "sha256": "e20ea2b716eaa1c59548863279c3d41867142b8b656dd76bc683ed27bbb0abdf"
+    },
+    {
+      "path": "tests/simulation/test_single_change_probe.py",
+      "bytes": 24455,
+      "sha256": "a0a39be118b3cd8e026289849d31780a1c14d62514a7cc91707db011bdc57bff"
+    },
+    {
+      "path": "tests/simulation/test_snapshot.py",
+      "bytes": 11442,
+      "sha256": "db1ab50d5e425c87ff175d6164451fdaf3421883eceb14c98085668c6d96e367"
+    }
+  ],
+  "not_validated": [
+    "general single-point API",
+    "other MV changes",
+    "candidate order independence",
+    "approved operating ranges",
+    "complete material/energy and quality boundaries",
+    "RTO or Agent integration",
+    "independent process startup",
+    "hard timeout of a blocked COM call",
+    "field deployment"
+  ],
+  "deleted_files": [],
+  "git_commit_or_push": false
+}

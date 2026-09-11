@@ -28,6 +28,19 @@ _BOOTSTRAP = (
     "from test_model_retry_interrupt import _signal_worker; _signal_worker()"
 )
 
+_WINDOWS_INTERRUPT = """
+import sys, time
+import win32api, win32console
+win32console.FreeConsole()
+win32console.AttachConsole(int(sys.argv[1]))
+try:
+    win32api.SetConsoleCtrlHandler(None, True)
+    win32api.GenerateConsoleCtrlEvent(0, 0)
+    time.sleep(0.2)
+finally:
+    win32console.FreeConsole()
+"""
+
 
 def _events(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
@@ -41,6 +54,11 @@ def _events(path: Path) -> list[dict[str, Any]]:
 
 def _signal_worker() -> None:
     """A real SIGINT reaches the main thread while framework workers are blocked."""
+    if sys.platform == "win32":
+        import win32api
+
+        # The test launcher may inherit Ctrl-C suppression from its hosting application.
+        win32api.SetConsoleCtrlHandler(None, False)
     workspace, source, phase = Path(sys.argv[2]), sys.argv[3], sys.argv[4]
     workspace.mkdir(parents=True, exist_ok=True)
     log_fd = os.open(workspace / "events.jsonl", os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
@@ -72,7 +90,9 @@ def _signal_worker() -> None:
         if phase == "backoff" and not later_turn and not ready:
             ready = True
             record("ready", phase="backoff", thread=current_thread().name, delay=seconds)
-            if not cancelled.wait(timeout=10):
+            released = cancelled.wait(timeout=10)
+            record("barrier-released", cancelled=released)
+            if not released:
                 raise AssertionError("parent did not signal the retry backoff")
         # Delay length is irrelevant: the real official retry loop still owns attempts.
 
@@ -85,7 +105,9 @@ def _signal_worker() -> None:
             if phase == "http" and not ready:
                 ready = True
                 record("ready", phase="http", thread=current_thread().name)
-                if not cancelled.wait(timeout=10):
+                released = cancelled.wait(timeout=10)
+                record("barrier-released", cancelled=released)
+                if not released:
                     raise AssertionError("parent did not signal the active HTTP request")
             return httpx.Response(503)
         text = "下一轮正常回答。" if payload.get("tools") else "旧资料摘要：仅调温度。"
@@ -95,8 +117,7 @@ def _signal_worker() -> None:
         raise AssertionError("interrupt acceptance must not run physical computation")
 
     react.RunControl = ObservedControl
-    react.solve_prepared_optimization = no_computation
-    react.verify_prepared_optimization = no_computation
+    react.execute_comparison = no_computation
     time.sleep = controlled_sleep
     transport = NativeTransport("synthetic-test-key", http_transport=httpx.MockTransport(mock))
     selected = selection()
@@ -151,6 +172,13 @@ def test_sigint_stops_background_retry_and_next_turn_has_fresh_control(
     tmp_path: Path, source: str, phase: str
 ) -> None:
     workspace = tmp_path / "worker"
+    spawn_options: dict[str, Any] = {}
+    if sys.platform == "win32":
+        # Isolate Ctrl-C to a hidden test console; never signal the pytest/user console.
+        startup = subprocess.STARTUPINFO()
+        startup.dwFlags = subprocess.STARTF_USESHOWWINDOW
+        startup.wShowWindow = subprocess.SW_HIDE
+        spawn_options = {"creationflags": subprocess.CREATE_NEW_CONSOLE, "startupinfo": startup}
     process = subprocess.Popen(
         [
             sys.executable,
@@ -164,6 +192,7 @@ def test_sigint_stops_background_retry_and_next_turn_has_fresh_control(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        **spawn_options,
     )
     try:
         deadline = time.monotonic() + 15
@@ -178,13 +207,24 @@ def test_sigint_stops_background_retry_and_next_turn_has_fresh_control(
         else:
             pytest.fail("child did not reach its HTTP/backoff cancellation barrier")
         assert ready["phase"] == phase and ready["thread"].startswith("ThreadPoolExecutor")
-        process.send_signal(signal.SIGINT)
+        if sys.platform == "win32":
+            sender = subprocess.run(
+                [sys.executable, "-c", _WINDOWS_INTERRUPT, str(process.pid)],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            assert sender.returncode == 0, sender.stderr
+        else:
+            process.send_signal(signal.SIGINT)
         stdout, stderr = process.communicate(timeout=30)
         assert process.returncode == 0, stderr
         result = json.loads(stdout)
         assert result["next_turn_ok"] and result["handler_restored"]
         events = _events(workspace / "events.jsonl")
         assert any(event == {"event": "drain", "reason": "user-interrupt"} for event in events)
+        assert {"event": "barrier-released", "cancelled": True} in events
         assert [
             event for event in events if event["event"] == "request" and not event["later_turn"]
         ] == [{"event": "request", "later_turn": False, "after_cancel": False}]
@@ -238,4 +278,50 @@ def test_callback_interrupt_drains_before_waiting_for_stream_worker(
         assert any(message.text == "保留这条原始用户请求" for message in runtime.messages)
         assert not any(isinstance(message, AIMessage) for message in runtime.messages)
     finally:
+        runtime.close()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows native handler cleanup")
+@pytest.mark.parametrize("custom_handler", [False, True])
+def test_windows_console_handler_cleanup_on_stream_start_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, custom_handler: bool
+) -> None:
+    import win32api
+
+    changes: list[tuple[Any, bool]] = []
+    original_console = win32api.SetConsoleCtrlHandler
+    original_signal = signal.getsignal(signal.SIGINT)
+
+    def observed_console(handler: Any, add: bool) -> None:
+        changes.append((handler, add))
+        original_console(handler, add)
+
+    def broken_stream(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("synthetic stream construction failure")
+
+    transport = NativeTransport(
+        "synthetic-test-key",
+        http_transport=httpx.MockTransport(lambda _: pytest.fail("unexpected HTTP request")),
+    )
+    runtime = ReactAgent(
+        DmxNativeModel(transport=transport, selection=selection()), AgentDomainTools(tmp_path)
+    )
+    monkeypatch.setattr(win32api, "SetConsoleCtrlHandler", observed_console)
+    monkeypatch.setattr(runtime._graph, "stream", broken_stream)
+    if custom_handler:
+        signal.signal(signal.SIGINT, lambda signum, frame: None)
+    expected_signal = signal.getsignal(signal.SIGINT)
+    try:
+        with pytest.raises(RuntimeError, match="synthetic"), runtime._stream_run({}, False):
+            pytest.fail("failed stream was entered")
+        assert signal.getsignal(signal.SIGINT) is expected_signal
+        if custom_handler:
+            assert changes == []
+        else:
+            assert len(changes) == 2
+            assert changes[0] == (changes[1][0], True)
+            assert changes[1][1] is False
+        assert transport.request_count == 0
+    finally:
+        signal.signal(signal.SIGINT, original_signal)
         runtime.close()

@@ -1,0 +1,410 @@
+{
+  "schema_id": "hysys-agent-steady-delivery",
+  "schema_version": "1.0.0",
+  "status": "local_agent_and_real_hysys_verified_real_llm_pending_credential",
+  "scope": "single T-39 only; no old CDU execution",
+  "workflow_id": "steady-d59fa79bb2c99ea1",
+  "result_sha256": "8775c35389ed115be8cb72711e55e8b04990604bba050bc8ed0b25d5efe06514",
+  "local_acceptance": {
+    "path": "runs/simulation/agent-steady-local-20260911-v2/report.json",
+    "sha256": "9fad2867b982a29bfea624e77ec529d3a4f4df1ad675b6767fdd7637a59aa866"
+  },
+  "points": [
+    {
+      "role": "baseline",
+      "report": "runs/rto/steady-d59fa79bb2c99ea1/baseline/report.json",
+      "sha256": "2ee0ab81d8dbe87be33468ce4ef26ce947a86ade487a2fc882f200fcede10a8b",
+      "schema_version": "2.0.0",
+      "status": "passed",
+      "target_c": 156.8,
+      "source_unchanged": true,
+      "boundary_sha256": "adaf1f58d655545e5b340cfb6606f26108794820526a6e7a6f193cde0df24700"
+    },
+    {
+      "role": "candidate",
+      "report": "runs/rto/steady-d59fa79bb2c99ea1/candidate/report.json",
+      "sha256": "fb53a7f9fda65f33c793982fe3d148f84c5e180289773e6ee1fb1ca9b912815b",
+      "schema_version": "2.0.0",
+      "status": "passed",
+      "target_c": 156.9,
+      "source_unchanged": true,
+      "boundary_sha256": "f6b5de3af53aa6cc5993e61c64c6cc1a08e61b48ec9ebd2250855e433f7de517"
+    }
+  ],
+  "automated_tests": {
+    "passed": 935,
+    "skipped": 5,
+    "subtests_passed": 17,
+    "junit": "runs/simulation/dependency_setup_20260911/steady-final.xml",
+    "junit_sha256": "9ad09b70fab59ed74ff7e44fe2808b8465473fa7ec30eb67879cf313056fe9c8"
+  },
+  "static_checks": {
+    "ruff_files": 59,
+    "mypy_source_files": 21,
+    "local_links": 137
+  },
+  "source_originals": [
+    {
+      "path": "hysys/analyze_results.py",
+      "sha256": "bba79b0c29863a409d45b64bd502323c80ab720cca31b237152bacc72f91eccb",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/before_after.csv",
+      "sha256": "704663228149e986a011cf2e27440f461fee6947cfb56c786dffc54d5f0400fc",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/heat_loads.csv",
+      "sha256": "069f4806bcc6fe5c07666cac7fd88f969c995a8af8bcf465248f611155c2596a",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/products.csv",
+      "sha256": "9e1b51742ce4fee62ec4a2e3c961132c4895293445df86f08416402c409a6eb2",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/results_analysis.md",
+      "sha256": "a24538804deca565964596eb9413837539c0450a6d33c0a92669947f137c6cce",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/stages.csv",
+      "sha256": "32ec6c783c730b2cd0d0b126fe47aeffdefafe29ecf16916ac3d23f77b667501",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/summary.json",
+      "sha256": "325ab4f85329757d1285bc28c03a4a9d8a463056552575163d9e33a5169649a8",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/hysys_inspection.json",
+      "sha256": "524735252b826369e1567c7bdbe81608ae1c49da4c31f9766be955b33cbdd764",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/nature-figure.json",
+      "sha256": "dad100bf58fece91f6d9ce9ef861408b330aea06bb703ea8229bf8d464754a8b",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/operating_point_before.json",
+      "sha256": "21ed572cc511a25d28414ca815357997abec183bb7a7f0458e6ea073f60f512d",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/original/data_read",
+      "sha256": "313be0bd61ce5c77dddf3f48bd2d29be2293638bac5b636779a25facde825886",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/original/hysys_control.py",
+      "sha256": "ba1fb17f13858250bd5c025f6558aad6e81016899451284d48329194e4ab2073",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/original/main.py",
+      "sha256": "2e7ecf5824aebdd11bc16776e704518a44148b28ac864d29fc03633fc8e8a1e8",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/artifacts/run_report.json",
+      "sha256": "3c15797bbb3e5b01ba4a1e8d58f96102e6106810aa38c16017375859cc9d4b01",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/data_read",
+      "sha256": "e8bf169c8033c676690846b3a81448d65c099f934b663e6b801ea9f6d85aa04e",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/data_write",
+      "sha256": "313be0bd61ce5c77dddf3f48bd2d29be2293638bac5b636779a25facde825886",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/hysys_control.py",
+      "sha256": "8394f6c3ec0be4e996158590c0de3542be4008fa35f4112704702f920e7374a7",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/inspect_hysys.py",
+      "sha256": "6b74d55ca3449d0df651693d14a138a10d7df0b77e477e5b4ce1ed275c2a2071",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/main.py",
+      "sha256": "645270e6d746399e0baca4928d73c98e06360901a14e0e98ccab9627a91c7fd1",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/mjh_ATM.hsc",
+      "sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/README.md",
+      "sha256": "6514470757ad2f49e794c70f2500d7212cf9b5098b072bdf85a23179413884e4",
+      "unchanged": true
+    },
+    {
+      "path": "hysys/tests/test_hysys_control.py",
+      "sha256": "f4e7ef4f1b825af26259a5baecaef8a1777b640dca1bb8ba48540a706e98f0e6",
+      "unchanged": true
+    }
+  ],
+  "implementation_and_tests": [
+    {
+      "path": "src/petroleum_rto/assistant/__init__.py",
+      "sha256": "d211b642f2684d467153d3ffda4e31e262e582508a105c103c7da7964fcef02d"
+    },
+    {
+      "path": "src/petroleum_rto/assistant/cli.py",
+      "sha256": "ff43eb359a763abe5d0b60f687b9b4678f48c8fa5d6ceff9bf7b630a776c812e"
+    },
+    {
+      "path": "src/petroleum_rto/assistant/context.py",
+      "sha256": "dd7e07ed8adde93ee9027d0019ea5de25cb8ccc45705bacbd8db4353426821d2"
+    },
+    {
+      "path": "src/petroleum_rto/assistant/native_tools.py",
+      "sha256": "5bf9b38bff3e166b034a52ca908e5e6a80aeda85f568847da081054888a0041c"
+    },
+    {
+      "path": "src/petroleum_rto/assistant/presentation.py",
+      "sha256": "97598d4e375e382980441e93b8df2ca8815188066d6cd7bfbffc6e9cefe661c3"
+    },
+    {
+      "path": "src/petroleum_rto/assistant/react.py",
+      "sha256": "ecb7c37d2e0d40dc0190686cb4b7c2053cd081175a6d83335a7751fefb84fe1f"
+    },
+    {
+      "path": "src/petroleum_rto/assistant/session.py",
+      "sha256": "fb71a872e9decb7e92ccfc43251b2666cc9d9c92f3549e2a971aa841d5ee16f9"
+    },
+    {
+      "path": "src/petroleum_rto/assistant/state.py",
+      "sha256": "9ebf13e58e924e0cd8861f7d27dc7dfef13bd3328ec4115cac3aa2660f2f3248"
+    },
+    {
+      "path": "src/petroleum_rto/assistant/turn.py",
+      "sha256": "8429cbf34b35a74a3c1eb167035d8e7be643f7e21f01daba871a5835a0b729b3"
+    },
+    {
+      "path": "src/petroleum_rto/rto/adapters/hysys_steady.py",
+      "sha256": "adc37b619ad340ec6a5bd973d54e9f80a41ee4ce2d07e79ce32545f650e72276"
+    },
+    {
+      "path": "src/petroleum_rto/rto/runtime/steady.py",
+      "sha256": "ac44d0bc906433b97c1c8fa4a51be2349a6d0b433726c619bf6d211794b92e8f"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/__init__.py",
+      "sha256": "bdedf9566aea8d391f54bfb1fd4a17e588822857fe9e7ac3d39e4ffbede932b5"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/__main__.py",
+      "sha256": "f3259bc1a66c3e50a9a54fb3ef45f7ce9e6e805fddd1df2b368bb311e05b2caa"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/baseline.py",
+      "sha256": "7a3b54df4c64bc9cc08bc85db88670539c558d809d740762fc8062c963573f6a"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/boundary.py",
+      "sha256": "8f075eaf039bc427adae9ee8b561d381ba97f9dc47dbd9c4a5f0c03efb51f854"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/comparison.py",
+      "sha256": "dacda81bb1544812cce0c5bc3a451f38d611319c6e530163d75a3e7ce3204028"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/hysys.py",
+      "sha256": "94f9df99856483b0f16170a3a97e6e93d9b66685249c373b7f484a8d45140207"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/models.py",
+      "sha256": "bf11182c362c179dc9798c98cfbdb742e57ffe24de117820bf17035dd6ea13f2"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/point.py",
+      "sha256": "67713b24eed4de4167c10302fa43be550ac380bc500a95c728cfeb1e503dd428"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/point_evidence.py",
+      "sha256": "f4d2f0885f39c038e49c9e933177ac4b8bdb0f2462a80834ddeb4b7bd2619e42"
+    },
+    {
+      "path": "src/petroleum_rto/simulation/recovery.py",
+      "sha256": "143e16f62da590bd1c081b25c10e2894903c956c17148a68bd267c9b10de13b7"
+    },
+    {
+      "path": "tests/domain_model/unit/conftest.py",
+      "sha256": "7dd7863ba6fef25cfa85860b321976900864d9c6a58f1a6d0483e2fbc4bac49f"
+    },
+    {
+      "path": "tests/domain_model/unit/steady_helpers.py",
+      "sha256": "ac432378c95a59bc55da8ddecee4098b2026e576c4c2c849c352c0f8212ed569"
+    },
+    {
+      "path": "tests/domain_model/unit/test_agent_progress.py",
+      "sha256": "cd1745ae83b2d4abd0f6a9e02f0b2d134b2f138696b6b7978620ba847cf547a0"
+    },
+    {
+      "path": "tests/domain_model/unit/test_application_help.py",
+      "sha256": "9393a9377cc217afbe0dc73984711a0f4502e99e0a035ff5eb70d77470b8900d"
+    },
+    {
+      "path": "tests/domain_model/unit/test_architecture_boundary.py",
+      "sha256": "e8657da7a64b4e567a18b8e7754ac0115c27d1c1b278802afad20734e1a0cd1b"
+    },
+    {
+      "path": "tests/domain_model/unit/test_chat_cli.py",
+      "sha256": "2b0f14abdb02fce9a2e61ebcf07e91fd014443e6ebc017ad25ee511b235f284c"
+    },
+    {
+      "path": "tests/domain_model/unit/test_chat_cli_terminal.py",
+      "sha256": "a0da8a3147a12ec0142309b5b2d13eabeb72044272bcbf9766e29112fae126c9"
+    },
+    {
+      "path": "tests/domain_model/unit/test_context_compaction.py",
+      "sha256": "d75c41da2363588b088244e01c1dc4f561824e15fff7a798141dd7016aa48d5b"
+    },
+    {
+      "path": "tests/domain_model/unit/test_credentials.py",
+      "sha256": "e3dfd11eca55e719aab4739b5dc9f01db45b653a3620b5a42e343418195bd7a8"
+    },
+    {
+      "path": "tests/domain_model/unit/test_model_retry.py",
+      "sha256": "4eff0c0cd5c7a198146751aaf6b90926cacb381c1203267385fc17db5e0ca9db"
+    },
+    {
+      "path": "tests/domain_model/unit/test_model_retry_interrupt.py",
+      "sha256": "3df1ad26fab5e65cbbef6b03a594f6cd81a9f06719e29de9ae64e2e648fac53d"
+    },
+    {
+      "path": "tests/domain_model/unit/test_model_retry_streaming.py",
+      "sha256": "2baa67a8518123c6403b3c85bbc148dc324ce0d5ea752b08a0dd760b72a875c9"
+    },
+    {
+      "path": "tests/domain_model/unit/test_native_protocol.py",
+      "sha256": "5edfd2c4a321fc6e59cd10124e28fe8ba9a69fa1f6891ae8651139ef1322d3ef"
+    },
+    {
+      "path": "tests/domain_model/unit/test_native_retry_classification.py",
+      "sha256": "0321c55a996ae5f3b12db9dd45dfbc6eba726a0e2d43a5fee2eaabbb4c1af1d5"
+    },
+    {
+      "path": "tests/domain_model/unit/test_native_streaming.py",
+      "sha256": "c4f20fd3f3b554c4645afca5b234881c10995cfb654e173ff3d3c179168e3eed"
+    },
+    {
+      "path": "tests/domain_model/unit/test_optimization_tools.py",
+      "sha256": "aef5961f468e9936e53a4aab8011a50fed3970ef2dfd2310b8d40ef1aa8b28fc"
+    },
+    {
+      "path": "tests/domain_model/unit/test_persisted_agent.py",
+      "sha256": "b7f7367faca6cdb23da991d66d371a5a370cabfc9c0c9f6385aa512e8ba24f2b"
+    },
+    {
+      "path": "tests/domain_model/unit/test_react_agent.py",
+      "sha256": "e6ac06c8c9d8bde6be4ce074bd48683a2b47ff42748a95ea4680e766ac1ff228"
+    },
+    {
+      "path": "tests/domain_model/unit/test_react_recovery_edges.py",
+      "sha256": "14f6fb1fa488b0fb0e67c594b1cbcd50e214ec144feee04d6c82f920a4962716"
+    },
+    {
+      "path": "tests/domain_model/unit/test_result_explanation.py",
+      "sha256": "37781743a13dd39ac98f5e744571d68763ea405738ec3a61b4216be56aa44347"
+    },
+    {
+      "path": "tests/domain_model/unit/test_result_presentation.py",
+      "sha256": "a9d0f5113b1fa6f9248b7b7ea99bf742640d9e46d498360b671b7573fef6cb4c"
+    },
+    {
+      "path": "tests/domain_model/unit/test_session_credentials.py",
+      "sha256": "1eb0f90374bc9317a245af1654eb9d631d913ba892790249c6569937243924a7"
+    },
+    {
+      "path": "tests/domain_model/unit/test_session_store.py",
+      "sha256": "5049e2b089b73cc403afc390f38db6bdc83a34afae127ccdd252663f0f433afe"
+    },
+    {
+      "path": "tests/domain_model/unit/test_summary_persistence.py",
+      "sha256": "f55306ca2c7f2e1358d03551950cd5a4fff0c114abe1c85afa495848be0ad31e"
+    },
+    {
+      "path": "tests/domain_model/unit/test_summary_public_boundaries.py",
+      "sha256": "aa04b9d7ceeb25d26a8d18170d2e38036a3ad15f8b6ce0bfb4ea0d01f3301f73"
+    },
+    {
+      "path": "tests/simulation/point_boundary_helpers.py",
+      "sha256": "a768d512de97a419affe1fc7e2c9688bd16c3725e4ceba5c581eddc1aff57bb5"
+    },
+    {
+      "path": "tests/simulation/test_baseline.py",
+      "sha256": "db5af5f48582c74aad789fbdf8a34aad7e0549933f018f5c3593f6fca20540b6"
+    },
+    {
+      "path": "tests/simulation/test_boundary.py",
+      "sha256": "56e3623b6f7a681bba32b65afed0bad6b0bbc3704a85e7acbe4c552ea12ede37"
+    },
+    {
+      "path": "tests/simulation/test_comparison.py",
+      "sha256": "ee15ea5b71d4105e3d6cf17196a41b33480507f7149c9510fc7a2c319b427df5"
+    },
+    {
+      "path": "tests/simulation/test_hysys_read_probe.py",
+      "sha256": "f92296cda1d2aa23227aec049e9b580e0794a4156d60b4ad97f3aea0546fc4fc"
+    },
+    {
+      "path": "tests/simulation/test_hysys_reader.py",
+      "sha256": "01bca630b1609677d9322b66bc2259670e48d563bfb7bb304febaf62731ef571"
+    },
+    {
+      "path": "tests/simulation/test_point.py",
+      "sha256": "e2dcb24c2d8de2279bb74e229e51dbaf8ef72c82355734eb1e83a254b62adfd3"
+    },
+    {
+      "path": "tests/simulation/test_point_cli.py",
+      "sha256": "97984cc2b2b31cb37ceec04043d2d7110d1cffed50ec7a6daee32f7d4d3a84c1"
+    },
+    {
+      "path": "tests/simulation/test_point_evidence.py",
+      "sha256": "8f12fde007b196109baccf214f00f489a14161e355b09838323b5347255c6fb5"
+    },
+    {
+      "path": "tests/simulation/test_recovery.py",
+      "sha256": "e20ea2b716eaa1c59548863279c3d41867142b8b656dd76bc683ed27bbb0abdf"
+    },
+    {
+      "path": "tests/simulation/test_snapshot.py",
+      "sha256": "db1ab50d5e425c87ff175d6164451fdaf3421883eceb14c98085668c6d96e367"
+    },
+    {
+      "path": "tests/simulation/test_steady_runtime.py",
+      "sha256": "f2d4bb2815b42ed48d9c6cc6261e475078526069b48dea71528c58e1c16dabad"
+    },
+    {
+      "path": "tests/simulation/test_t39_order.py",
+      "sha256": "c85d49faaf350c4b28b9047e0f7440a66e6d50f3b1d1f60509b950ea633c7271"
+    }
+  ],
+  "limitations": [
+    "Repeated recalculation differences remain unresolved; comparison_only and eligible=false.",
+    "Separate cases share one HYSYS application; no COM hard timeout.",
+    "Existing CDU offline core/CLI retained but removed from current Agent flow.",
+    "No real model request in this batch: initial auto-review rejection resolved by explicit user approval, then local credential file found absent."
+  ],
+  "next_step": "Configure local DMXAPI credential; verify authorized real model with minimal simulation summary.",
+  "original_control_script_review": {
+    "suspend": "Solver.CanSolve=False",
+    "resume": "Solver.CanSolve=True",
+    "set_mv_original": "suspend; sequential table writes; finally resume",
+    "formal_point": "pause; only T-39 write; Reset; resume; Run; wait; target check; own boundary; close working cases"
+  },
+  "git_commit_or_push": false
+}

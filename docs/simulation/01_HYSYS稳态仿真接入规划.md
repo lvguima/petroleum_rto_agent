@@ -1,30 +1,34 @@
 # HYSYS稳态仿真替换与Agent接入规划
 
-_2026-09-11 · 仿真文件：mjh_ATM.hsc · 用户已明确稳态专用、删除旧CDU及动态内容、HYSYS优先工况来源；当前仍为规划，实施未开始。进度以[STATUS](../STATUS_REACT_REBUILD.md)为准。_
+当前授权已从首轮T-39贯通扩展到变量目录内24项MV的单项/多项调节。实现与验收以[当前连接说明](02_HYSYS连接与状态读取说明.md)及[STATUS](../STATUS_REACT_REBUILD.md)为准；下文首轮T-39限制为阶段历史，不再限制当前可选MV。只选代表变量实际联调，不全量逐项扰动，不扫描模型失收敛推定范围。
+
+_2026-09-11 · 仿真文件：mjh_ATM.hsc · 用户已明确稳态专用、删除旧CDU及动态内容、HYSYS优先工况来源；读取、严格快照、内存基准/恢复、T-39单点及独立物料/能量边界已实测，H1/H2部分完成。固定ABBA重复输出存在差异，顺序验收失败，须先诊断；Agent已接入唯一T-39稳态比较并通过真实模型联调；旧CDU及专用离线链路已退役，其他变量和优化搜索尚未开放。进度以[STATUS](../STATUS_REACT_REBUILD.md)为准。_
 
 已确定用HYSYS稳态仿真完整替换原Python CDU，删除旧稳态、动态、控制、校正、验证及其专用入口；不保留双后端、动态占位或DCS扩展分支。保留Agent的意图理解、人工确认、RTO候选搜索、结果解释和证据管理。新仿真代码及资产统一归属simulation模块；装置状态默认从HYSYS读取，固定快照仅为明确标注的离线来源。
 
-当前材料足以设计接口，但还不足以发布优化变量范围或产品质量约束。以下保留前三节文件事实，第四节起是按用户最新范围重写的整体方案。本轮只修改规划/导航/状态和整理核对报告，没有搬入或删除模型实现。
+当前材料及只读实测仍不足以发布优化变量范围或产品质量约束。以下前三节保留历史文件事实与原始数值，当前核定另作补记；第四节起是整体替换方案。现行能力以[连接与状态读取说明](02_HYSYS连接与状态读取说明.md)及[变量与正式读取报告](../../reports/simulation/hysys_binding_qualification_20260911.json)为准，当前Agent已调用新模块；hysys来源模型原位保留，旧物理实现已删除。下文替换步骤保留设计背景，实际保留范围以STATUS及当前模块说明为准。
 
 ## 📁 1. 目录中什么有用
 
-来源目录：[hysys_moni](/Users/idc/Desktop/hysys_moni)。[只读核对记录](../../reports/simulation/hysys_inventory_20260911.json)保存26个文件的大小、SHA-256、60个表单映射及核算结果；[替换范围核对](../../reports/simulation/hysys_replacement_scope_20260911.json)列出旧模块文件、跨模块引用和Windows障碍。未复制二进制模型。
+历史来源目录为`/Users/idc/Desktop/hysys_moni`，当前对应项目[hysys/](../../hysys/)。[只读核对记录](../../reports/simulation/hysys_inventory_20260911.json)保存26个文件的大小、SHA-256、60个表单映射及核算结果；[替换范围核对](../../reports/simulation/hysys_replacement_scope_20260911.json)列出旧模块文件、跨模块引用和Windows障碍。
+
+**Windows接续补记：** [Windows接收核对报告](../../reports/simulation/windows_hysys_intake_20260911.json)确认22个非缓存/系统文件与原清单逐一哈希相符，包含核心模型和正确导出；8份JSON严格解析、5份现行Python语法检查及现有10项离线测试通过。本机HYSYS为V12.0，项目Python3.12.13已安装pywin32。正式`simulation`读取器现已消费版本化变量目录，核对60项真实绑定并按显式单位读取，取得73级、20项规格/10项活动规格及直接读取的0自由度，严格快照保存与重载已实测。正式入口只附着用户已打开的指定案例，不沿用来源脚本的打开/激活行为；两次自动打开副本失败仍见[早期读取证据](../../reports/simulation/windows_hysys_read_20260911.json)，根因尚未解决。来源目录仍保留原样，尚未完成H1资料迁移。
 
 | 文件 | 已查明的用途 | 接入时的处理建议 |
 | --- | --- | --- |
-| [mjh_ATM.hsc](/Users/idc/Desktop/hysys_moni/mjh_ATM.hsc) | 1,773,263字节的二进制案例，文件头为SimulationCase10 | 核心资产，保持原件；Windows使用受控工作副本。文件头不能证明产品版本 |
-| [hysys_control.py](/Users/idc/Desktop/hysys_moni/hysys_control.py) | 通过COM访问Table和C-1102，读取运行点、写MV、校验回读、等待收敛 | 复用已实现的读写逻辑，在专用适配器内补足任务隔离和严格证据 |
-| [main.py](/Users/idc/Desktop/hysys_moni/main.py) | 一次连接、快照、写入、求解、导出的命令入口 | 可作为Windows首轮联调参考，不能直接充当多候选RTO执行器 |
-| [data_read](/Users/idc/Desktop/hysys_moni/data_read) | 修正气相读取后的最近一次导出 | 历史HYSYS快照，可供Mac读取和展示；不是当前在线工况 |
-| [data_write](/Users/idc/Desktop/hysys_moni/data_write) | 输入文件，只有mv实际参与写入；同时夹带旧cv和stage | 后续请求只保留需要修改的变量；其中旧输出不得作为结果证据 |
-| [hysys_inspection.json](/Users/idc/Desktop/hysys_moni/artifacts/hysys_inspection.json)及inspect_hysys.py | COM成员清单、Table的设备/属性/原始数值/单位标签 | 变量对照依据；缺少单元格连接到哪个真实HYSYS属性的信息 |
+| [mjh_ATM.hsc](../../hysys/mjh_ATM.hsc) | 1,773,263字节的二进制案例，文件头为SimulationCase10 | 核心资产，保持原件；Windows使用受控工作副本。文件头不能证明产品版本 |
+| [hysys_control.py](../../hysys/hysys_control.py) | 通过COM访问Table和C-1102，读取运行点、写MV、校验回读、等待收敛 | 复用已实现的读写逻辑，在专用适配器内补足任务隔离和严格证据 |
+| [main.py](../../hysys/main.py) | 一次连接、快照、写入、求解、导出的命令入口 | 可作为Windows首轮联调参考，不能直接充当多候选RTO执行器 |
+| [data_read](../../hysys/data_read) | 修正气相读取后的最近一次导出 | 历史HYSYS快照，可供离线读取和展示；不是当前在线工况 |
+| [data_write](../../hysys/data_write) | 输入文件，只有mv实际参与写入；同时夹带旧cv和stage | 后续请求只保留需要修改的变量；其中旧输出不得作为结果证据 |
+| [hysys_inspection.json](../../hysys/artifacts/hysys_inspection.json)及inspect_hysys.py | COM成员清单、Table的设备/属性/原始数值/单位标签 | 变量对照依据；缺少单元格连接到哪个真实HYSYS属性的信息 |
 | operating_point_before.json、run_report.json | 本次运行前快照及成功/收敛/耗时报告 | 保留历史证据；后续改为每次运行独立保存 |
 | analyze_results.py、artifacts/analysis/ | 从既有JSON生成的分析、汇总和CSV | 可追溯的派生分析，不是额外仿真试验 |
 | tests/test_hysys_control.py | 模拟单元格及求解状态的离线测试 | 保留相关读写/回滚测试；不作为Windows实算证明 |
 | artifacts/original/ | 改进前脚本和错误气相导出的备份 | 历史参考，不迁入活动接口 |
 | __pycache__/、.DS_Store、artifacts/nature-figure.json | 缓存、系统元数据；最后一项仅含backend=python | 无仿真接入用途，可列为后续清理对象；本轮未删除 |
 
-README记录Windows上使用HYSYS V12、Python 3.11和pywin32；本轮没有在Windows重新确认这些版本。run_report记录2026-09-09一次24项MV写入成功、36项输出和73级导出，历时3.687秒。输入、运行前、运行后的MV完全相同，属于同工况重求解，不是扰动或优化实验。不能把3.687秒直接用作新候选的耗时估计。
+来源README记录当时Windows使用HYSYS V12、Python3.11和pywin32；当前项目环境另见STATUS。来源run_report记录2026-09-09一次24项MV写入成功、36项输出和73级导出，历时3.687秒。输入、运行前、运行后的MV完全相同，属于同工况重求解，不是扰动或优化实验。不能把3.687秒直接用作新候选的耗时估计。
 
 analysis/summary.json中的四个源文件哈希均与现有文件一致。不过旧运行报告没有记录案例哈希，不能证明本次收到的.hsc二进制与那次运行时的案例内容完全相同，也不能证明当时内存状态已保存到文件。
 
@@ -53,7 +57,7 @@ analysis/summary.json中的四个源文件哈希均与现有文件一致。不�
 
 文件实际使用mv、cv、stage三个分区。用户所说的PV可以覆盖读取的cv和塔级属性；这里只能确认它们是输出，不能据cv命名认定全部是控制回路的被控量。24个MV首先是“接口允许写入的字段”，还不是24个已批准优化自由度。
 
-| 原字段或字段组 | 当前值 | 首版用途与待确认事项 |
+| 原字段或字段组 | 历史导出值 | 历史规划中的用途与待确认事项 |
 | --- | --- | --- |
 | crude_oil.temperature_C / pressure_kPa / massflow_kg_h | 32.6 / 180 / 400000 | 工况输入；首轮优化固定，之后可做明确指定的负荷/进料情景 |
 | heater_to_flash.D_temperature_C | 169.4 | 加热规格候选；D是温升还是出口值须查属性连接 |
@@ -69,15 +73,17 @@ analysis/summary.json中的四个源文件哈希均与现有文件一致。不�
 | C-1102.boilup_rate | 0.5，标签% | 暂时固定；0.5比例、0.5%或自定义显示尚不能确定 |
 | C-1102.39/26/16_temperature_C | 156.8 / 215 / 301 | 优先检查的分馏规格候选；活动规格、实际控制对象和联动约束须验证 |
 
-读取范围包括全部36项CV和73级状态。供优化的变量目录则只开放已确认语义、写入有效、具备范围和步长、扰动后能够恢复的条目；不从一个基准值自动生成“±5%安全范围”。首轮选1–2个资格通过的变量，候选分组优先考虑塔级温度规格、循环规格、汽提流量、加热规格。
+**Windows当前核定：** 上表保留历史数值及当时疑问，不覆盖为当前工况。真实ImportedVariable及类型库已确认：加热设备的`D_temperature_C`是温差，泵的`D_pressure_kPa`是压差；Flash对应液相体积百分比，正式ID为`flash_column.liquid_volume_percent`。`Kerosene SS BoilUp Ratio`是无量纲0.5，不是0.5%，正式ID为`C-1102.kerosene_ss_boilup_ratio`。三组PA分别绑定循环流量与返回温度，另有三条塔温规格和再沸比。24项MV实测为指定状态且可修改，36项CV为计算状态且不可修改；这些属性不构成优化授权。当前60项绑定、单位及规格证据见[正式读取说明](02_HYSYS连接与状态读取说明.md)和[核定报告](../../reports/simulation/hysys_binding_qualification_20260911.json)。
+
+读取范围包括全部36项CV和73级状态。首版按用户最新要求，仅用T-39这一个调控变量贯通Agent，其他变量维持当前设定，不列为首版必测任务。后续优化搜索范围需有明确依据，不从一个基准值自动生成“±5%安全范围”，也不通过持续调整至模型不收敛来认定上下限。
 
 单个变量需要一份权威定义：稳定变量ID、中文名、来源对象/属性、读写角色、原始及规范单位、量纲语义、绑定规则。已开放决策再关联经确认的上下界、步长和当前值来源。工艺限制与界面标签不能混在一起；目录只存元数据，快照存观测值。
 
-单位转换必须按已核对的属性定义执行：现有Table的kg/s→kg/h和kJ/s→kJ/h乘3600已在文件中相互对应，但D列只是表单文字，不能作为其它案例的通用单位证明。绝对℃→K加273.15，温差℃→K不加偏移；压力必须声明绝压/表压；百分号未确认前保留原始值并禁止相关优化。TBP还应补充馏出百分数基准及属性方法。
+单位转换必须按已核对的属性定义执行：历史Table的kg/s→kg/h和kJ/s→kJ/h乘3600在来源文件中相互对应，但D列只是表单文字，不能作为单位证明；正式读取器已改用真实属性的`GetValue`请求规范单位，另存原始内部值。绝对℃→K加273.15，温差℃→K不加偏移；压力仍须核实绝压/表压基准，新增或未核定字段不得凭百分号开放优化。TBP还应补充馏出百分数基准及属性方法。
 
 ## 📂 4. 模块归属与最小接口
 
-新模块命名为simulation，按现有“类型目录＋模块命名空间”放置内容；不沿用cdu这个已经代表旧Python实现的包名。以下是实施目标，不在规划阶段创建空目录或空类。
+新模块命名为simulation，按现有“类型目录＋模块命名空间”放置内容；不沿用cdu这个已经代表旧Python实现的包名。已建立`models.py`纯Python不可变观测、`hysys.py`只读实现及`__main__.py`独立入口，并实际消费`configs/simulation/mjh_atm_variables.json`。基准捕获/恢复、T-39单点和严格结果读取已形成正式接口；`boundary.py`另消费实际边界定义，提供独立只读证据，尚未并入逐候选单点结果。下表列完整实施目标，其余变量及RTO适配能力不因目录存在而视为完成。
 
 | 目标位置 | 负责的内容 |
 | --- | --- |
@@ -102,7 +108,7 @@ HYSYS通过COM提供自动化能力，现有脚本已经采用该路线。[Aspen
 
 ## 📡 5. 从HYSYS取得工况，以及如何固定一次优化
 
-当前[Agent工具](../../src/petroleum_rto/assistant/native_tools.py)的装置介绍和工况读取均写死`configs/rto/contexts/case_20260604.json`；[展示投影](../../src/petroleum_rto/rto/runtime/chat_summary.py)要求旧炉温/塔压两个设定及三个库存比，并把模拟器状态固定写成idle。[OperatingContext](../../src/petroleum_rto/rto/contracts/context.py)还强制要求进料组成。上述假设必须一起删除；缺少HYSYS原油组成时应标明缺项，不用旧七组分表补齐。
+当前[Agent工具](../../src/petroleum_rto/assistant/native_tools.py)的装置介绍和工况读取均写死`configs/rto/contexts/case_20260604.json`；展示投影（已退役，历史路径：`../../src/petroleum_rto/rto/runtime/chat_summary.py`）要求旧炉温/塔压两个设定及三个库存比，并把模拟器状态固定写成idle。OperatingContext（已退役，历史路径：`../../src/petroleum_rto/rto/contracts/context.py`）还强制要求进料组成。上述假设必须一起删除；缺少HYSYS原油组成时应标明缺项，不用旧七组分表补齐。
 
 ### 数据来源规则
 
@@ -151,9 +157,9 @@ flowchart LR
 
 | 位置 | 现有耦合 | 目标修改 |
 | --- | --- | --- |
-| [capabilities/models.py](../../src/petroleum_rto/rto/capabilities/models.py)、目录/政策及打包数据 | 决策要求M2参数和M4回路；路线有动态事件、时域和预设 | 只绑定稳态变量；删除动态字段，搜索次数/返回数量各自有唯一含义；换成本案例指标和工艺条件 |
-| [contracts/context.py](../../src/petroleum_rto/rto/contracts/context.py)、context/loader.py | 旧进料组成、设定和库存合同；只读JSON案例 | 以HYSYS快照为权威来源；固定快照走同一严格转换，移除旧case默认值及动态库存 |
-| [problem/builder.py](../../src/petroleum_rto/rto/problem/builder.py)、contracts/problem.py | 强制dynamic_verification_required=True及M4时间参数 | 删除动态计划字段及必经阶段，构造仅含稳态目标/决策/约束/预算的固定问题 |
+| capabilities/models.py（已退役，历史路径：`../../src/petroleum_rto/rto/capabilities/models.py`）、目录/政策及打包数据 | 决策要求M2参数和M4回路；路线有动态事件、时域和预设 | 只绑定稳态变量；删除动态字段，搜索次数/返回数量各自有唯一含义；换成本案例指标和工艺条件 |
+| contracts/context.py（已退役，历史路径：`../../src/petroleum_rto/rto/contracts/context.py`）、context/loader.py | 旧进料组成、设定和库存合同；只读JSON案例 | 以HYSYS快照为权威来源；固定快照走同一严格转换，移除旧case默认值及动态库存 |
+| problem/builder.py（已退役，历史路径：`../../src/petroleum_rto/rto/problem/builder.py`）、contracts/problem.py | 强制dynamic_verification_required=True及M4时间参数 | 删除动态计划字段及必经阶段，构造仅含稳态目标/决策/约束/预算的固定问题 |
 | compilation/compiler.py、ports/interfaces.py、contracts/simulation.py | M2/M4双请求、动态事件与阶段枚举 | 单一稳态请求和基准/候选配对；不保留M4占位、动态sample/event计数 |
 | evaluation/m2.py、evaluation/m4.py、evaluation/formulas.py | 旧物理字段和质量/燃料代理、M4验收 | 删除m4.py，适用的配对检查迁为steady评价；删除旧指标和旧公式，新增有真实HYSYS依据的公式 |
 | selection/selector.py、contracts/finalization.py、orchestration/ | 完整M4短名单、dynamic_evaluations.json、动态阶段回执与恢复 | 以有效稳态结果和工艺约束选方案；保存实际复算证据；删除动态产物/回执/reader路径 |
@@ -166,7 +172,9 @@ flowchart LR
 
 源码检索已发现旧CDU根目录以外53个源码/配置/测试/脚本文件包含相关引用；这是待逐项审查范围，不是53个应直接删除的文件。完整清单见替换范围报告。特别是现有M2评价器会把not_converged归为process_infeasible，新合同必须区分“未求得数值解”与“已求解且违反工艺约束”；COM/许可/损坏等系统错误也不能混入工艺判定。
 
-现有单目标/多目标算法可继续使用，但M2命名收敛为steady或evaluation，删除默认继承的33/81预算及旧变量网格假设；新预算按实际变量数量与Windows耗时确定。优化变量初期仍限定已验证的1–2项，24个可写量不等于一次开放24维网格。进料负荷情景如需保留，必须在HYSYS副本执行并取得新快照，不能只把Context中的feed数字乘比例就当成新工况。
+现有单目标/多目标算法可继续使用，但M2命名收敛为steady或evaluation，删除默认继承的33/81预算及旧变量网格假设；新预算按实际变量数量与Windows耗时确定。首版唯一调控变量为T-39，用于贯通整个Agent流程，不安排24项控制变量逐一扰动验收，其余变量保持当前设定。联调可沿用已实测156.8℃和156.9℃两个离散目标，但不把它们包装成工艺上下限；重复性失败须如实回传，不宣称可靠最优排名。进料负荷情景如需保留，必须在HYSYS副本执行并取得新快照，不能只把Context中的feed数字乘比例就当成新工况。
+
+候选的物料/能量数据在其工作副本计算结束后、恢复基准前读取，并与该次输入和结果一同保存；评价复用这份对应证据。变量范围和产品约束在具体优化任务中按需定义，不作为只读连接或单点接入的前置门禁；没有已确认质量条件时可以展示仿真结果，但不声明满足成品要求或已取得合格最优解。
 
 ### 目标、约束和结果的实际含义
 
@@ -205,16 +213,27 @@ flowchart LR
 
 ## 🧪 8. 分批实施与验收顺序
 
-跨模块合同变化较大，先形成可验证的替换链，再删除依赖根。每批同步源码、配置、测试、主文档和STATUS；临时不能执行的功能必须清楚显示，不让旧模拟器代跑。以下均尚未实施。
+跨模块合同变化较大，先形成可验证的替换链，再删除依赖根。每批同步源码、配置、测试、主文档和STATUS；临时不能执行的功能必须清楚显示，不让旧模拟器代跑。正式只读读取与严格快照重载已实测，H1/H2部分完成；完整批次状态以STATUS为准。
+
+### Windows接续的小批次安排（资料接收后）
+
+已有模型/脚本完整性、安装注册和来源离线测试核对完成。项目3.12正式入口已取得60变量真绑定与规范单位、73级、20项规格/10项活动规格及0自由度，并完成不可变快照保存和严格重载。当前源内存`IsDirty=true`，因此使用SaveCopyAs保存内存基准；同一HYSYS应用内自动打开独立工作案例并零容差恢复已通过，独立新进程仍未成功。T-39固定诊断及正式单点已通过，后续固定ABBA重复性验收失败；独立边界读取已实测，尚未扩展其他变量。现行合同见[连接读取说明](02_HYSYS连接与状态读取说明.md)，本批实测见[顺序与边界报告](../../reports/simulation/hysys_order_boundary_20260911.json)。H1/H2按以下小步继续推进，在重复性问题和候选证据边界明确后进入H3。
+
+1. **连接与状态读取（已实测）。** 正式只读入口记录案例路径、源文件哈希、软件版本、内存状态、实际变量/塔级/规格和求解状态；连续两份完整采样及四次状态检查后保存到独立`runs/simulation/`目录，并严格重载核对。读取失败保留结构化诊断，不写MV、不覆盖历史导出。采样一致不构成原子快照，当前合同仍禁止用于优化；独立新进程启动失败另列待解决项，同应用副本Open已成功。
+2. **变量与仿真资料归位（部分完成）。** 本案例60项真实属性绑定、量纲、显式单位及10项活动规格映射已核定，唯一变量目录和严格快照合同已实现并实测。必要源资产尚未按H1迁移；首版只开放T-39贯通流程，已实测两个目标可供有限联调，不扩其余控制变量。连续搜索范围和质量约束在具体优化任务中按需定义，不将极限探查或全产品质量认证设为接入前置任务。
+3. **基准重建与副本单点（部分完成）。** 基准捕获、严格重载和恢复已有正式接口；固定T-39 +0.1℃在工作塔Reset后Run，通过实际温度跟随与A零容差恢复，前两次仅Run时未跟随的失败保留。T-39正式单点完成原目标和+0.1℃实测；后续A→B→B→A的四点各自通过，但同目标重复输出存在差异，零容差顺序验收失败。源案例和原件均保持不变。下一步先定位重复求解差异，再扩其他变量或候选评价；现有接口不发布工艺范围或质量约束。区分写入失败、未跟随、数值未收敛、COM/许可错误和调用未结束；超时不盲目重发，副本处置与恢复证据先于多候选搜索。
+4. **Windows运行基础。** 项目锁定依赖、单写锁、文件保护、原生终端及会话相关适配和针对性回归已完成，范围见STATUS。后续Agent切换仍需验证组合后的双进程互斥、退出/异常恢复及中文路径，不以旧CDU实验替代HYSYS验收，也不以移除保护来取得可运行性。
+
+随后按H3统一稳态请求、评价、排序和严格证据，并以公共入口完成有限候选搜索及推荐复算；H4协调切换当前工况查询、确认、执行、结果展示和会话版本。H3/H4中间态不得通过旧Agent执行已不匹配的合同，旧审批不沿用。依赖切断后执行H5删除；H6以真实HYSYS完成完整Agent链及重启只读重载验收。每批先做最相关验证，后续不重复以已通过离线测试替代真实连接/恢复证据。
 
 | 批次 | 交付与同步删除 | 最低验收 |
 | --- | --- | --- |
-| H1：仿真模块与资料归位 | simulation模块及变量/快照合同；引入核心.hsc和正确导出，排除旧错误输出；配置/数据/测试按新目录归属 | 导入不依赖Windows COM；24/36/73可追溯；拒绝重复键、非有限值、单位不明及无来源数据；迁入原件哈希一致 |
-| H2：HYSYS状态与单点稳态接口 | 实现当前状态读取、基准冻结、预览/单点执行/严格证据；补齐Windows锁/会话/终端兼容；删除迁入脚本的覆盖式输出和不受控活动案例复用 | Mac合同及失败路径通过；Windows验证实时读取、修改规格、A→B→A、隔离副本和复位；不能实测时记录已实现未验证，禁止宣布接通 |
+| H1：仿真模块与资料归位（部分完成） | 已有simulation只读模块、变量目录、不可变快照及模块测试；尚须引入核心.hsc和正确导出，排除旧错误输出 | 纯Python合同、真实绑定/单位、完整读取及严格重载已验证；资料迁入及原件哈希核对仍待执行 |
+| H2：HYSYS状态与单点稳态接口（部分完成） | 已有读取、基准捕获/严格重载、副本恢复及Windows基础；T-39正式单点与严格证据读取已实现，独立物料/能量边界待并入逐次计算结果；其他调控变量不在首版范围 | Windows读取、内存基准重开、T-39响应及A零差恢复已通过；固定A→B→B→A四点各自通过、重复输出不等，顺序验收失败；采用同应用案例隔离，独立进程未验证；各批真实结果见STATUS |
 | H3：RTO稳态合同与评价 | 统一稳态请求、Context、能力/Problem/策略引用；删除M4评价/字段/产物，替换旧指标、情景假设、provider装配和公共CLI必填case | 以同一仿真接口完成基准/候选/推荐复算；系统错误、数值非收敛、约束失败分开；严格重载与候选去重；无假动态通过 |
 | H4：Agent与恢复整体切换 | get_plant_info/read_operating_context改HYSYS优先；单一稳态节点、确认前漂移检查、实时/固定来源展示、进度与解释；升级会话/工具并退出旧审批 | 当前状态来自真实来源；固定快照有标签；刷新不换旧计划；未确认不算；重复确认/result/启动无重算；旧会话不接续旧CDU任务 |
 | H5：删除旧模型和全部残余 | 依赖已断开后删除第7节旧模型代码/配置/测试/报告/专用文档与包入口；保留通用原始资料和用户证据；更新总导航与主说明 | 新路径可导入、安装/帮助/离线查询可用；活动依赖扫描无旧CDU/M4；原始资料清单一致；相关回归及剩余全仓检查通过 |
-| H6：Windows有限变量优化验收 | 以已确认范围、质量条件和可用指标开放1–2变量；验收整个稳态Agent链 | 真实查询→准备→确认→多候选求解→推荐复算→解释→重启只读重载；实测耗时与重复容差；候选顺序不污染结果；无COM替身代替实算 |
+| H6：Windows单变量Agent验收 | 仅用T-39贯通查询、准备、确认、计算、结果解释及保存重载；首轮有限目标联调，优化排名另须满足范围/质量/重复性条件 | 真实查询→准备→确认→基准与候选求解→比较/解释→重启只读重载；执行失败和重复性未通过如实呈现；不以COM替身代替实算或将联调通过称为最优解证明 |
 
 H1以及H2–H5的合同/实现/离线回归可以在Mac推进，Windows实算门禁记录未执行，不因为Mac测试通过而开放真实优化。只要活动调用已全部切断且Mac回归通过，旧代码删除不必等到H6；Windows验收尚未通过的事实必须持续可见。H6通过才声明HYSYS稳态Agent接入完成。
 
@@ -230,12 +249,12 @@ H1以及H2–H5的合同/实现/离线回归可以在Mac推进，Windows实算�
 
 ## 📌 9. Windows限制、待补资料与本轮边界
 
-[assistant/session.py](../../src/petroleum_rto/assistant/session.py)直接import fcntl并使用O_NOFOLLOW/getuid/fchmod；[rto/_file_lock.py](../../src/petroleum_rto/rto/_file_lock.py)明确拒绝非POSIX；[assistant/cli.py](../../src/petroleum_rto/assistant/cli.py)缺readline就退出交互。因此目前不能声称完整Agent直接复制到Windows即可运行。Python官方也明确fcntl仅适用于Unix。[Python fcntl文档](https://docs.python.org/3.12/library/fcntl.html)
+[assistant/session.py](../../src/petroleum_rto/assistant/session.py)、[rto/_file_lock.py](../../src/petroleum_rto/rto/_file_lock.py)和[assistant/cli.py](../../src/petroleum_rto/assistant/cli.py)已增加Windows文件锁、私有文件保护及原生终端分支。POSIX仍使用fcntl等原机制；Python官方明确fcntl仅适用于Unix。[Python fcntl文档](https://docs.python.org/3.12/library/fcntl.html) Windows实测范围和剩余门禁统一记录在STATUS，不以COM读取成功代表完整稳态Agent已经接通。
 
-同机运行的建议仍成立，但实施必须先完成有限的Windows适配：采用可用的本地独占文件锁和对应文件保护，保持会话及证据单写；交互输入使用系统可用能力，不强求Unix readline。优先标准库或已必需的Windows依赖，不建设通用并发平台。项目要求Python3.12，而来源README报告3.11；首选在独立Windows3.12环境验证HYSYS/pywin32，不修改现有可用环境，也不凭记录宣布新组合兼容。
+同机运行的建议仍成立；Windows适配采用本地锁及系统文件保护，保持会话及证据单写，使用原生终端而不强求Unix readline。用户已授权安装相关依赖，本机保留既有项目3.12环境并定向安装锁定依赖，HYSYS/pywin32实际附着读取已通过。来源README中的3.11仅作来源事实，不代表项目环境。
 
 COM对象应在所属线程初始化、使用、释放并处理消息，HYSYS任务串行；客户端超时不能保证阻塞COM已经停止。[Microsoft COM线程规则](https://learn.microsoft.com/en-us/windows/win32/com/single-threaded-apartments) 不增加后台服务；若以后明确要求Mac长期调用Windows，再单独增加一条承载同一请求合同的通信通道。
 
-Windows仍需补导出：精确产品版本、物性/原油assay与依赖资源、设备物流拓扑、Table属性链接及单位基准、活动塔规格/独立自由度、Water相态、产品含水/边界物流、热负荷边界，以及经确认的变量范围/步长和质量约束。动态控制器、动态试验和DCS数据均不在本阶段待办。
+Windows产品版本、本案例60项Table真实绑定与单位、活动规格及直接读取的自由度已核定；内存基准捕获、副本恢复及固定单变量诊断已通过。当前只读已核实主/塔子流程设备和流连接、44组分物性体系、Water入口液相及后续汽化、产品含水和11股物理能流，详见现行读取说明。仍缺原油assay与依赖资源核查、压力基准和TBP方法、产品质量及公用工程指标口径，以及经确认的变量范围/步长。固定ABBA已实测失败，重复计算差异须先诊断；资料迁移、其他变量及RTO/Agent替换仍待完成。动态控制器、动态试验和DCS数据均不在本阶段待办。
 
-本轮在上一轮静态数据核查基础上，补充当前源码/配置/导出/CLI/会话/策略/包资源和依赖扫描，形成删除清单与53文件交叉影响清单。首次用系统Python3.9做AST扫描不支持项目3.12语法，已用项目Python3.12.14重新扫描成功；这是检查工具版本问题，无实现修改。只更新规划、报告归属、导航和STATUS；未运行项目测试、Windows、HYSYS或优化，未复制.hsc、删除旧CDU或改写当前会话。
+历史规划批次形成了删除清单与53文件交叉影响清单；其中旧Mac环境扫描和未执行说明仅属于当时证据。后续Windows资料接收、实际读取、依赖和适配结果以STATUS及对应报告为准，本文不重复维护运行日志。

@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 from langchain_core.messages import ToolMessage, messages_to_dict
+from steady_helpers import synthetic_context
 from test_native_protocol import Wire, call, chat, selection
 
 from petroleum_rto.assistant import react
@@ -18,8 +19,7 @@ from petroleum_rto.assistant.native_tools import AgentDomainTools
 from petroleum_rto.assistant.react import ReactAgent
 from petroleum_rto.assistant.session import SessionError, SessionStore
 from petroleum_rto.assistant.state import new_session, validate_session
-from petroleum_rto.rto import load_operating_context
-from petroleum_rto.rto.runtime import load_prepared_optimization
+from petroleum_rto.rto.runtime.steady import backend, context_ref, load_prepared_comparison
 
 _PAGE_TEXT = "原始全文分页测试🙂" * 10_000 + "最后一页标记"
 _BOOTSTRAP = (
@@ -37,18 +37,14 @@ def _hash(value: Any) -> str:
 def _worker_main() -> None:
     """A separate interpreter runs the production Agent with an in-process HTTP fake."""
     workspace, path, action = Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4]
-    calls = {"m2": 0, "m4": 0}
+    calls = {"steady": 0}
+    backend.read_context = synthetic_context
 
     def stop_m2(*args: Any, **kwargs: Any) -> None:
-        calls["m2"] += 1
+        calls["steady"] += 1
         raise KeyboardInterrupt("synthetic interruption before any simulation")
 
-    def stop_m4(*args: Any, **kwargs: Any) -> None:
-        calls["m4"] += 1
-        raise AssertionError("unrequested M4 execution")
-
-    react.solve_prepared_optimization = stop_m2
-    react.verify_prepared_optimization = stop_m4
+    react.execute_comparison = stop_m2
     wire = Wire([])
     runtime: ReactAgent | None = None
     store: SessionStore | None = None
@@ -61,13 +57,12 @@ def _worker_main() -> None:
                 return {**ordinary_info(state), "synthetic_reference_text": _PAGE_TEXT}
 
             domain.plant_info = large_info  # type: ignore[method-assign]
-            context = load_operating_context(workspace / "configs/rto/contexts/case_20260604.json")
+            context = synthetic_context(workspace)
             args = {
-                "snapshot_ref": context.fingerprint,
-                "objectives": [
-                    {"metric_id": "specific_furnace_fuel_energy_mj_per_t", "sense": "minimize"}
+                "snapshot_ref": context_ref(context),
+                "changes": [
+                    {"variable_id": "C-1102.39_temperature_C", "value": 156.9, "unit": "C"}
                 ],
-                "decision_variables": ["furnace_temperature_target_k"],
             }
             wire.replies.extend(
                 [
@@ -96,7 +91,7 @@ def _worker_main() -> None:
             assert not runtime.handle("/clear").errors
         elif action == "approve":
             turn = runtime.handle("/confirm")
-            assert turn.errors, "the synthetic M2 interruption must be surfaced"
+            assert turn.errors, "the synthetic steady interruption must be surfaced"
             output["turn_errors"] = turn.errors
         elif action == "followup":
             wire.replies.append(chat("该方案仍只允许调整温度。", reasoning="native-followup"))
@@ -141,7 +136,7 @@ def _worker_main() -> None:
             snapshots=data["snapshots"],
             pending_status=pending["status"] if pending else None,
             pending_ref=pending["ref"] if pending else None,
-            problem_hash=_hash(load_prepared_optimization(pending["prepared"]).problem.as_dict())
+            problem_hash=_hash(load_prepared_comparison(pending["prepared"]).as_dict())
             if pending
             else None,
             prepared=pending["prepared"] if pending else None,
@@ -152,7 +147,8 @@ def _worker_main() -> None:
                 for text in data["context"]["results"].values()
             ),
         )
-        print(json.dumps(output, ensure_ascii=False))
+        # ASCII JSON keeps subprocess transport independent of Windows' console code page.
+        print(json.dumps(output))
     except SessionError as exc:
         print(
             json.dumps({"session_error": exc.code, "requests": len(wire.requests), "stages": calls})
@@ -169,7 +165,7 @@ def _worker_main() -> None:
 @pytest.fixture
 def isolated_workspace(tmp_path: Path, repo_root: Path) -> Path:
     workspace = tmp_path / "workspace"
-    shutil.copytree(repo_root / "configs/rto", workspace / "configs/rto")
+    shutil.copytree(repo_root / "configs/simulation", workspace / "configs/simulation")
     return workspace
 
 
@@ -198,7 +194,7 @@ def prepared_session(isolated_workspace: Path) -> tuple[Path, dict[str, Any]]:
     saved = _run_process(isolated_workspace, "prepare")
     assert "session_error" not in saved, saved
     assert saved["requests"] == 4
-    assert saved["stages"] == {"m2": 0, "m4": 0}
+    assert saved["stages"] == {"steady": 0}
     assert saved["pending_status"] == "awaiting_confirmation"
     assert saved["context"]["results"], "the actual oversized tool result must be saved"
     return isolated_workspace, saved
@@ -210,7 +206,7 @@ def test_real_agent_recovers_messages_selection_plan_context_and_page_in_next_pr
     workspace, saved = prepared_session
     restored = _run_process(workspace, "restore")
     assert restored["startup"] and restored["startup_requests"] == 0
-    assert restored["requests"] == 0 and restored["stages"] == {"m2": 0, "m4": 0}
+    assert restored["requests"] == 0 and restored["stages"] == {"steady": 0}
     for key in (
         "history_hash",
         "messages",
@@ -231,20 +227,20 @@ def test_real_agent_recovers_messages_selection_plan_context_and_page_in_next_pr
     assert page["startup_requests"] == 0 and page["requests"] == 2
     assert page["page"]["text_chunk"] == page["expected_page"]
     assert page["page"]["next_offset"] is None
-    assert page["stages"] == {"m2": 0, "m4": 0}
+    assert page["stages"] == {"steady": 0}
 
 
-def test_restore_reconstructs_bound_problem_after_current_configs_change(
+def test_restore_reconstructs_bound_plan_after_current_hysys_configs_change(
     prepared_session: tuple[Path, dict[str, Any]],
 ) -> None:
     workspace, saved = prepared_session
-    (workspace / "configs/rto/capabilities/system_policy.json").write_text('{"changed": true}')
-    (workspace / "configs/rto/contexts/case_20260604.json").unlink()
+    (workspace / "configs/simulation/mjh_atm_boundary.json").write_text('{"changed": true}')
+    (workspace / "configs/simulation/mjh_atm_variables.json").unlink()
     restored = _run_process(workspace, "restore")
     assert "session_error" not in restored
     assert restored["problem_hash"] == saved["problem_hash"]
     assert restored["prepared"] == saved["prepared"]
-    assert restored["requests"] == 0 and restored["stages"] == {"m2": 0, "m4": 0}
+    assert restored["requests"] == 0 and restored["stages"] == {"steady": 0}
 
 
 def test_clear_persists_empty_session_keeps_model_and_preserves_disk_evidence(
@@ -263,10 +259,10 @@ def test_clear_persists_empty_session_keeps_model_and_preserves_disk_evidence(
     assert restored["model"] == saved["model"]
     assert restored["messages"] == 0 and restored["last_result"] is None
     assert restored["pending_ref"] is None and restored["context"]["summary"] is None
-    assert restored["requests"] == 0 and restored["stages"] == {"m2": 0, "m4": 0}
+    assert restored["requests"] == 0 and restored["stages"] == {"steady": 0}
     assert marker.read_text() == "preserved test evidence"
     resumed = _run_process(workspace, "resume")
-    assert resumed["turn_errors"] and resumed["stages"] == {"m2": 0, "m4": 0}
+    assert resumed["turn_errors"] and resumed["stages"] == {"steady": 0}
 
 
 def test_approved_unfinished_restart_and_followup_do_not_resume_calculation(
@@ -275,17 +271,17 @@ def test_approved_unfinished_restart_and_followup_do_not_resume_calculation(
     workspace, saved = prepared_session
     approved = _run_process(workspace, "approve")
     assert approved["pending_status"] == "approved"
-    assert approved["stages"] == {"m2": 1, "m4": 0}
+    assert approved["stages"] == {"steady": 1}
     assert approved["requests"] == 0
     restored = _run_process(workspace, "restore")
     assert "/resume" in "".join(restored["startup"])
     assert restored["pending_ref"] == saved["pending_ref"]
-    assert restored["requests"] == 0 and restored["stages"] == {"m2": 0, "m4": 0}
+    assert restored["requests"] == 0 and restored["stages"] == {"steady": 0}
     followup = _run_process(workspace, "followup")
     assert followup["pending_status"] == "approved"
-    assert followup["stages"] == {"m2": 0, "m4": 0}
+    assert followup["stages"] == {"steady": 0}
     resumed = _run_process(workspace, "resume")
-    assert resumed["stages"] == {"m2": 1, "m4": 0}
+    assert resumed["stages"] == {"steady": 1}
     assert resumed["requests"] == 0 and resumed["pending_status"] == "approved"
 
 
@@ -324,7 +320,7 @@ def test_actual_agent_refuses_corrupt_recovery_before_any_request_or_computation
     def mutate(data: dict[str, Any]) -> None:
         if corruption == "missing-stage":
             data["pending"]["status"] = "approved"
-            data["pending"]["static"] = {"static_ref": "missing-evidence"}
+            data["pending"].update(status="completed", result={"workflow_id": "steady-" + "a" * 16})
         elif corruption == "invalid-version":
             data["schema_version"] = "999.0.0"
         else:
@@ -334,7 +330,7 @@ def test_actual_agent_refuses_corrupt_recovery_before_any_request_or_computation
     _corrupt_state(workspace, mutate)
     refused = _run_process(workspace, "restore")
     assert refused["session_error"] == "invalid-restored-session"
-    assert refused["requests"] == 0 and refused["stages"] == {"m2": 0, "m4": 0}
+    assert refused["requests"] == 0 and refused["stages"] == {"steady": 0}
 
 
 @pytest.mark.parametrize("field", ["schema_version", "model", "pending", "context", "snapshots"])

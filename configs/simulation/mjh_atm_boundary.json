@@ -1,0 +1,536 @@
+{
+  "schema_id": "hysys-boundary-definition",
+  "schema_version": "1.0.0",
+  "case_id": "mjh_atm",
+  "column_name": "C-1102",
+  "materials": [
+    {
+      "scope": "main",
+      "name": "Crude_Oil",
+      "direction": "in",
+      "upstream": [
+        {
+          "name": "FeederBlock_Crude_Oil",
+          "type_name": "feederblock"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "heater_to_flash",
+          "type_name": "heaterop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Light",
+      "direction": "internal",
+      "upstream": [
+        {
+          "name": "Flash",
+          "type_name": "flashtank"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "C-1102",
+          "type_name": "columnop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Btm Liq",
+      "direction": "internal",
+      "upstream": [
+        {
+          "name": "Flash",
+          "type_name": "flashtank"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "P-100",
+          "type_name": "pumpop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "To_Hoter",
+      "direction": "internal",
+      "upstream": [
+        {
+          "name": "heater_to_furnace",
+          "type_name": "heaterop"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "furnace_1",
+          "type_name": "heaterop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "2",
+      "direction": "internal",
+      "upstream": [
+        {
+          "name": "P-100",
+          "type_name": "pumpop"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "heater_to_furnace",
+          "type_name": "heaterop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Risedue",
+      "direction": "out",
+      "upstream": [
+        {
+          "name": "C-1102",
+          "type_name": "columnop"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "ProductBlock_Risedue",
+          "type_name": "feederblock"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Naptha",
+      "direction": "out",
+      "upstream": [
+        {
+          "name": "C-1102",
+          "type_name": "columnop"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "ProductBlock_Naptha",
+          "type_name": "feederblock"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Steam1",
+      "direction": "internal",
+      "upstream": [
+        {
+          "name": "furnace_2",
+          "type_name": "heaterop"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "C-1102",
+          "type_name": "columnop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Kerosene",
+      "direction": "out",
+      "upstream": [
+        {
+          "name": "C-1102",
+          "type_name": "columnop"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "ProductBlock_Kerosene",
+          "type_name": "feederblock"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Steam2",
+      "direction": "internal",
+      "upstream": [
+        {
+          "name": "furnace_3",
+          "type_name": "heaterop"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "C-1102",
+          "type_name": "columnop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Diesel",
+      "direction": "out",
+      "upstream": [
+        {
+          "name": "C-1102",
+          "type_name": "columnop"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "ProductBlock_Diesel",
+          "type_name": "feederblock"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Steam3",
+      "direction": "internal",
+      "upstream": [
+        {
+          "name": "furnace_4",
+          "type_name": "heaterop"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "C-1102",
+          "type_name": "columnop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "AGO",
+      "direction": "out",
+      "upstream": [
+        {
+          "name": "C-1102",
+          "type_name": "columnop"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "ProductBlock_AGO",
+          "type_name": "feederblock"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "FEED",
+      "direction": "internal",
+      "upstream": [
+        {
+          "name": "furnace_1",
+          "type_name": "heaterop"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "C-1102",
+          "type_name": "columnop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "1",
+      "direction": "internal",
+      "upstream": [
+        {
+          "name": "heater_to_flash",
+          "type_name": "heaterop"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "Flash",
+          "type_name": "flashtank"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Water1",
+      "direction": "in",
+      "upstream": [
+        {
+          "name": "FeederBlock_Water1",
+          "type_name": "feederblock"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "furnace_2",
+          "type_name": "heaterop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Water2",
+      "direction": "in",
+      "upstream": [
+        {
+          "name": "FeederBlock_Water2",
+          "type_name": "feederblock"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "furnace_3",
+          "type_name": "heaterop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Water3",
+      "direction": "in",
+      "upstream": [
+        {
+          "name": "FeederBlock_Water3",
+          "type_name": "feederblock"
+        }
+      ],
+      "downstream": [
+        {
+          "name": "furnace_4",
+          "type_name": "heaterop"
+        }
+      ]
+    }
+  ],
+  "energy": [
+    {
+      "scope": "main",
+      "name": "Q-100",
+      "direction": "in",
+      "upstream": [],
+      "downstream": [
+        {
+          "name": "heater_to_furnace",
+          "type_name": "heaterop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Q-101",
+      "direction": "in",
+      "upstream": [],
+      "downstream": [
+        {
+          "name": "P-100",
+          "type_name": "pumpop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "TopStagePA_Q-Cooler_1",
+      "direction": "bridge",
+      "upstream": [
+        {
+          "name": "C-1102",
+          "type_name": "columnop"
+        }
+      ],
+      "downstream": []
+    },
+    {
+      "scope": "main",
+      "name": "Q-103",
+      "direction": "in",
+      "upstream": [],
+      "downstream": [
+        {
+          "name": "heater_to_flash",
+          "type_name": "heaterop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Q-104",
+      "direction": "in",
+      "upstream": [],
+      "downstream": [
+        {
+          "name": "furnace_1",
+          "type_name": "heaterop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Q-105",
+      "direction": "in",
+      "upstream": [],
+      "downstream": [
+        {
+          "name": "furnace_2",
+          "type_name": "heaterop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Q-106",
+      "direction": "in",
+      "upstream": [],
+      "downstream": [
+        {
+          "name": "furnace_3",
+          "type_name": "heaterop"
+        }
+      ]
+    },
+    {
+      "scope": "main",
+      "name": "Q-107",
+      "direction": "in",
+      "upstream": [],
+      "downstream": [
+        {
+          "name": "furnace_4",
+          "type_name": "heaterop"
+        }
+      ]
+    },
+    {
+      "scope": "column",
+      "name": "TopStagePA_Q-Cooler_1",
+      "direction": "out",
+      "upstream": [
+        {
+          "name": "TopStagePA_Cooler",
+          "type_name": "coolerop"
+        }
+      ],
+      "downstream": []
+    },
+    {
+      "scope": "column",
+      "name": "PA_1_Q-Cooler",
+      "direction": "out",
+      "upstream": [
+        {
+          "name": "PA_1_Cooler",
+          "type_name": "coolerop"
+        }
+      ],
+      "downstream": []
+    },
+    {
+      "scope": "column",
+      "name": "PA_2_Q-Cooler",
+      "direction": "out",
+      "upstream": [
+        {
+          "name": "PA_2_Cooler",
+          "type_name": "coolerop"
+        }
+      ],
+      "downstream": []
+    },
+    {
+      "scope": "column",
+      "name": "Kerosene SS_Energy",
+      "direction": "in",
+      "upstream": [],
+      "downstream": [
+        {
+          "name": "Kerosene SS_Reb",
+          "type_name": "bpreboiler"
+        }
+      ]
+    }
+  ],
+  "main_operations": [
+    {
+      "name": "Flash",
+      "type_name": "flashtank"
+    },
+    {
+      "name": "P-100",
+      "type_name": "pumpop"
+    },
+    {
+      "name": "heater_to_furnace",
+      "type_name": "heaterop"
+    },
+    {
+      "name": "C-1102",
+      "type_name": "columnop"
+    },
+    {
+      "name": "TABLE",
+      "type_name": "spreadsheetop"
+    },
+    {
+      "name": "heater_to_flash",
+      "type_name": "heaterop"
+    },
+    {
+      "name": "furnace_1",
+      "type_name": "heaterop"
+    },
+    {
+      "name": "furnace_2",
+      "type_name": "heaterop"
+    },
+    {
+      "name": "furnace_3",
+      "type_name": "heaterop"
+    },
+    {
+      "name": "furnace_4",
+      "type_name": "heaterop"
+    }
+  ],
+  "column_operations": [
+    {
+      "name": "Main Tower",
+      "type_name": "traysection"
+    },
+    {
+      "name": "TopStagePA_Cooler",
+      "type_name": "coolerop"
+    },
+    {
+      "name": "PA_1_Cooler",
+      "type_name": "coolerop"
+    },
+    {
+      "name": "PA_2_Cooler",
+      "type_name": "coolerop"
+    },
+    {
+      "name": "Kerosene SS",
+      "type_name": "traysection"
+    },
+    {
+      "name": "Kerosene SS_Reb",
+      "type_name": "bpreboiler"
+    },
+    {
+      "name": "Diesel SS",
+      "type_name": "traysection"
+    },
+    {
+      "name": "AGO SS",
+      "type_name": "traysection"
+    }
+  ]
+}

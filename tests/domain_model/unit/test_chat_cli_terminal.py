@@ -24,7 +24,7 @@ import termios
 _PROMPT = "你> ".encode()
 _TURN_MARKER = b"__CLI_TURN_COMPLETE__"
 _RESULT_MARKER = b"__CLI_RESULT__"
-_PROGRESS_MARKER = "M2搜索：已评价候选1。".encode()
+_PROGRESS_MARKER = "HYSYS：正在计算候选点。".encode()
 _TEXT_MARKER = "先到的中文🙂".encode()
 _CHILD = r"""
 import fcntl
@@ -62,13 +62,13 @@ class Recorder:
                     errors=("模型调用失败。",),
                     text_streamed=True,
                 )
-            on_progress("M2搜索：已评价候选1。")
+            on_progress("HYSYS：正在计算候选点。")
             on_text("后到的正文。")
             return AgentTurn(
                 outputs=("模型> 先到的中文🙂后到的正文。", "受信结果仍保留。", "__CLI_TURN_COMPLETE__"),
                 text_streamed=True,
             )
-        on_progress("M2搜索：已评价候选1。")
+        on_progress("HYSYS：正在计算候选点。")
         if progress_fd is not None:
             os.read(progress_fd, 1)
         return AgentTurn(

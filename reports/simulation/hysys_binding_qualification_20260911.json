@@ -1,0 +1,1260 @@
+{
+  "schema_id": "hysys-binding-qualification",
+  "schema_version": "1.0.0",
+  "checked_at_utc": "2026-09-11T11:17:08.072481+00:00",
+  "status": "formal_read_and_strict_snapshot_reload_verified",
+  "scope": "existing_case_read_only_synthetic_engineering_observation",
+  "case_id": "mjh_atm",
+  "source_disk_sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+  "memory_is_dirty": true,
+  "memory_state_bound_to_disk_hash": false,
+  "atomic_snapshot_proven": false,
+  "eligible_for_optimization": false,
+  "hysys_version": "Aspen HYSYS Version 12 (38.0)",
+  "variable_catalog": {
+    "path": "configs/simulation/mjh_atm_variables.json",
+    "bytes": 16731,
+    "sha256": "2a53edf15fc0d84d12a13442fa9850f4702e7249dc8d2220f54bb62eb9ea4ef3"
+  },
+  "qualified_unit_conversion_enums": {
+    "uctTemperature": 1,
+    "uctPressure": 2,
+    "uctMassFlow": 4,
+    "uctEnthalpy": 6,
+    "uctDeltaTemperature": 24,
+    "uctDeltaPressure": 45,
+    "uctPercent": 64,
+    "uctUnitless": 65
+  },
+  "quantity_code_interpretation": {
+    "1": "temperature",
+    "2": "pressure",
+    "4": "mass_flow",
+    "6": "heat_flow",
+    "24": "temperature_difference",
+    "45": "pressure_difference",
+    "64": "percent",
+    "65": "ratio"
+  },
+  "variable_status_enums": {
+    "VariableStatus_enum": {
+      "vsCalculated": 0,
+      "vsSpecified": 1,
+      "vsDefaultedValue": 2,
+      "vsSpecifiedOutside": 4,
+      "vsDefaultOutside": 5
+    }
+  },
+  "qualified_variables": [
+    {
+      "row": 2,
+      "object": "Crude_Oil",
+      "property": "相-温度 (总体)",
+      "unit": "C",
+      "description": "相-温度",
+      "unit_conversion_type": 1,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 32.6,
+      "value_in_unit": 32.6
+    },
+    {
+      "row": 3,
+      "object": "Crude_Oil",
+      "property": "相-压力 (总体)",
+      "unit": "kPa",
+      "description": "相-压力",
+      "unit_conversion_type": 2,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 180.0,
+      "value_in_unit": 180.0
+    },
+    {
+      "row": 4,
+      "object": "Crude_Oil",
+      "property": "相-质量流量 (总体)",
+      "unit": "kg/h",
+      "description": "相-质量流量",
+      "unit_conversion_type": 4,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 111.11111111111111,
+      "value_in_unit": 400000.0
+    },
+    {
+      "row": 5,
+      "object": "heater_to_flash",
+      "property": "温差",
+      "unit": "C",
+      "description": "温差",
+      "unit_conversion_type": 24,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 169.4,
+      "value_in_unit": 169.4
+    },
+    {
+      "row": 6,
+      "object": "Flash",
+      "property": "液相体积百分比",
+      "unit": "%",
+      "description": "液相体积百分比",
+      "unit_conversion_type": 64,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 44.5,
+      "value_in_unit": 44.5
+    },
+    {
+      "row": 7,
+      "object": "P-100",
+      "property": "压差",
+      "unit": "kPa",
+      "description": "压差",
+      "unit_conversion_type": 45,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 550.0,
+      "value_in_unit": 550.0
+    },
+    {
+      "row": 8,
+      "object": "heater_to_furnace",
+      "property": "温差",
+      "unit": "C",
+      "description": "温差",
+      "unit_conversion_type": 24,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 67.85,
+      "value_in_unit": 67.85
+    },
+    {
+      "row": 9,
+      "object": "furnace_1",
+      "property": "温差",
+      "unit": "C",
+      "description": "温差",
+      "unit_conversion_type": 24,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 115.0,
+      "value_in_unit": 115.0
+    },
+    {
+      "row": 10,
+      "object": "furnace_2",
+      "property": "温差",
+      "unit": "C",
+      "description": "温差",
+      "unit_conversion_type": 24,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 225.0,
+      "value_in_unit": 225.0
+    },
+    {
+      "row": 11,
+      "object": "furnace_3",
+      "property": "温差",
+      "unit": "C",
+      "description": "温差",
+      "unit_conversion_type": 24,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 225.0,
+      "value_in_unit": 225.0
+    },
+    {
+      "row": 12,
+      "object": "furnace_4",
+      "property": "温差",
+      "unit": "C",
+      "description": "温差",
+      "unit_conversion_type": 24,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 225.0,
+      "value_in_unit": 225.0
+    },
+    {
+      "row": 13,
+      "object": "Water1",
+      "property": "相-质量流量 (总体)",
+      "unit": "kg/h",
+      "description": "相-质量流量",
+      "unit_conversion_type": 4,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 0.6111111111111112,
+      "value_in_unit": 2200.0
+    },
+    {
+      "row": 14,
+      "object": "Water2",
+      "property": "相-质量流量 (总体)",
+      "unit": "kg/h",
+      "description": "相-质量流量",
+      "unit_conversion_type": 4,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 0.08333333333333333,
+      "value_in_unit": 300.0
+    },
+    {
+      "row": 15,
+      "object": "Water3",
+      "property": "相-质量流量 (总体)",
+      "unit": "kg/h",
+      "description": "相-质量流量",
+      "unit_conversion_type": 4,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 0.1388888888888889,
+      "value_in_unit": 500.0
+    },
+    {
+      "row": 16,
+      "object": "C-1102",
+      "property": "规定值 (TopStagePA_Rate(Pa))",
+      "unit": "kg/h",
+      "description": "规定值",
+      "unit_conversion_type": 4,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 89.08055555555555,
+      "value_in_unit": 320690.0
+    },
+    {
+      "row": 17,
+      "object": "C-1102",
+      "property": "规定值 (TopStagePA_TRet(Pa))",
+      "unit": "C",
+      "description": "规定值",
+      "unit_conversion_type": 1,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 105.0,
+      "value_in_unit": 105.0
+    },
+    {
+      "row": 18,
+      "object": "C-1102",
+      "property": "规定值 (PA_1_Rate(Pa))",
+      "unit": "kg/h",
+      "description": "规定值",
+      "unit_conversion_type": 4,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 47.22222222222222,
+      "value_in_unit": 170000.0
+    },
+    {
+      "row": 19,
+      "object": "C-1102",
+      "property": "规定值 (PA_1_TRet(Pa))",
+      "unit": "C",
+      "description": "规定值",
+      "unit_conversion_type": 1,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 150.0,
+      "value_in_unit": 150.0
+    },
+    {
+      "row": 20,
+      "object": "C-1102",
+      "property": "规定值 (PA_2_Rate(Pa))",
+      "unit": "kg/h",
+      "description": "规定值",
+      "unit_conversion_type": 4,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 66.94444444444444,
+      "value_in_unit": 241000.0
+    },
+    {
+      "row": 21,
+      "object": "C-1102",
+      "property": "规定值 (PA_2_TRet(Pa))",
+      "unit": "C",
+      "description": "规定值",
+      "unit_conversion_type": 1,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 180.0,
+      "value_in_unit": 180.0
+    },
+    {
+      "row": 22,
+      "object": "C-1102",
+      "property": "规定值 (Kerosene SS BoilUp Ratio)",
+      "unit": "",
+      "description": "规定值",
+      "unit_conversion_type": 65,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 0.5,
+      "value_in_unit": 0.5
+    },
+    {
+      "row": 23,
+      "object": "C-1102",
+      "property": "规定值 (T-39)",
+      "unit": "C",
+      "description": "规定值",
+      "unit_conversion_type": 1,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 156.8,
+      "value_in_unit": 156.8
+    },
+    {
+      "row": 24,
+      "object": "C-1102",
+      "property": "规定值 (T-26)",
+      "unit": "C",
+      "description": "规定值",
+      "unit_conversion_type": 1,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 215.0,
+      "value_in_unit": 215.0
+    },
+    {
+      "row": 25,
+      "object": "C-1102",
+      "property": "规定值 (T-16)",
+      "unit": "C",
+      "description": "规定值",
+      "unit_conversion_type": 1,
+      "state": 1,
+      "known": true,
+      "can_modify": true,
+      "internal_value": 301.0,
+      "value_in_unit": 301.0
+    },
+    {
+      "row": 28,
+      "object": "heater_to_flash",
+      "property": "总体负荷",
+      "unit": "kJ/h",
+      "description": "总体负荷",
+      "unit_conversion_type": 6,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 44179.322269229335,
+      "value_in_unit": 159045560.1692256
+    },
+    {
+      "row": 29,
+      "object": "heater_to_furnace",
+      "property": "总体负荷",
+      "unit": "kJ/h",
+      "description": "总体负荷",
+      "unit_conversion_type": 6,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 20670.51876693606,
+      "value_in_unit": 74413867.56096981
+    },
+    {
+      "row": 30,
+      "object": "furnace_1",
+      "property": "总体负荷",
+      "unit": "kJ/h",
+      "description": "总体负荷",
+      "unit_conversion_type": 6,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 39482.7556342333,
+      "value_in_unit": 142137920.28323987
+    },
+    {
+      "row": 31,
+      "object": "furnace_2",
+      "property": "总体负荷",
+      "unit": "kJ/h",
+      "description": "总体负荷",
+      "unit_conversion_type": 6,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 1765.0415019884385,
+      "value_in_unit": 6354149.4071583785
+    },
+    {
+      "row": 32,
+      "object": "furnace_3",
+      "property": "总体负荷",
+      "unit": "kJ/h",
+      "description": "总体负荷",
+      "unit_conversion_type": 6,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 240.68747754387778,
+      "value_in_unit": 866474.91915796
+    },
+    {
+      "row": 33,
+      "object": "furnace_4",
+      "property": "总体负荷",
+      "unit": "kJ/h",
+      "description": "总体负荷",
+      "unit_conversion_type": 6,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 401.14579590646304,
+      "value_in_unit": 1444124.865263267
+    },
+    {
+      "row": 34,
+      "object": "Naptha",
+      "property": "相-质量流量 (总体)",
+      "unit": "kg/h",
+      "description": "相-质量流量",
+      "unit_conversion_type": 4,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 3.4149076627701516,
+      "value_in_unit": 12293.667585972546
+    },
+    {
+      "row": 35,
+      "object": "沸点曲线-Naptha",
+      "property": "真实沸点 (Cut Pt-20.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 10.623397930062902,
+      "value_in_unit": 10.623397930062902
+    },
+    {
+      "row": 36,
+      "object": "沸点曲线-Naptha",
+      "property": "真实沸点 (Cut Pt-40.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 53.105297311706565,
+      "value_in_unit": 53.105297311706565
+    },
+    {
+      "row": 37,
+      "object": "沸点曲线-Naptha",
+      "property": "真实沸点 (Cut Pt-60.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 137.99040102596032,
+      "value_in_unit": 137.99040102596032
+    },
+    {
+      "row": 38,
+      "object": "沸点曲线-Naptha",
+      "property": "真实沸点 (Cut Pt-80.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 153.59226649053403,
+      "value_in_unit": 153.59226649053403
+    },
+    {
+      "row": 39,
+      "object": "沸点曲线-Naptha",
+      "property": "真实沸点 (Cut Pt-100.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 173.5357905706529,
+      "value_in_unit": 173.5357905706529
+    },
+    {
+      "row": 40,
+      "object": "Kerosene",
+      "property": "相-质量流量 (总体)",
+      "unit": "kg/h",
+      "description": "相-质量流量",
+      "unit_conversion_type": 4,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 2.696431269674912,
+      "value_in_unit": 9707.152570829683
+    },
+    {
+      "row": 41,
+      "object": "沸点曲线-Kerosene",
+      "property": "真实沸点 (Cut Pt-20.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 167.00417557569514,
+      "value_in_unit": 167.00417557569514
+    },
+    {
+      "row": 42,
+      "object": "沸点曲线-Kerosene",
+      "property": "真实沸点 (Cut Pt-40.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 179.7275836885645,
+      "value_in_unit": 179.7275836885645
+    },
+    {
+      "row": 43,
+      "object": "沸点曲线-Kerosene",
+      "property": "真实沸点 (Cut Pt-60.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 191.53103957587828,
+      "value_in_unit": 191.53103957587828
+    },
+    {
+      "row": 44,
+      "object": "沸点曲线-Kerosene",
+      "property": "真实沸点 (Cut Pt-80.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 201.4336073965195,
+      "value_in_unit": 201.4336073965195
+    },
+    {
+      "row": 45,
+      "object": "沸点曲线-Kerosene",
+      "property": "真实沸点 (Cut Pt-100.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 221.94521383155057,
+      "value_in_unit": 221.94521383155057
+    },
+    {
+      "row": 46,
+      "object": "Diesel",
+      "property": "相-质量流量 (总体)",
+      "unit": "kg/h",
+      "description": "相-质量流量",
+      "unit_conversion_type": 4,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 7.0171535774889895,
+      "value_in_unit": 25261.752878960364
+    },
+    {
+      "row": 47,
+      "object": "沸点曲线-Diesel",
+      "property": "真实沸点 (Cut Pt-20.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 212.05294785625262,
+      "value_in_unit": 212.05294785625262
+    },
+    {
+      "row": 48,
+      "object": "沸点曲线-Diesel",
+      "property": "真实沸点 (Cut Pt-40.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 227.7899269475021,
+      "value_in_unit": 227.7899269475021
+    },
+    {
+      "row": 49,
+      "object": "沸点曲线-Diesel",
+      "property": "真实沸点 (Cut Pt-60.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 240.78296922932284,
+      "value_in_unit": 240.78296922932284
+    },
+    {
+      "row": 50,
+      "object": "沸点曲线-Diesel",
+      "property": "真实沸点 (Cut Pt-80.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 255.3858268833582,
+      "value_in_unit": 255.3858268833582
+    },
+    {
+      "row": 51,
+      "object": "沸点曲线-Diesel",
+      "property": "真实沸点 (Cut Pt-100.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 281.6201526321111,
+      "value_in_unit": 281.6201526321111
+    },
+    {
+      "row": 52,
+      "object": "AGO",
+      "property": "相-质量流量 (总体)",
+      "unit": "kg/h",
+      "description": "相-质量流量",
+      "unit_conversion_type": 4,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 15.681144489541847,
+      "value_in_unit": 56452.12016235065
+    },
+    {
+      "row": 53,
+      "object": "沸点曲线-AGO",
+      "property": "真实沸点 (Cut Pt-20.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 281.58465559122425,
+      "value_in_unit": 281.58465559122425
+    },
+    {
+      "row": 54,
+      "object": "沸点曲线-AGO",
+      "property": "真实沸点 (Cut Pt-40.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 302.048176655291,
+      "value_in_unit": 302.048176655291
+    },
+    {
+      "row": 55,
+      "object": "沸点曲线-AGO",
+      "property": "真实沸点 (Cut Pt-60.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 321.6660947948976,
+      "value_in_unit": 321.6660947948976
+    },
+    {
+      "row": 56,
+      "object": "沸点曲线-AGO",
+      "property": "真实沸点 (Cut Pt-80.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 343.5904354787689,
+      "value_in_unit": 343.5904354787689
+    },
+    {
+      "row": 57,
+      "object": "沸点曲线-AGO",
+      "property": "真实沸点 (Cut Pt-100.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 380.44931808330807,
+      "value_in_unit": 380.44931808330807
+    },
+    {
+      "row": 58,
+      "object": "Risedue",
+      "property": "相-质量流量 (总体)",
+      "unit": "kg/h",
+      "description": "相-质量流量",
+      "unit_conversion_type": 4,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 83.1348074449686,
+      "value_in_unit": 299285.30680188694
+    },
+    {
+      "row": 59,
+      "object": "沸点曲线-Risedue",
+      "property": "真实沸点 (Cut Pt-20.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 399.4253551243728,
+      "value_in_unit": 399.4253551243728
+    },
+    {
+      "row": 60,
+      "object": "沸点曲线-Risedue",
+      "property": "真实沸点 (Cut Pt-40.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 455.58583062430745,
+      "value_in_unit": 455.58583062430745
+    },
+    {
+      "row": 61,
+      "object": "沸点曲线-Risedue",
+      "property": "真实沸点 (Cut Pt-60.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 513.0644550710899,
+      "value_in_unit": 513.0644550710899
+    },
+    {
+      "row": 62,
+      "object": "沸点曲线-Risedue",
+      "property": "真实沸点 (Cut Pt-80.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 594.3515278508438,
+      "value_in_unit": 594.3515278508438
+    },
+    {
+      "row": 63,
+      "object": "沸点曲线-Risedue",
+      "property": "真实沸点 (Cut Pt-100.00%)",
+      "unit": "C",
+      "description": "真实沸点",
+      "unit_conversion_type": 1,
+      "state": 0,
+      "known": true,
+      "can_modify": false,
+      "internal_value": 714.2938568177741,
+      "value_in_unit": 714.2938568177741
+    }
+  ],
+  "semantics": {
+    "row_6": "Flash liquid volume percent, not inferred level",
+    "row_7": "P-100 pressure difference",
+    "rows_5_8_9_10_11_12": "temperature differences, not absolute outlet temperatures",
+    "row_22": "Kerosene SS BoilUp Ratio is dimensionless 0.5; D22 percent label is not authoritative",
+    "rows_16_through_21": "three pump-around flow / return-temperature specification pairs",
+    "rows_23_through_25": "active T-39 / T-26 / T-16 temperature specifications",
+    "current_top_pa_return_temperature_C": 105.0,
+    "state_and_modifiability": "all 24 MV specified/modifiable; all 36 CV calculated/nonmodifiable at observation"
+  },
+  "column_specifications": [
+    {
+      "name": "TopStagePA_Rate(Pa)",
+      "specification_type": "ColumnPumpAroundSpec",
+      "active": true,
+      "used_as_estimate": true,
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "goal": 320690.0,
+      "current": 320689.9814555386
+    },
+    {
+      "name": "TopStagePA_Dt(Pa)",
+      "specification_type": "ColumnPumpAroundSpec",
+      "active": false,
+      "used_as_estimate": true,
+      "quantity_type": "temperature_difference",
+      "unit": "C",
+      "goal": null,
+      "current": 8.72523225488817
+    },
+    {
+      "name": "TopStagePA_Duty(Pa)",
+      "specification_type": "ColumnPumpAroundSpec",
+      "active": false,
+      "used_as_estimate": true,
+      "quantity_type": "heat_flow",
+      "unit": "kJ/h",
+      "goal": null,
+      "current": -7158383.752006679
+    },
+    {
+      "name": "TopStagePA_TRet(Pa)",
+      "specification_type": "ColumnPumpAroundSpec",
+      "active": true,
+      "used_as_estimate": true,
+      "quantity_type": "temperature",
+      "unit": "C",
+      "goal": 105.0,
+      "current": 104.99999949100425
+    },
+    {
+      "name": "PA_1_Rate(Pa)",
+      "specification_type": "ColumnPumpAroundSpec",
+      "active": true,
+      "used_as_estimate": true,
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "goal": 170000.0,
+      "current": 170000.00447047674
+    },
+    {
+      "name": "PA_1_Dt(Pa)",
+      "specification_type": "ColumnPumpAroundSpec",
+      "active": false,
+      "used_as_estimate": true,
+      "quantity_type": "temperature_difference",
+      "unit": "C",
+      "goal": null,
+      "current": 30.21182714719191
+    },
+    {
+      "name": "PA_1_Duty(Pa)",
+      "specification_type": "ColumnPumpAroundSpec",
+      "active": false,
+      "used_as_estimate": true,
+      "quantity_type": "heat_flow",
+      "unit": "kJ/h",
+      "goal": null,
+      "current": -13909401.1937597
+    },
+    {
+      "name": "PA_1_TRet(Pa)",
+      "specification_type": "ColumnPumpAroundSpec",
+      "active": true,
+      "used_as_estimate": true,
+      "quantity_type": "temperature",
+      "unit": "C",
+      "goal": 150.0,
+      "current": 150.00000081683703
+    },
+    {
+      "name": "PA_2_Rate(Pa)",
+      "specification_type": "ColumnPumpAroundSpec",
+      "active": true,
+      "used_as_estimate": true,
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "goal": 241000.0,
+      "current": 241000.00034389974
+    },
+    {
+      "name": "PA_2_Dt(Pa)",
+      "specification_type": "ColumnPumpAroundSpec",
+      "active": false,
+      "used_as_estimate": true,
+      "quantity_type": "temperature_difference",
+      "unit": "C",
+      "goal": null,
+      "current": 69.92041743920669
+    },
+    {
+      "name": "PA_2_Duty(Pa)",
+      "specification_type": "ColumnPumpAroundSpec",
+      "active": false,
+      "used_as_estimate": true,
+      "quantity_type": "heat_flow",
+      "unit": "kJ/h",
+      "goal": null,
+      "current": -47621789.12420702
+    },
+    {
+      "name": "PA_2_TRet(Pa)",
+      "specification_type": "ColumnPumpAroundSpec",
+      "active": true,
+      "used_as_estimate": true,
+      "quantity_type": "temperature",
+      "unit": "C",
+      "goal": 180.0,
+      "current": 180.0000001056481
+    },
+    {
+      "name": "Kerosene SS Prod Flow",
+      "specification_type": "ColumnDrawSpec",
+      "active": false,
+      "used_as_estimate": true,
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "goal": 13000.0,
+      "current": 9707.152570829683
+    },
+    {
+      "name": "Kerosene SS BoilUp Ratio",
+      "specification_type": "ColumnReboilRatioSpec",
+      "active": true,
+      "used_as_estimate": true,
+      "quantity_type": "ratio",
+      "unit": "",
+      "goal": 0.5,
+      "current": 0.5000000017293271
+    },
+    {
+      "name": "Kerosene SS_Reb Duty",
+      "specification_type": "ColumnDutySpec",
+      "active": false,
+      "used_as_estimate": true,
+      "quantity_type": "heat_flow",
+      "unit": "kJ/h",
+      "goal": null,
+      "current": 1577900.3529657659
+    },
+    {
+      "name": "Diesel SS Prod Flow",
+      "specification_type": "ColumnDrawSpec",
+      "active": false,
+      "used_as_estimate": true,
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "goal": 22000.0,
+      "current": 25261.752878960364
+    },
+    {
+      "name": "AGO SS Prod Flow",
+      "specification_type": "ColumnDrawSpec",
+      "active": false,
+      "used_as_estimate": true,
+      "quantity_type": "mass_flow",
+      "unit": "kg/h",
+      "goal": 58000.0,
+      "current": 56452.12016235065
+    },
+    {
+      "name": "T-39",
+      "specification_type": "ColumnTemperatureSpec",
+      "active": true,
+      "used_as_estimate": true,
+      "quantity_type": "temperature",
+      "unit": "C",
+      "goal": 156.8,
+      "current": 156.79999949345017
+    },
+    {
+      "name": "T-26",
+      "specification_type": "ColumnTemperatureSpec",
+      "active": true,
+      "used_as_estimate": true,
+      "quantity_type": "temperature",
+      "unit": "C",
+      "goal": 215.0,
+      "current": 215.00000032536275
+    },
+    {
+      "name": "T-16",
+      "specification_type": "ColumnTemperatureSpec",
+      "active": true,
+      "used_as_estimate": true,
+      "quantity_type": "temperature",
+      "unit": "C",
+      "goal": 301.0,
+      "current": 300.99999997762495
+    }
+  ],
+  "active_specifications": [
+    "TopStagePA_Rate(Pa)",
+    "TopStagePA_TRet(Pa)",
+    "PA_1_Rate(Pa)",
+    "PA_1_TRet(Pa)",
+    "PA_2_Rate(Pa)",
+    "PA_2_TRet(Pa)",
+    "Kerosene SS BoilUp Ratio",
+    "T-39",
+    "T-26",
+    "T-16"
+  ],
+  "degrees_of_freedom": 0,
+  "solver": {
+    "can_solve": true,
+    "is_solving": false,
+    "is_valid": true,
+    "column_converged": true
+  },
+  "formal_live_acceptance": {
+    "command": ".venv/python.exe -B -m petroleum_rto.simulation --case hysys/mjh_ATM.hsc",
+    "observed_at_utc": "2026-09-11T11:14:08.244162+00:00",
+    "exit_code": 0,
+    "status": "observed_stable",
+    "counts": {
+      "variables": 60,
+      "stages": 73,
+      "specifications": 20
+    },
+    "snapshot": {
+      "path": "runs/simulation/hysys-snapshot-9jj2h2mq/snapshot.json",
+      "bytes": 42446,
+      "sha256": "61fb527b20bb1325196e5686b59704a2985ce60b1ea9177e782bcd20cee9be30"
+    },
+    "report": {
+      "path": "runs/simulation/hysys-snapshot-9jj2h2mq/report.json",
+      "bytes": 361,
+      "sha256": "882aeb9b34b4b65d2c7af4eef6c0a90b4bb18e68e35e80e412d6949cae7961b8"
+    },
+    "strict_readback_equal": true,
+    "note": "Repeated after adding Current/Goal quantity drift rejection; no MV write, Save, Open or solve request"
+  },
+  "previous_formal_read": {
+    "path": "runs/simulation/hysys-snapshot-_uy60wkl/report.json",
+    "bytes": 361,
+    "sha256": "7b365a4ec3e7bdf27dd206efced6ac8686d58f6e294d3659e3d69735bbba6fa7"
+  },
+  "qualification_evidence": [
+    {
+      "path": "runs/simulation/hysys-bindings-s7ysugcv/typeinfo.json",
+      "bytes": 34596,
+      "sha256": "fcebe98d50f42c93699956cb8ba444434e6d3656b646613ee4935f50a80f5f1d"
+    },
+    {
+      "path": "runs/simulation/hysys-bindings-19swjdjz/bindings.json",
+      "bytes": 50344,
+      "sha256": "a14878bf2cbc417bf5ea0f101e6059bbecf5871eccb206f0f86f2c37a8e8f720"
+    },
+    {
+      "path": "runs/simulation/hysys-bindings-9nvsq05k/qualified-values.json",
+      "bytes": 43813,
+      "sha256": "a977a74c796869c44bb1750f1887cf19a934ca3df1c559115cf7f58c10ce00d5"
+    }
+  ],
+  "offline_validation": {
+    "command": ".venv/python.exe -m pytest tests/simulation -q --junitxml=runs/simulation/dependency_setup_20260911/simulation-reader-final.xml",
+    "pytest_passed": 131,
+    "unittest_subtests_passed": 17,
+    "junit_attributes": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "148",
+      "time": "0.588",
+      "timestamp": "2026-09-11T19:14:01.352384+08:00",
+      "hostname": "wyl-main-desktop"
+    },
+    "junit": {
+      "path": "runs/simulation/dependency_setup_20260911/simulation-reader-final.xml",
+      "bytes": 19751,
+      "sha256": "988c0d1723c4bd5e973b1175503f77282935853bdac04c8f2cb16060f6dec864"
+    },
+    "scope": "68 snapshot, 42 fake COM reader, 21 early probe tests plus 17 probe subtests; no legacy CDU",
+    "quantity_drift_regression": "same unit C with temperature versus temperature_difference rejected",
+    "com_lifecycle": "weak-reference checks cover release before CoUninitialize on success, failure and KeyboardInterrupt"
+  },
+  "source_files_unchanged": [
+    {
+      "path": "hysys/analyze_results.py",
+      "sha256": "bba79b0c29863a409d45b64bd502323c80ab720cca31b237152bacc72f91eccb",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/before_after.csv",
+      "sha256": "704663228149e986a011cf2e27440f461fee6947cfb56c786dffc54d5f0400fc",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/heat_loads.csv",
+      "sha256": "069f4806bcc6fe5c07666cac7fd88f969c995a8af8bcf465248f611155c2596a",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/products.csv",
+      "sha256": "9e1b51742ce4fee62ec4a2e3c961132c4895293445df86f08416402c409a6eb2",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/results_analysis.md",
+      "sha256": "a24538804deca565964596eb9413837539c0450a6d33c0a92669947f137c6cce",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/stages.csv",
+      "sha256": "32ec6c783c730b2cd0d0b126fe47aeffdefafe29ecf16916ac3d23f77b667501",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/artifacts/analysis/summary.json",
+      "sha256": "325ab4f85329757d1285bc28c03a4a9d8a463056552575163d9e33a5169649a8",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/artifacts/hysys_inspection.json",
+      "sha256": "524735252b826369e1567c7bdbe81608ae1c49da4c31f9766be955b33cbdd764",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/artifacts/nature-figure.json",
+      "sha256": "dad100bf58fece91f6d9ce9ef861408b330aea06bb703ea8229bf8d464754a8b",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/artifacts/operating_point_before.json",
+      "sha256": "21ed572cc511a25d28414ca815357997abec183bb7a7f0458e6ea073f60f512d",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/artifacts/original/data_read",
+      "sha256": "313be0bd61ce5c77dddf3f48bd2d29be2293638bac5b636779a25facde825886",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/artifacts/original/hysys_control.py",
+      "sha256": "ba1fb17f13858250bd5c025f6558aad6e81016899451284d48329194e4ab2073",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/artifacts/original/main.py",
+      "sha256": "2e7ecf5824aebdd11bc16776e704518a44148b28ac864d29fc03633fc8e8a1e8",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/artifacts/run_report.json",
+      "sha256": "3c15797bbb3e5b01ba4a1e8d58f96102e6106810aa38c16017375859cc9d4b01",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/data_read",
+      "sha256": "e8bf169c8033c676690846b3a81448d65c099f934b663e6b801ea9f6d85aa04e",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/data_write",
+      "sha256": "313be0bd61ce5c77dddf3f48bd2d29be2293638bac5b636779a25facde825886",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/hysys_control.py",
+      "sha256": "8394f6c3ec0be4e996158590c0de3542be4008fa35f4112704702f920e7374a7",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/inspect_hysys.py",
+      "sha256": "6b74d55ca3449d0df651693d14a138a10d7df0b77e477e5b4ce1ed275c2a2071",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/main.py",
+      "sha256": "645270e6d746399e0baca4928d73c98e06360901a14e0e98ccab9627a91c7fd1",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/mjh_ATM.hsc",
+      "sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/README.md",
+      "sha256": "6514470757ad2f49e794c70f2500d7212cf9b5098b072bdf85a23179413884e4",
+      "matches_intake": true
+    },
+    {
+      "path": "hysys/tests/test_hysys_control.py",
+      "sha256": "f4e7ef4f1b825af26259a5baecaef8a1777b640dca1bb8ba48540a706e98f0e6",
+      "matches_intake": true
+    }
+  ],
+  "implementation_hashes": {
+    "src/petroleum_rto/simulation/hysys.py": "94f9df99856483b0f16170a3a97e6e93d9b66685249c373b7f484a8d45140207",
+    "src/petroleum_rto/simulation/models.py": "bf11182c362c179dc9798c98cfbdb742e57ffe24de117820bf17035dd6ea13f2",
+    "src/petroleum_rto/simulation/__init__.py": "bdedf9566aea8d391f54bfb1fd4a17e588822857fe9e7ac3d39e4ffbede932b5",
+    "src/petroleum_rto/simulation/__main__.py": "f3259bc1a66c3e50a9a54fb3ef45f7ce9e6e805fddd1df2b368bb311e05b2caa",
+    "tests/simulation/test_hysys_reader.py": "01bca630b1609677d9322b66bc2259670e48d563bfb7bb304febaf62731ef571",
+    "tests/simulation/test_hysys_read_probe.py": "f92296cda1d2aa23227aec049e9b580e0794a4156d60b4ad97f3aea0546fc4fc",
+    "tests/simulation/test_snapshot.py": "db1ab50d5e425c87ff175d6164451fdaf3421883eceb14c98085668c6d96e367"
+  },
+  "known_limitations": [
+    "Automatic copy Open failed twice in earlier diagnostic runs; root cause unresolved",
+    "No immutable/reconstructible baseline or isolated candidate execution yet",
+    "No variable perturbation, A-to-B-to-A recovery, objective or constraint qualification",
+    "RTO and Agent contracts are not connected to this reader",
+    "COM calls are synchronous and may block; no cancellation timeout guarantee",
+    "Bindings target this model and local property names, not cross-model or cross-language portability",
+    "Source hashes and equal observations do not prove memory-to-disk binding or atomicity"
+  ],
+  "next_step": "establish isolated reconstructible baseline before bounded single-variable execution"
+}

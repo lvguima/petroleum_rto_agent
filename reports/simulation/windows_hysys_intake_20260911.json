@@ -1,0 +1,283 @@
+{
+  "schema_id": "windows-hysys-intake",
+  "schema_version": "1.0.0",
+  "checked_at": "2026-09-11T10:08:15.968460+00:00",
+  "source_root": "hysys",
+  "evidence_scope": "static_files_only_no_com_connection_or_hysys_execution",
+  "previous_inventory": "reports/simulation/hysys_inventory_20260911.json",
+  "files": [
+    {
+      "path": "analyze_results.py",
+      "bytes": 11608,
+      "sha256": "bba79b0c29863a409d45b64bd502323c80ab720cca31b237152bacc72f91eccb",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "artifacts/analysis/before_after.csv",
+      "bytes": 29305,
+      "sha256": "704663228149e986a011cf2e27440f461fee6947cfb56c786dffc54d5f0400fc",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "artifacts/analysis/heat_loads.csv",
+      "bytes": 208,
+      "sha256": "069f4806bcc6fe5c07666cac7fd88f969c995a8af8bcf465248f611155c2596a",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "artifacts/analysis/products.csv",
+      "bytes": 1034,
+      "sha256": "9e1b51742ce4fee62ec4a2e3c961132c4895293445df86f08416402c409a6eb2",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "artifacts/analysis/results_analysis.md",
+      "bytes": 6550,
+      "sha256": "a24538804deca565964596eb9413837539c0450a6d33c0a92669947f137c6cce",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "artifacts/analysis/stages.csv",
+      "bytes": 6564,
+      "sha256": "32ec6c783c730b2cd0d0b126fe47aeffdefafe29ecf16916ac3d23f77b667501",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "artifacts/analysis/summary.json",
+      "bytes": 4057,
+      "sha256": "325ab4f85329757d1285bc28c03a4a9d8a463056552575163d9e33a5169649a8",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "artifacts/hysys_inspection.json",
+      "bytes": 14979,
+      "sha256": "524735252b826369e1567c7bdbe81608ae1c49da4c31f9766be955b33cbdd764",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "artifacts/nature-figure.json",
+      "bytes": 29,
+      "sha256": "dad100bf58fece91f6d9ce9ef861408b330aea06bb703ea8229bf8d464754a8b",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "artifacts/operating_point_before.json",
+      "bytes": 20357,
+      "sha256": "21ed572cc511a25d28414ca815357997abec183bb7a7f0458e6ea073f60f512d",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "artifacts/original/data_read",
+      "bytes": 20351,
+      "sha256": "313be0bd61ce5c77dddf3f48bd2d29be2293638bac5b636779a25facde825886",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "artifacts/original/hysys_control.py",
+      "bytes": 5258,
+      "sha256": "ba1fb17f13858250bd5c025f6558aad6e81016899451284d48329194e4ab2073",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "artifacts/original/main.py",
+      "bytes": 344,
+      "sha256": "2e7ecf5824aebdd11bc16776e704518a44148b28ac864d29fc03633fc8e8a1e8",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "artifacts/run_report.json",
+      "bytes": 604,
+      "sha256": "3c15797bbb3e5b01ba4a1e8d58f96102e6106810aa38c16017375859cc9d4b01",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "data_read",
+      "bytes": 20336,
+      "sha256": "e8bf169c8033c676690846b3a81448d65c099f934b663e6b801ea9f6d85aa04e",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "data_write",
+      "bytes": 20351,
+      "sha256": "313be0bd61ce5c77dddf3f48bd2d29be2293638bac5b636779a25facde825886",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "hysys_control.py",
+      "bytes": 10056,
+      "sha256": "8394f6c3ec0be4e996158590c0de3542be4008fa35f4112704702f920e7374a7",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "inspect_hysys.py",
+      "bytes": 1847,
+      "sha256": "6b74d55ca3449d0df651693d14a138a10d7df0b77e477e5b4ce1ed275c2a2071",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "main.py",
+      "bytes": 2639,
+      "sha256": "645270e6d746399e0baca4928d73c98e06360901a14e0e98ccab9627a91c7fd1",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "mjh_ATM.hsc",
+      "bytes": 1773263,
+      "sha256": "f73f80b5b5344c3b4779f3a1e09da5cda6b1aaf319ff50cc7f1a84cc2a4e7741",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "README.md",
+      "bytes": 3528,
+      "sha256": "6514470757ad2f49e794c70f2500d7212cf9b5098b072bdf85a23179413884e4",
+      "matches_previous_inventory": true
+    },
+    {
+      "path": "tests/test_hysys_control.py",
+      "bytes": 6306,
+      "sha256": "f4e7ef4f1b825af26259a5baecaef8a1777b640dca1bb8ba48540a706e98f0e6",
+      "matches_previous_inventory": true
+    }
+  ],
+  "files_checked": 22,
+  "previous_paths_not_copied_or_excluded": [
+    ".DS_Store",
+    "__pycache__/hysys_control.cpython-311.pyc",
+    "artifacts/.DS_Store",
+    "tests/__pycache__/test_hysys_control.cpython-311.pyc"
+  ],
+  "strict_json_files_checked": [
+    "artifacts/analysis/summary.json",
+    "artifacts/hysys_inspection.json",
+    "artifacts/nature-figure.json",
+    "artifacts/operating_point_before.json",
+    "artifacts/original/data_read",
+    "artifacts/run_report.json",
+    "data_read",
+    "data_write"
+  ],
+  "active_python_syntax_checked": [
+    "hysys_control.py",
+    "main.py",
+    "inspect_hysys.py",
+    "analyze_results.py",
+    "tests/test_hysys_control.py"
+  ],
+  "snapshot_counts": {
+    "data_read": {
+      "mv": 24,
+      "cv": 36,
+      "stages": 73,
+      "numeric_scalars": 352,
+      "stages_with_identical_vapor_liquid": 0
+    },
+    "data_write": {
+      "mv": 24,
+      "cv": 36,
+      "stages": 73,
+      "numeric_scalars": 352,
+      "stages_with_identical_vapor_liquid": 73
+    },
+    "artifacts/operating_point_before.json": {
+      "mv": 24,
+      "cv": 36,
+      "stages": 73,
+      "numeric_scalars": 352,
+      "stages_with_identical_vapor_liquid": 0
+    },
+    "artifacts/original/data_read": {
+      "mv": 24,
+      "cv": 36,
+      "stages": 73,
+      "numeric_scalars": 352,
+      "stages_with_identical_vapor_liquid": 73
+    }
+  },
+  "table_rows": 60,
+  "table_mapping_unique_and_matches_snapshot": true,
+  "historical_summary_source_hashes_match": {
+    "data_read": true,
+    "data_write": true,
+    "artifacts/operating_point_before.json": true,
+    "artifacts/run_report.json": true
+  },
+  "mv_equal_input_before_after": true,
+  "source_files_modified": false,
+  "unverified": [
+    "current HYSYS state",
+    "actual property links and unit semantics",
+    "active specifications and independent degrees of freedom",
+    "baseline freezing and reopening",
+    "isolated candidate execution",
+    "perturbation and repeatability",
+    "optimization bounds and quality conditions"
+  ],
+  "excluded_from_active_output_evidence": [
+    "data_write.cv",
+    "data_write.stage",
+    "artifacts/original/"
+  ],
+  "windows_environment": {
+    "hysys_executable": "D:\\aspen\\aspen\\Aspen HYSYS V12.0\\aspenhysys.exe",
+    "registered_product": "Aspen HYSYS V12.0",
+    "file_and_product_version": "38.0.0.380",
+    "executable_architecture": "x64",
+    "com_registration_64_bit": {
+      "progid": "HYSYS.Application",
+      "curver": "HYSYS.Application.V12.0",
+      "clsid": "{388D7853-880C-470F-84CB-FC0E3464EF89}",
+      "local_server32": "D:\\aspen\\aspen\\Aspen HYSYS V12.0\\aspenhysys.exe /Automation"
+    },
+    "legacy_script_interpreter": {
+      "path": "D:\\anaconda3\\python.exe",
+      "version": "3.11.15",
+      "architecture": "x64",
+      "pywin32_version": "312",
+      "pythoncom_and_win32com_client_import": "passed"
+    },
+    "project_interpreter": {
+      "path": ".venv/python.exe",
+      "version": "3.12.13",
+      "architecture": "x64",
+      "pythoncom_and_win32com_available": false
+    },
+    "python_launcher_caveat": "py -0p labels base as 3.8; directly executed base reports 3.11.15",
+    "hysys_com_activation_performed": false,
+    "hysys_runtime_license_verified": false,
+    "dependencies_installed_or_modified": false
+  },
+  "offline_tests": {
+    "command": "D:\\anaconda3\\python.exe -B -m unittest discover -s tests -v",
+    "working_directory": "hysys",
+    "tests_run": 10,
+    "failures": 0,
+    "errors": 0,
+    "exit_code": 0,
+    "test_runner_elapsed_seconds": 0.022,
+    "scope": "existing fake cell and solver tests; HYSYSControl constructor bypassed; no COM activation"
+  },
+  "script_review": [
+    {
+      "source": "hysys/hysys_control.py:59",
+      "finding": "Read-only CLI still Dispatches HYSYS, sets Visible, opens or reuses the source case and activates it."
+    },
+    {
+      "source": "hysys/main.py:15",
+      "finding": "Default outputs overwrite historical data_read, before and run report; use independent output paths."
+    },
+    {
+      "source": "hysys/hysys_control.py:170",
+      "finding": "Rollback only covers write/readback failure; successful writes followed by nonconvergence do not restore the baseline."
+    },
+    {
+      "source": "hysys/hysys_control.py:104",
+      "finding": "Empty property rows skipped; runtime snapshot completeness and consistent idle state are not enforced."
+    },
+    {
+      "source": "hysys/hysys_control.py:155",
+      "finding": "MV JSON loader does not reject duplicate keys; current unit mapping relies on spreadsheet text."
+    }
+  ],
+  "next_step": "Create a narrowly scoped connection/read probe with explicit case ownership and unique outputs; validate current state before any perturbation. Use a copied case for subsequent single-point testing.",
+  "source_hashes_unchanged_after_tests": true
+}

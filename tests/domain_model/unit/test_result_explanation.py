@@ -13,6 +13,7 @@ from typing import Any
 import httpx
 import pytest
 from langchain_core.messages import AIMessage, ToolMessage
+from steady_helpers import receipt
 from test_native_protocol import Wire, call, chat, sse
 from test_native_streaming import delta
 from test_optimization_tools import prepared
@@ -28,70 +29,12 @@ from petroleum_rto.assistant.session import SessionStore
 def finished_stages(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     """Replace only physical execution/readers, retaining real prepare and graph."""
     monkeypatch.setattr(time, "sleep", lambda _seconds: None)
-    summary = {
-        "status": "success",
-        "targets": [
-            {
-                "metric_id": "valuable_distillate_yield",
-                "business_name": "有价值馏分收率",
-                "sense": "maximize",
-                "priority": 1,
-                "unit": "mass_fraction",
-            }
-        ],
-        "operating_context": {
-            "operating_mode": "normal-steady",
-            "fresh_feed_load_kg_s": 100.0,
-            "fresh_feed_load_t_per_h": 360.0,
-            "data_timestamp": "2026-09-11T08:00:00Z",
-            "data_quality": "trusted_synthetic_fixture",
-        },
-        "baseline_values": [
-            {
-                "metric_id": "valuable_distillate_yield",
-                "value": 0.81234567891,
-                "unit": "mass_fraction",
-            }
-        ],
-        "recommended_adjustments": [
-            {
-                "variable_id": "furnace_temperature_target_k",
-                "business_name": "炉出口温度目标",
-                "unit": "K",
-                "baseline_value": 650.123456789,
-                "recommended_value": 651.234567891,
-                "adjustment": 1.111111102,
-            }
-        ],
-        "predicted_effects": [
-            {
-                "metric_id": "valuable_distillate_yield",
-                "predicted_value": 0.82345678912,
-                "unit": "mass_fraction",
-                "directional_improvement": 0.01111111021,
-                "relative_improvement": 0.01367781,
-            }
-        ],
-        "alternative_candidates": [],
-    }
-    final = {
-        "status": "complete",
-        "workflow_id": "offline-rto-" + "a" * 16,
-        "result_source": "offline-rto-" + "a" * 16 + "/result.json",
-        "result": summary,
-        "physical_m2_executions": 0,
-        "physical_m4_executions": 2,
-    }
-    static = {"status": "static_complete", "static_ref": "synthetic-static-1"}
-    stages = SimpleNamespace(final=final, static=static, calls=[], interrupt_m4=False)
+    final = receipt()
+    stages = SimpleNamespace(final=final, calls=[], interrupt_steady=False)
 
-    def solve(*args: Any, **kwargs: Any) -> dict[str, Any]:
-        stages.calls.append("M2")
-        return copy.deepcopy(static)
-
-    def verify(*args: Any, **kwargs: Any) -> dict[str, Any]:
-        stages.calls.append("M4")
-        if stages.interrupt_m4:
+    def execute(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        stages.calls.append("steady")
+        if stages.interrupt_steady:
             raise KeyboardInterrupt("synthetic interruption before physical computation")
         return copy.deepcopy(final)
 
@@ -101,15 +44,9 @@ def finished_stages(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         assert requested in {None, final["workflow_id"]}
         if requested is None:
             return {"status": "ok", "task": self.project(state), "result": state["last_result"]}
-        return {
-            "status": "ok",
-            "workflow_id": final["workflow_id"],
-            "result": copy.deepcopy(summary),
-        }
+        return copy.deepcopy(final)
 
-    monkeypatch.setattr(react, "solve_prepared_optimization", solve)
-    monkeypatch.setattr(react, "verify_prepared_optimization", verify)
-    monkeypatch.setattr(react, "read_prepared_static", lambda *a, **kw: copy.deepcopy(static))
+    monkeypatch.setattr(react, "execute_comparison", execute)
     monkeypatch.setattr(react, "read_prepared_result", lambda *a, **kw: copy.deepcopy(final))
     monkeypatch.setattr(AgentDomainTools, "inspect_result", inspect)
     return stages
@@ -166,9 +103,9 @@ def test_report_is_saved_and_shown_before_same_model_explains_without_tools(
         assert request["model"] == runtime.model.selection.profile.model_id
         assert [m["role"] for m in request["messages"]] == ["system", "user"]
         assert request["messages"][-1]["content"] == report
-        assert finished_stages.calls == ["M2", "M4"]
+        assert finished_stages.calls == ["steady"]
         assert runtime.data["last_result"] == original == finished_stages.final
-        assert "650.123456789" not in report and "650.12" in report
+        assert "156.8001" not in report and "156.80" in report
         if callback_mode == "both":
             assert events.index(("program", report)) < events.index(("request", "explanation"))
             assert events.index(("request", "explanation")) < events.index(("text", explanation))
@@ -205,7 +142,7 @@ def test_three_explanation_attempts_never_repeat_stages_or_lose_reusable_result(
         assert len(wire.requests) == before + 3 and not wire.replies
         assert wire.requests[-1] == wire.requests[-2] == wire.requests[-3]
         assert all(not r.get("tools") for r in wire.requests[-3:])
-        assert finished_stages.calls == ["M2", "M4"]
+        assert finished_stages.calls == ["steady"]
         assert runtime.data["last_result"] == finished_stages.final
         assert runtime.data["pending"]["status"] == "completed"
         if not succeeds:
@@ -216,7 +153,7 @@ def test_three_explanation_attempts_never_repeat_stages_or_lose_reusable_result(
             reused = runtime.handle(command)
             assert not reused.errors and reused.outputs == (report,)
         assert runtime.handle("/resume").errors
-        assert len(wire.requests) == count and finished_stages.calls == ["M2", "M4"]
+        assert len(wire.requests) == count and finished_stages.calls == ["steady"]
         assert runtime.data["last_result"]["result"] == finished_stages.final["result"]
     finally:
         runtime.close()
@@ -240,7 +177,7 @@ def test_explanation_tool_call_is_rejected_without_execution_or_saved_orphan(
         result = runtime.handle("确认执行")
         assert result.errors and "invalid-result-explanation" in str(result.errors)
         assert result.outputs[0] == render_optimization_result(finished_stages.final)
-        assert not calls and finished_stages.calls == ["M2", "M4"]
+        assert not calls and finished_stages.calls == ["steady"]
         assert len(wire.requests) == before + 1
         assert not wire.requests[-1].get("tools")
         assert [m for m in runtime.messages if isinstance(m, ToolMessage)] == original_tools
@@ -262,16 +199,16 @@ def test_sqlite_resume_finishes_m4_and_explains_once_without_repeating_m2(
     path = tmp_path / "result-session.sqlite"
     first_wire = Wire([])
     runtime = prepared(repo_root, wire=first_wire, store=SessionStore(path))
-    finished_stages.interrupt_m4 = True
+    finished_stages.interrupt_steady = True
     try:
         count = len(first_wire.requests)
         assert runtime.handle("/confirm").errors
         assert len(first_wire.requests) == count
         assert runtime.data["pending"]["status"] == "approved"
-        assert finished_stages.calls == ["M2", "M4"]
+        assert finished_stages.calls == ["steady"]
     finally:
         runtime.close()
-    finished_stages.interrupt_m4 = False
+    finished_stages.interrupt_steady = False
     wire = Wire([chat("恢复完成，下面解释已经保存的结果。")])
     runtime = ReactAgent(wire.model(), AgentDomainTools(repo_root), store=SessionStore(path))
     try:
@@ -281,12 +218,12 @@ def test_sqlite_resume_finishes_m4_and_explains_once_without_repeating_m2(
         assert result.outputs[0] == render_optimization_result(finished_stages.final)
         assert result.outputs[-1] == "模型> 恢复完成，下面解释已经保存的结果。"
         assert len(wire.requests) == 1 and not wire.requests[0].get("tools")
-        assert finished_stages.calls == ["M2", "M4", "M4"]
+        assert finished_stages.calls == ["steady", "steady"]
         assert runtime.data["last_result"] == finished_stages.final
         assert runtime.data["pending"]["status"] == "completed"
         assert not runtime.handle("/confirm").errors
         assert not runtime.handle("/result").errors
         assert runtime.handle("/resume").errors
-        assert len(wire.requests) == 1 and finished_stages.calls == ["M2", "M4", "M4"]
+        assert len(wire.requests) == 1 and finished_stages.calls == ["steady", "steady"]
     finally:
         runtime.close()
